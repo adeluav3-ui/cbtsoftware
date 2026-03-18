@@ -8,9 +8,10 @@ const router = Router({ mergeParams: true });
 // List results for a school
 router.get("/", async (req, res) => {
   const { schoolCode } = req.params;
-  const { examId, studentId } = req.query;
 
   try {
+    const { teacherId, examId, studentId } = req.query;
+
     const conditions: any[] = [eq(resultsTable.schoolCode, schoolCode)];
 
     if (examId) {
@@ -19,6 +20,10 @@ router.get("/", async (req, res) => {
 
     if (studentId) {
       conditions.push(eq(resultsTable.studentId, parseInt(studentId as string)));
+    }
+
+    if (teacherId) {
+      conditions.push(eq(examsTable.teacherId, parseInt(teacherId as string)));
     }
 
     const results = await db

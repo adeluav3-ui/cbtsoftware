@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useListExams, useCreateExam, useDeleteExam, useToggleExamStatus } from "@workspace/api-client-react";
+import { useListExams, useCreateExam, useDeleteExam, useToggleExamStatus, useListResults } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Plus, Settings, Trash2, Power, PowerOff } from "lucide-react";
+import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList } from "lucide-react";
+import { format } from "date-fns";
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -18,6 +19,13 @@ export default function TeacherDashboard() {
   const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   const { data: exams = [], isLoading } = useListExams(schoolCode);
+
+  // Fetch all results then filter to this teacher's exams client-side
+  const teacherExamIds = new Set(exams.map(e => e.id));
+  const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode, {}, {
+    query: { enabled: activeTab === "Results" && exams.length > 0 }
+  });
+  const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
 
   const [isExamModalOpen, setExamModalOpen] = useState(false);
   const [eTitle, setETitle] = useState("");
@@ -109,9 +117,58 @@ export default function TeacherDashboard() {
       )}
 
       {activeTab === "Results" && (
-        <Card className="p-12 text-center text-muted-foreground">
-          <p>Results functionality available in the School Admin dashboard.</p>
-        </Card>
+        <>
+          {resultsLoading ? (
+            <Card className="p-12 text-center text-muted-foreground">Loading results...</Card>
+          ) : results.length === 0 ? (
+            <div className="py-20 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border">
+              <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-20" />
+              <p className="font-semibold text-lg">No results yet.</p>
+              <p className="text-sm mt-1">Results will appear here once students submit your exams.</p>
+            </div>
+          ) : (
+            <Card className="p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                      <th className="px-5 py-4 font-semibold">Student Name</th>
+                      <th className="px-5 py-4 font-semibold">Class</th>
+                      <th className="px-5 py-4 font-semibold">Exam</th>
+                      <th className="px-5 py-4 font-semibold">Subject</th>
+                      <th className="px-5 py-4 font-semibold text-center">Score</th>
+                      <th className="px-5 py-4 font-semibold text-center">%</th>
+                      <th className="px-5 py-4 font-semibold text-center">Grade</th>
+                      <th className="px-5 py-4 font-semibold">Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.map(r => {
+                      const pct = r.percentage ?? 0;
+                      const grade = pct >= 70 ? "Pass" : "Fail";
+                      return (
+                        <tr key={r.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
+                          <td className="px-5 py-3.5 font-semibold">{r.fullName}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{r.class}</td>
+                          <td className="px-5 py-3.5 font-medium">{r.examTitle || "—"}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground">{r.subject || "—"}</td>
+                          <td className="px-5 py-3.5 text-center font-bold">{r.score}/{r.totalQuestions}</td>
+                          <td className="px-5 py-3.5 text-center font-semibold">{pct.toFixed(1)}%</td>
+                          <td className="px-5 py-3.5 text-center">
+                            <Badge variant={pct >= 70 ? "success" : "destructive"}>{grade}</Badge>
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground text-sm">
+                            {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
       )}
 
       <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
