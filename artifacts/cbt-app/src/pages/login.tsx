@@ -102,7 +102,7 @@ export default function Login() {
                   <Input 
                     value={schoolCode} 
                     onChange={e => setSchoolCode(e.target.value)} 
-                    placeholder="e.g. SCH-001" 
+                    placeholder="Enter school code" 
                     required 
                   />
                 </div>
