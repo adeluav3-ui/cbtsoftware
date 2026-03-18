@@ -144,18 +144,12 @@ export function CustomTabs({ tabs, activeTab, onChange }: { tabs: string[], acti
           key={tab}
           onClick={() => onChange(tab)}
           className={cn(
-            "relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors outline-none",
-            activeTab === tab ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-black/5"
+            "relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 outline-none",
+            activeTab === tab
+              ? "bg-primary text-white shadow-md shadow-primary/30 scale-[1.02]"
+              : "text-muted-foreground hover:text-foreground hover:bg-black/5"
           )}
         >
-          {activeTab === tab && (
-            <motion.div
-              layoutId="activeTabIndicator"
-              className="absolute inset-0 bg-primary rounded-xl shadow-md"
-              style={{ zIndex: -1 }}
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          )}
           {tab}
         </button>
       ))}
