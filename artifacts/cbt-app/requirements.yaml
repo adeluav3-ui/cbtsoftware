@@ -1,0 +1,9 @@
+packages:
+  "framer-motion": "For beautiful page transitions and micro-interactions"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to safely merge Tailwind classes"
+
+images:
+  - path: "artifacts/cbt-app/public/images/login-hero.png"
+    description: "Abstract 3D geometric shapes in deep indigo, teal, and soft purple, representing education, growth, and technology, highly polished and modern, studio lighting, premium render"
+    aspect_ratio: "16:9"

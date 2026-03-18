@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CBT School Exam System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: schools
+    description: School management
+  - name: teachers
+    description: Teacher management
+  - name: students
+    description: Student management
+  - name: exams
+    description: Exam management
+  - name: results
+    description: Result management
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,538 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /schools:
+    get:
+      operationId: listSchools
+      tags: [schools]
+      summary: List all schools
+      responses:
+        "200":
+          description: Schools list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/School"
+    post:
+      operationId: updateSchoolName
+      tags: [schools]
+      summary: Update school name by code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSchoolNameRequest"
+      responses:
+        "200":
+          description: School updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/School"
+
+  /schools/admin/login:
+    post:
+      operationId: schoolAdminLogin
+      tags: [schools]
+      summary: School admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchoolAdminLoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /schools/{schoolCode}/new-session:
+    post:
+      operationId: startNewSession
+      tags: [schools]
+      summary: Start new academic session (promote students)
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session started, students promoted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /schools/{schoolCode}/teachers:
+    get:
+      operationId: listTeachers
+      tags: [teachers]
+      summary: List teachers for a school
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Teachers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Teacher"
+    post:
+      operationId: createTeacher
+      tags: [teachers]
+      summary: Create a teacher
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeacherRequest"
+      responses:
+        "201":
+          description: Teacher created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Teacher"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /schools/{schoolCode}/teachers/{teacherId}:
+    delete:
+      operationId: deleteTeacher
+      tags: [teachers]
+      summary: Delete a teacher
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: teacherId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Teacher deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /schools/{schoolCode}/students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List students for a school
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: class
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Students list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Create a student
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentRequest"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /schools/{schoolCode}/students/{studentId}:
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      summary: Delete a student
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /schools/{schoolCode}/exams:
+    get:
+      operationId: listExams
+      tags: [exams]
+      summary: List exams for a school
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: class
+          in: query
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Exams list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Exam"
+    post:
+      operationId: createExam
+      tags: [exams]
+      summary: Create an exam
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExamRequest"
+      responses:
+        "201":
+          description: Exam created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Exam"
+
+  /schools/{schoolCode}/exams/{examId}:
+    get:
+      operationId: getExam
+      tags: [exams]
+      summary: Get exam with questions
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Exam details with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamWithQuestions"
+    delete:
+      operationId: deleteExam
+      tags: [exams]
+      summary: Delete an exam
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Exam deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /schools/{schoolCode}/exams/{examId}/toggle:
+    post:
+      operationId: toggleExamStatus
+      tags: [exams]
+      summary: Activate or deactivate an exam
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleExamRequest"
+      responses:
+        "200":
+          description: Status toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Exam"
+
+  /schools/{schoolCode}/exams/{examId}/questions:
+    post:
+      operationId: addQuestion
+      tags: [exams]
+      summary: Add a question to an exam
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuestionRequest"
+      responses:
+        "201":
+          description: Question added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /schools/{schoolCode}/exams/{examId}/questions/{questionId}:
+    delete:
+      operationId: deleteQuestion
+      tags: [exams]
+      summary: Delete a question
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Question deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /schools/{schoolCode}/exams/{examId}/submit:
+    post:
+      operationId: submitExam
+      tags: [exams]
+      summary: Submit exam answers and get result
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitExamRequest"
+      responses:
+        "200":
+          description: Exam result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamResult"
+
+  /schools/{schoolCode}/results:
+    get:
+      operationId: listResults
+      tags: [results]
+      summary: List results for a school
+      parameters:
+        - name: schoolCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: examId
+          in: query
+          schema:
+            type: integer
+        - name: studentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Results list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExamResult"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +574,303 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        schoolCode:
+          type: string
+      required: [username, password]
+
+    SchoolAdminLoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        schoolCode:
+          type: string
+      required: [username, password, schoolCode]
+
+    LoginResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [super_admin, school_admin, teacher, student]
+        schoolCode:
+          type: string
+          nullable: true
+        schoolName:
+          type: string
+          nullable: true
+        fullName:
+          type: string
+          nullable: true
+        class:
+          type: string
+          nullable: true
+      required: [id, username, role]
+
+    School:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, code]
+
+    UpdateSchoolNameRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+      required: [code, name]
+
+    Teacher:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        schoolCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, username, fullName, schoolCode]
+
+    CreateTeacherRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+      required: [username, password, fullName]
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        class:
+          type: string
+        schoolCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, username, fullName, class, schoolCode]
+
+    CreateStudentRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        class:
+          type: string
+      required: [username, password, fullName, class]
+
+    Exam:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        subject:
+          type: string
+        class:
+          type: string
+        durationMinutes:
+          type: integer
+        isActive:
+          type: boolean
+        schoolCode:
+          type: string
+        teacherId:
+          type: integer
+        questionCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, subject, class, durationMinutes, isActive, schoolCode, teacherId]
+
+    CreateExamRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        subject:
+          type: string
+        class:
+          type: string
+        durationMinutes:
+          type: integer
+      required: [title, subject, class, durationMinutes]
+
+    ToggleExamRequest:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+      required: [isActive]
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: integer
+        examId:
+          type: integer
+        text:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctOption:
+          type: string
+          enum: [A, B, C, D]
+      required: [id, examId, text, optionA, optionB, optionC, optionD, correctOption]
+
+    CreateQuestionRequest:
+      type: object
+      properties:
+        text:
+          type: string
+        optionA:
+          type: string
+        optionB:
+          type: string
+        optionC:
+          type: string
+        optionD:
+          type: string
+        correctOption:
+          type: string
+          enum: [A, B, C, D]
+      required: [text, optionA, optionB, optionC, optionD, correctOption]
+
+    ExamWithQuestions:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        subject:
+          type: string
+        class:
+          type: string
+        durationMinutes:
+          type: integer
+        isActive:
+          type: boolean
+        schoolCode:
+          type: string
+        teacherId:
+          type: integer
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, subject, class, durationMinutes, isActive, schoolCode, teacherId, questions]
+
+    SubmitExamRequest:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        fullName:
+          type: string
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+      required: [studentId, fullName, answers]
+
+    ExamResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        examId:
+          type: integer
+        studentId:
+          type: integer
+        fullName:
+          type: string
+        class:
+          type: string
+        score:
+          type: integer
+        totalQuestions:
+          type: integer
+        percentage:
+          type: number
+        examTitle:
+          type: string
+        subject:
+          type: string
+        schoolCode:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+      required: [id, examId, studentId, fullName, class, score, totalQuestions, percentage, schoolCode]

@@ -1,0 +1,246 @@
+Build a robust, scalable, offline-capable Computer-Based Test (CBT) web application that supports multi-school usage with strict data isolation per school.
+
+CORE SYSTEM REQUIREMENTS
+
+The system must support multiple schools using unique school codes, ensuring that:
+
+Data (students, teachers, exams, results) is fully isolated per school
+
+No data collision or leakage occurs between schools
+
+Preload the following school codes in the backend:
+
+NEW-1001 (Assigned to Newbridge Academy)
+
+BDG-4002
+
+CSE-6782
+
+WER-5673
+
+YUE-0978
+
+Note:
+
+Only NEW-1001 should have a school name initially
+
+Other school codes should exist without assigned names
+
+The system should allow assigning names later
+
+OFFLINE FUNCTIONALITY
+
+The application must function fully offline
+
+It should be deployable on:
+
+A single system OR
+
+A local network (LAN)
+
+No internet dependency for:
+
+Authentication
+
+Exam participation
+
+Result processing
+
+Use technologies suitable for offline-first systems such as:
+
+Node.js
+
+SQLite
+
+USER ROLES & DASHBOARDS
+1. Super Admin (System-Level)
+
+Login credentials:
+
+Username: Newbridge
+
+Password: REDACTED
+
+Responsibilities:
+
+Manage all schools
+
+Assign school names to codes
+
+Oversee system-wide activity
+
+2. School Admin (Per School)
+
+Login requires:
+
+Username
+
+Password
+
+School Code
+
+Permissions:
+
+Create and manage teachers
+
+Delete teacher accounts
+
+View all students and results
+
+Initiate “New Session” (class promotion system)
+
+3. Teacher Dashboard
+
+Features:
+
+Create exams and questions
+
+Select class when setting questions:
+
+JSS1, JSS2, JSS3, SSS1, SSS2, SSS3
+
+Schedule exams
+
+Activate / deactivate exams
+
+Delete exams
+
+Student Management:
+
+“Manage Students” section must:
+
+Be organized by class tabs
+
+Allow creation of student accounts under each class
+
+Store student class data properly
+
+4. Student Portal
+
+Login flow:
+
+Student logs in using:
+
+Username / ID
+
+Password
+
+School Code
+
+Before starting an exam:
+
+Student must input full name
+
+System must store:
+
+Full name
+
+Class
+
+Score
+
+Features:
+
+Access available exams
+
+Take CBT exams
+
+See results immediately after submission
+
+SESSION MANAGEMENT SYSTEM
+
+Include a “New Session” button in the School Admin dashboard
+
+When triggered:
+
+Automatically promote students:
+
+JSS1 → JSS2 → JSS3 → SSS1 → SSS2 → SSS3
+
+Graduated students (SSS3) are archived or removed
+
+JSS1 becomes empty for new intake
+
+EXAM SYSTEM REQUIREMENTS
+
+Timer-based exams
+
+Auto-submit when time expires
+
+Immediate grading upon submission
+
+Randomization of:
+
+Questions
+
+Answer options
+
+Ability to:
+
+Activate / deactivate exams
+
+Delete exams
+
+PERFORMANCE & RELIABILITY
+
+Must handle high concurrent users on a local network without lag
+
+Optimize for low-resource environments
+
+Ensure:
+
+No runtime errors
+
+No broken buttons or dead links
+
+All features fully tested and functional
+
+DATA STRUCTURE & SAFETY
+
+Strict separation of data by school code
+
+Ensure:
+
+No cross-school data access
+
+Secure authentication per role
+
+Use efficient local database structure
+
+ERROR HANDLING & VALIDATION
+
+Validate all forms:
+
+Student creation
+
+Teacher creation
+
+Exam setup
+
+Prevent:
+
+Duplicate entries
+
+Missing required fields
+
+Provide clear error messages
+
+FINAL REQUIREMENTS
+
+The system must be:
+
+Stable
+
+Fast
+
+Fully functional offline
+
+Free of logical and runtime errors
+
+Test all:
+
+Buttons
+
+Navigation flows
+
+User actions
