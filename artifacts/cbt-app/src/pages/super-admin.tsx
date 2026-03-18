@@ -5,20 +5,31 @@ import { Card, Button, Modal, Input, Label, Badge } from "@/components/ui-elemen
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Building, Edit2 } from "lucide-react";
+import { Building, Edit2, Plus } from "lucide-react";
 
 export default function SuperAdminDashboard() {
   const { data: schools = [], isLoading } = useListSchools();
   const queryClient = useQueryClient();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Assign name modal
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [selectedCode, setSelectedCode] = useState("");
   const [nameInput, setNameInput] = useState("");
 
-  const { mutate, isPending } = useUpdateSchoolName({
+  // Add new school modal
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newCode, setNewCode] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newAdminUsername, setNewAdminUsername] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [addError, setAddError] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+
+  const { mutate: updateName, isPending } = useUpdateSchoolName({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
-        setIsModalOpen(false);
+        setIsAssignOpen(false);
       }
     }
   });
@@ -26,12 +37,43 @@ export default function SuperAdminDashboard() {
   const openAssignModal = (code: string, currentName: string) => {
     setSelectedCode(code);
     setNameInput(currentName || "");
-    setIsModalOpen(true);
+    setIsAssignOpen(true);
   };
 
   const handleAssign = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate({ data: { code: selectedCode, name: nameInput } });
+    updateName({ data: { code: selectedCode, name: nameInput } });
+  };
+
+  const handleAddSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError("");
+    setIsAdding(true);
+    try {
+      const res = await fetch("/api/schools/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          code: newCode,
+          name: newName,
+          adminUsername: newAdminUsername,
+          adminPassword: newAdminPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAddError(data.error || "Failed to create school");
+      } else {
+        queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
+        setIsAddOpen(false);
+        setNewCode(""); setNewName(""); setNewAdminUsername(""); setNewAdminPassword("");
+      }
+    } catch {
+      setAddError("Network error. Please try again.");
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   return (
@@ -39,8 +81,11 @@ export default function SuperAdminDashboard() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-display font-bold">Registered Schools</h1>
-          <p className="text-muted-foreground mt-1">Manage and assign names to school codes.</p>
+          <p className="text-muted-foreground mt-1">Manage schools and their admin accounts.</p>
         </div>
+        <Button onClick={() => { setAddError(""); setIsAddOpen(true); }}>
+          <Plus className="w-4 h-4 mr-2" /> Add New School
+        </Button>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -91,7 +136,8 @@ export default function SuperAdminDashboard() {
         )}
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Assign School Name">
+      {/* Assign / Edit School Name Modal */}
+      <Modal isOpen={isAssignOpen} onClose={() => setIsAssignOpen(false)} title="Edit School Name">
         <form onSubmit={handleAssign} className="space-y-5">
           <div>
             <Label>School Code</Label>
@@ -99,16 +145,73 @@ export default function SuperAdminDashboard() {
           </div>
           <div>
             <Label>School Name</Label>
-            <Input 
-              value={nameInput} 
-              onChange={e => setNameInput(e.target.value)} 
-              placeholder="e.g. Newbridge International School" 
-              required 
+            <Input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              placeholder="Enter school name"
+              required
             />
           </div>
           <div className="flex justify-end pt-4">
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)} type="button" className="mr-3">Cancel</Button>
+            <Button variant="ghost" onClick={() => setIsAssignOpen(false)} type="button" className="mr-3">Cancel</Button>
             <Button type="submit" isLoading={isPending}>Save Changes</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add New School Modal */}
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add New School">
+        <form onSubmit={handleAddSchool} className="space-y-5">
+          {addError && (
+            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">
+              {addError}
+            </div>
+          )}
+          <div>
+            <Label>School Code</Label>
+            <Input
+              value={newCode}
+              onChange={e => setNewCode(e.target.value.toUpperCase())}
+              placeholder="Enter unique school code"
+              required
+            />
+          </div>
+          <div>
+            <Label>School Name</Label>
+            <Input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Enter school name"
+              required
+            />
+          </div>
+          <div className="border-t border-border pt-4">
+            <p className="text-sm text-muted-foreground mb-4 font-medium">School Admin Account</p>
+            <div className="space-y-4">
+              <div>
+                <Label>Admin Username</Label>
+                <Input
+                  value={newAdminUsername}
+                  onChange={e => setNewAdminUsername(e.target.value)}
+                  placeholder="Enter admin username"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Admin Password</Label>
+                <Input
+                  type="password"
+                  value={newAdminPassword}
+                  onChange={e => setNewAdminPassword(e.target.value)}
+                  placeholder="Enter admin password"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end pt-4">
+            <Button variant="ghost" onClick={() => setIsAddOpen(false)} type="button" className="mr-3">Cancel</Button>
+            <Button type="submit" isLoading={isAdding}>Create School</Button>
           </div>
         </form>
       </Modal>

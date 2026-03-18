@@ -8,6 +8,59 @@ import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
+// Create a new school with admin account
+router.post("/create", async (req, res) => {
+  const { code, name, adminUsername, adminPassword } = req.body;
+
+  if (!code || !name || !adminUsername || !adminPassword) {
+    return res.status(400).json({ error: "School code, name, admin username and password are all required" });
+  }
+
+  try {
+    // Check if code already exists
+    const [existing] = await db
+      .select()
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, code.toUpperCase()))
+      .limit(1);
+
+    if (existing) {
+      return res.status(400).json({ error: "A school with this code already exists" });
+    }
+
+    // Check if admin username already exists in the system
+    const [existingUser] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.username, adminUsername), eq(usersTable.schoolCode, code.toUpperCase())))
+      .limit(1);
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Admin username already exists for this school" });
+    }
+
+    // Create the school
+    const [school] = await db
+      .insert(schoolsTable)
+      .values({ code: code.toUpperCase(), name })
+      .returning();
+
+    // Create the school admin
+    await db.insert(usersTable).values({
+      username: adminUsername,
+      password: adminPassword,
+      role: "school_admin",
+      fullName: `${name} Admin`,
+      schoolCode: code.toUpperCase(),
+    });
+
+    res.status(201).json(school);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // List all schools
 router.get("/", async (_req, res) => {
   try {
