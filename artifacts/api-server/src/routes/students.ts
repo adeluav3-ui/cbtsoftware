@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
+import { usersTable, examsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router({ mergeParams: true });
@@ -118,6 +118,77 @@ router.delete("/:studentId", async (req, res) => {
     }
 
     res.json({ message: "Student deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get a student's full profile: all results with answer breakdown
+router.get("/:studentId/detail", async (req, res) => {
+  const { schoolCode, studentId } = req.params;
+
+  try {
+    const [student] = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        fullName: usersTable.fullName,
+        class: usersTable.class,
+        schoolCode: usersTable.schoolCode,
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.id, parseInt(studentId)),
+          eq(usersTable.schoolCode, schoolCode),
+          eq(usersTable.role, "student")
+        )
+      )
+      .limit(1);
+
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get all results for this student with exam info
+    const results = await db
+      .select({
+        id: resultsTable.id,
+        examId: resultsTable.examId,
+        fullName: resultsTable.fullName,
+        class: resultsTable.class,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+        percentage: resultsTable.percentage,
+        submittedAt: resultsTable.submittedAt,
+        examTitle: examsTable.title,
+        subject: examsTable.subject,
+      })
+      .from(resultsTable)
+      .leftJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(
+        and(
+          eq(resultsTable.studentId, parseInt(studentId)),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      )
+      .orderBy(resultsTable.submittedAt);
+
+    // For each result, get answer breakdown
+    const resultsWithAnswers = await Promise.all(
+      results.map(async (result) => {
+        const answers = await db
+          .select()
+          .from(resultAnswersTable)
+          .where(eq(resultAnswersTable.resultId, result.id))
+          .orderBy(resultAnswersTable.id);
+        return { ...result, answers };
+      })
+    );
+
+    res.json({ ...student, results: resultsWithAnswers });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

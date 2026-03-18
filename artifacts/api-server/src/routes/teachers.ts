@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
+import { usersTable, examsTable, questionsTable, resultsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router({ mergeParams: true });
@@ -105,6 +105,76 @@ router.delete("/:teacherId", async (req, res) => {
     }
 
     res.json({ message: "Teacher deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get a teacher's full profile: exams + their questions + results
+router.get("/:teacherId/detail", async (req, res) => {
+  const { schoolCode, teacherId } = req.params;
+
+  try {
+    const [teacher] = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        fullName: usersTable.fullName,
+        schoolCode: usersTable.schoolCode,
+        createdAt: usersTable.createdAt,
+      })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.id, parseInt(teacherId)),
+          eq(usersTable.schoolCode, schoolCode),
+          eq(usersTable.role, "teacher")
+        )
+      )
+      .limit(1);
+
+    if (!teacher) {
+      return res.status(404).json({ error: "Teacher not found" });
+    }
+
+    // Get all exams by this teacher
+    const exams = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.schoolCode, schoolCode),
+          eq(examsTable.teacherId, parseInt(teacherId))
+        )
+      )
+      .orderBy(examsTable.createdAt);
+
+    // For each exam, get questions and results
+    const examsWithDetails = await Promise.all(
+      exams.map(async (exam) => {
+        const questions = await db
+          .select()
+          .from(questionsTable)
+          .where(eq(questionsTable.examId, exam.id))
+          .orderBy(questionsTable.id);
+
+        const results = await db
+          .select()
+          .from(resultsTable)
+          .where(
+            and(
+              eq(resultsTable.examId, exam.id),
+              eq(resultsTable.schoolCode, schoolCode)
+            )
+          )
+          .orderBy(resultsTable.submittedAt);
+
+        return { ...exam, questions, results };
+      })
+    );
+
+    res.json({ ...teacher, exams: examsWithDetails });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });

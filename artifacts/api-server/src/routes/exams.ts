@@ -4,6 +4,7 @@ import {
   examsTable,
   questionsTable,
   resultsTable,
+  resultAnswersTable,
   usersTable,
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -310,6 +311,25 @@ router.post("/:examId/submit", async (req, res) => {
         schoolCode,
       })
       .returning();
+
+    // Save individual answers for detailed review
+    if (questions.length > 0) {
+      await db.insert(resultAnswersTable).values(
+        questions.map((q) => ({
+          resultId: result.id,
+          questionId: q.id,
+          questionText: q.text,
+          optionA: q.optionA,
+          optionB: q.optionB,
+          optionC: q.optionC,
+          optionD: q.optionD,
+          correctOption: q.correctOption,
+          selectedOption: answers[q.id.toString()] ?? null,
+          isCorrect: (answers[q.id.toString()] ?? null) === q.correctOption,
+          schoolCode,
+        }))
+      );
+    }
 
     res.json({
       ...result,
