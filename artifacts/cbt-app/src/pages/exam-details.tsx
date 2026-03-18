@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useAddQuestion, useDeleteQuestion, CreateQuestionRequestCorrectOption } from "@workspace/api-client-react";
+import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, CreateQuestionRequestCorrectOption } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, Plus, Trash2, HelpCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff } from "lucide-react";
 
 export default function TeacherExamDetails() {
   const { examId: rawExamId } = useParams();
@@ -39,6 +39,10 @@ export default function TeacherExamDetails() {
     mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) }) }
   });
 
+  const { mutate: toggleStatus, isPending: isToggling } = useToggleExamStatus({
+    mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) }) }
+  });
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     addQuestion({
@@ -59,15 +63,38 @@ export default function TeacherExamDetails() {
         <div>
           <div className="flex items-center space-x-3 mb-2">
             <h1 className="text-3xl font-display font-bold">{exam.title}</h1>
-            <Badge variant={exam.isActive ? "success" : "default"}>{exam.isActive ? "Active" : "Draft"}</Badge>
+            <Badge variant={exam.isActive ? "success" : "default"}>
+              {exam.isActive ? "Live" : "Draft"}
+            </Badge>
           </div>
           <p className="text-muted-foreground font-semibold">
             {exam.subject} • Class: {exam.class} • {exam.durationMinutes} mins • {exam.questions.length} Questions
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" /> Add Question
-        </Button>
+        <div className="flex items-center gap-3">
+          {exam.isActive ? (
+            <Button
+              variant="outline"
+              onClick={() => toggleStatus({ schoolCode, examId, data: { isActive: false } })}
+              isLoading={isToggling}
+              className="border-destructive/40 text-destructive hover:bg-destructive/10"
+            >
+              <EyeOff className="w-4 h-4 mr-2" /> Unpublish
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => toggleStatus({ schoolCode, examId, data: { isActive: true } })}
+              isLoading={isToggling}
+              className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/25"
+            >
+              <Radio className="w-4 h-4 mr-2" /> Publish Exam
+            </Button>
+          )}
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Add Question
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-4">
