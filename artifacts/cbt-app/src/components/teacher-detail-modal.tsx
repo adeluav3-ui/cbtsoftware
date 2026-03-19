@@ -11,8 +11,10 @@ interface TeacherDetailModalProps {
   onClose: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
+
 async function fetchTeacherDetail(schoolCode: string, teacherId: number) {
-  const res = await fetch(`/api/schools/${schoolCode}/teachers/${teacherId}/detail`, {
+  const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers/${teacherId}/detail`, {
     credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch teacher detail");
@@ -61,17 +63,15 @@ export function TeacherDetailModal({ teacherId, teacherName, schoolCode, onClose
           <div className="flex gap-2 border-b border-border pb-2">
             <button
               onClick={() => setActiveSection("exams")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeSection === "exams" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === "exams" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
             >
               <BookOpen className="w-4 h-4 inline mr-1.5" />Exams & Questions
             </button>
             <button
               onClick={() => setActiveSection("students")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeSection === "students" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === "students" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                }`}
             >
               <Users className="w-4 h-4 inline mr-1.5" />Student Results
             </button>
@@ -115,9 +115,8 @@ export function TeacherDetailModal({ teacherId, teacherName, schoolCode, onClose
                                   {["A", "B", "C", "D"].map(l => (
                                     <span
                                       key={l}
-                                      className={`rounded px-2 py-0.5 ${
-                                        q.correctOption === l ? "bg-green-100 text-green-800 font-semibold" : "bg-muted/50"
-                                      }`}
+                                      className={`rounded px-2 py-0.5 ${q.correctOption === l ? "bg-green-100 text-green-800 font-semibold" : "bg-muted/50"
+                                        }`}
                                     >
                                       {l}. {q[`option${l}`]}
                                     </span>

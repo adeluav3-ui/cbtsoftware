@@ -10,9 +10,10 @@ interface StudentDetailModalProps {
   schoolCode: string;
   onClose: () => void;
 }
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
 
 async function fetchStudentDetail(schoolCode: string, studentId: number) {
-  const res = await fetch(`/api/schools/${schoolCode}/students/${studentId}/detail`, {
+  const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/detail`, {
     credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch student detail");
@@ -135,15 +136,14 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
                                     return (
                                       <div
                                         key={label}
-                                        className={`text-xs rounded-lg px-2.5 py-1.5 border ${
-                                          isCorrectOption && isStudentPick
-                                            ? "bg-green-100 border-green-400 font-bold"
-                                            : isCorrectOption
+                                        className={`text-xs rounded-lg px-2.5 py-1.5 border ${isCorrectOption && isStudentPick
+                                          ? "bg-green-100 border-green-400 font-bold"
+                                          : isCorrectOption
                                             ? "bg-green-50 border-green-300 font-semibold text-green-800"
                                             : isStudentPick
-                                            ? "bg-red-100 border-red-400 font-bold text-red-800"
-                                            : "bg-muted/30 border-border/40 text-muted-foreground"
-                                        }`}
+                                              ? "bg-red-100 border-red-400 font-bold text-red-800"
+                                              : "bg-muted/30 border-border/40 text-muted-foreground"
+                                          }`}
                                       >
                                         <span className="font-mono">{label}.</span> {value}
                                         {isCorrectOption && !isStudentPick && (
