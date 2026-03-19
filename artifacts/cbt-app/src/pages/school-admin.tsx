@@ -21,7 +21,7 @@ export default function SchoolAdminDashboard() {
   const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
-  const { data: students = [] } = useListStudents(schoolCode, { class: classFilter });
+  const { data: students = [] } = useListStudents(schoolCode, classFilter);
   const { data: results = [] } = useListResults(schoolCode);
 
   // Detail modal state
@@ -61,7 +61,7 @@ export default function SchoolAdminDashboard() {
   const { mutate: createStudent, isPending: isCSPending } = useCreateStudent({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, { class: classFilter }) });
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         setStudentModalOpen(false);
         setSUsername(""); setSPassword(""); setSFullName("");
       }
@@ -251,7 +251,7 @@ export default function SchoolAdminDashboard() {
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">
-        <form onSubmit={e => { e.preventDefault(); createTeacher({ schoolCode, data: { username: tUsername, password: tPassword, fullName: tFullName }}); }} className="space-y-4">
+        <form onSubmit={e => { e.preventDefault(); createTeacher({ schoolCode, data: { username: tUsername, password: tPassword, fullName: tFullName } }); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={tFullName} onChange={e => setTFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={tUsername} onChange={e => setTUsername(e.target.value)} required /></div>
           <div><Label>Password</Label><Input type="password" value={tPassword} onChange={e => setTPassword(e.target.value)} required /></div>
@@ -261,7 +261,7 @@ export default function SchoolAdminDashboard() {
 
       {/* Add Student Modal */}
       <Modal isOpen={isStudentModalOpen} onClose={() => setStudentModalOpen(false)} title="Add New Student">
-        <form onSubmit={e => { e.preventDefault(); createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass }}); }} className="space-y-4">
+        <form onSubmit={e => { e.preventDefault(); createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass } }); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} required /></div>
           <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
