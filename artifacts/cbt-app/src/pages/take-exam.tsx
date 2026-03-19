@@ -47,6 +47,33 @@ export default function TakeExam() {
     }
   };
 
+  useEffect(() => {
+    if (!hasStarted || isFinished) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ""; // required for Chrome
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasStarted, isFinished]);
+
+
+  useEffect(() => {
+    if (!hasStarted || isFinished) return;
+
+    // Push a fake history entry to catch back button
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [hasStarted, isFinished]);
+
   const handleFinalSubmit = () => {
     if (isFinished || !user) return;
     setIsFinished(true);
