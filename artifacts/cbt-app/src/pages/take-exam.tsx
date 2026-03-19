@@ -14,6 +14,7 @@ export default function TakeExam() {
   const schoolCode = user?.schoolCode || "";
   const [, setLocation] = useLocation();
   const [submittedResultId, setSubmittedResultId] = useState<number | null>(null);
+  const [showReview, setShowReview] = useState(false);
 
   const { data: exam, isLoading } = useGetExam(schoolCode, examId);
   const { mutate: submitExam, isPending: isSubmitting } = useSubmitExam();
@@ -224,7 +225,7 @@ export default function TakeExam() {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={() => setSubmittedResultId(submittedResultId)}
+                  onClick={() => setShowReview(true)}
                 >
                   Review My Answers
                 </Button>
@@ -239,9 +240,9 @@ export default function TakeExam() {
         </div>
       </Modal>
       <ResultDetailModal
-        resultId={submittedResultId}
+        resultId={showReview ? submittedResultId : null}
         schoolCode={schoolCode}
-        onClose={() => setSubmittedResultId(null)}
+        onClose={() => setShowReview(false)}
       />
     </div>
   );
