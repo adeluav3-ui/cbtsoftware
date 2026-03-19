@@ -1,17 +1,25 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, examsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+interface SchoolParams {
+  schoolCode: string;
+}
+
+interface StudentParams extends SchoolParams {
+  studentId: string;
+}
+
 const router = Router({ mergeParams: true });
 
 // List students for a school, optionally filtered by class
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { class: studentClass } = req.query;
 
   try {
-    const conditions = [
+    const conditions: any[] = [
       eq(usersTable.schoolCode, schoolCode),
       eq(usersTable.role, "student"),
     ];
@@ -34,14 +42,16 @@ router.get("/", async (req, res) => {
       .orderBy(usersTable.fullName);
 
     res.json(students);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Create a student
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { username, password, fullName, class: studentClass } = req.body;
 
@@ -91,14 +101,16 @@ router.post("/", async (req, res) => {
       });
 
     res.status(201).json(student);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Delete a student
-router.delete("/:studentId", async (req, res) => {
+router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
@@ -118,14 +130,16 @@ router.delete("/:studentId", async (req, res) => {
     }
 
     res.json({ message: "Student deleted" });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Get a student's full profile: all results with answer breakdown
-router.get("/:studentId/detail", async (req, res) => {
+router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
@@ -189,9 +203,11 @@ router.get("/:studentId/detail", async (req, res) => {
     );
 
     res.json({ ...student, results: resultsWithAnswers });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 

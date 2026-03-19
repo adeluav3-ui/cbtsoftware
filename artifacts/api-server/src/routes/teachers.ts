@@ -1,12 +1,20 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, examsTable, questionsTable, resultsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+interface SchoolParams {
+  schoolCode: string;
+}
+
+interface TeacherParams extends SchoolParams {
+  teacherId: string;
+}
+
 const router = Router({ mergeParams: true });
 
 // List teachers for a school
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {
@@ -28,14 +36,16 @@ router.get("/", async (req, res) => {
       .orderBy(usersTable.createdAt);
 
     res.json(teachers);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Create a teacher
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { username, password, fullName } = req.body;
 
@@ -78,14 +88,16 @@ router.post("/", async (req, res) => {
       });
 
     res.status(201).json(teacher);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Delete a teacher
-router.delete("/:teacherId", async (req, res) => {
+router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
@@ -105,14 +117,16 @@ router.delete("/:teacherId", async (req, res) => {
     }
 
     res.json({ message: "Teacher deleted" });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Get a teacher's full profile: exams + their questions + results
-router.get("/:teacherId/detail", async (req, res) => {
+router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Response) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
@@ -175,9 +189,11 @@ router.get("/:teacherId/detail", async (req, res) => {
     );
 
     res.json({ ...teacher, exams: examsWithDetails });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 

@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function seedIfEmpty() {
+export async function seedIfEmpty(): Promise<void> {
   try {
     // Check if any users exist already
     const existing = await db.select().from(usersTable).limit(1);
@@ -43,7 +43,9 @@ export async function seedIfEmpty() {
     console.log("[seed] Seed complete.");
     console.log("[seed] Super Admin → username: Phenomenal | password: REDACTED");
     console.log("[seed] School Admin (NEW-1001) → username: Newbridge | password: REDACTED | school code: NEW-1001");
+    return;
   } catch (err) {
     console.error("[seed] Seed failed:", err);
+    return;
   }
 }

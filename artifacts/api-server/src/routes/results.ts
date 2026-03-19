@@ -1,12 +1,20 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { resultsTable, examsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+interface SchoolParams {
+  schoolCode: string;
+}
+
+interface ResultParams extends SchoolParams {
+  resultId: string;
+}
+
 const router = Router({ mergeParams: true });
 
 // List results for a school
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {
@@ -47,14 +55,16 @@ router.get("/", async (req, res) => {
       .orderBy(resultsTable.submittedAt);
 
     res.json(results);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Get detailed result (with per-question answer breakdown)
-router.get("/:resultId/detail", async (req, res) => {
+router.get("/:resultId/detail", async (req: Request<ResultParams>, res: Response) => {
   const { schoolCode, resultId } = req.params;
 
   try {
@@ -93,9 +103,11 @@ router.get("/:resultId/detail", async (req, res) => {
       .orderBy(resultAnswersTable.id);
 
     res.json({ ...result, answers });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import {
   examsTable,
@@ -9,10 +9,32 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
+interface SchoolParams {
+  schoolCode: string;
+}
+
+interface ExamParams extends SchoolParams {
+  examId: string;
+}
+
+interface QuestionParams extends ExamParams {
+  questionId: string;
+}
+
+interface Session {
+  userId?: number;
+  role?: string;
+  schoolCode?: string | null;
+}
+
+interface RequestWithSession extends Request {
+  session: Session;
+}
+
 const router = Router({ mergeParams: true });
 
 // List exams for a school
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { class: examClass, active } = req.query;
 
@@ -45,16 +67,18 @@ router.get("/", async (req, res) => {
       .orderBy(examsTable.createdAt);
 
     res.json(exams);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Create exam
-router.post("/", async (req, res) => {
+router.post("/", async (req: RequestWithSession<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
-  const session = (req as any).session;
+  const session = req.session;
   const { title, subject, class: examClass, durationMinutes } = req.body;
 
   if (!title || !subject || !examClass || !durationMinutes) {
@@ -81,14 +105,16 @@ router.post("/", async (req, res) => {
       .returning();
 
     res.status(201).json({ ...exam, questionCount: 0 });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Get exam with questions
-router.get("/:examId", async (req, res) => {
+router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
 
   try {
@@ -113,14 +139,16 @@ router.get("/:examId", async (req, res) => {
       .where(eq(questionsTable.examId, parseInt(examId)));
 
     res.json({ ...exam, questions });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Delete exam
-router.delete("/:examId", async (req, res) => {
+router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
 
   try {
@@ -144,14 +172,16 @@ router.delete("/:examId", async (req, res) => {
     }
 
     res.json({ message: "Exam deleted" });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Toggle exam active/inactive
-router.post("/:examId/toggle", async (req, res) => {
+router.post("/:examId/toggle", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { isActive } = req.body;
 
@@ -177,14 +207,16 @@ router.post("/:examId/toggle", async (req, res) => {
       .where(eq(questionsTable.examId, parseInt(examId)));
 
     res.json({ ...exam, questionCount: questionCount[0]?.count ?? 0 });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Add question to exam
-router.post("/:examId/questions", async (req, res) => {
+router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { text, optionA, optionB, optionC, optionD, correctOption } = req.body;
 
@@ -212,14 +244,16 @@ router.post("/:examId/questions", async (req, res) => {
       .returning();
 
     res.status(201).json(question);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Delete question
-router.delete("/:examId/questions/:questionId", async (req, res) => {
+router.delete("/:examId/questions/:questionId", async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
 
   try {
@@ -238,14 +272,16 @@ router.delete("/:examId/questions/:questionId", async (req, res) => {
     }
 
     res.json({ message: "Question deleted" });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Submit exam
-router.post("/:examId/submit", async (req, res) => {
+router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, fullName, answers } = req.body;
 
@@ -336,9 +372,11 @@ router.post("/:examId/submit", async (req, res) => {
       examTitle: exam.title,
       subject: exam.subject,
     });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 

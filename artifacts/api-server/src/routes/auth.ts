@@ -1,11 +1,22 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+// Add session type
+interface Session {
+  userId?: number;
+  role?: string;
+  schoolCode?: string | null;
+}
+
+interface RequestWithSession extends Request {
+  session: Session;
+}
+
 const router = Router();
 
-router.post("/login", async (req, res) => {
+router.post("/login", async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password) {
@@ -59,8 +70,7 @@ router.post("/login", async (req, res) => {
     }
 
     // Store in session
-    (req as any).session = (req as any).session || {};
-    const session = (req as any).session;
+    const session = (req as RequestWithSession).session = (req as RequestWithSession).session || {};
     session.userId = user.id;
     session.role = user.role;
     session.schoolCode = user.schoolCode;
@@ -74,24 +84,27 @@ router.post("/login", async (req, res) => {
       fullName: user.fullName,
       class: user.class,
     });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
-router.post("/logout", (req, res) => {
-  const session = (req as any).session;
+router.post("/logout", (req: Request, res: Response) => {
+  const session = (req as RequestWithSession).session;
   if (session) {
-    session.userId = null;
-    session.role = null;
-    session.schoolCode = null;
+    session.userId = undefined;
+    session.role = undefined;
+    session.schoolCode = undefined;
   }
   res.json({ message: "Logged out" });
+  return;
 });
 
-router.get("/me", async (req, res) => {
-  const session = (req as any).session;
+router.get("/me", async (req: Request, res: Response) => {
+  const session = (req as RequestWithSession).session;
   const userId = session?.userId;
 
   if (!userId) {
@@ -128,9 +141,11 @@ router.get("/me", async (req, res) => {
       fullName: user.fullName,
       class: user.class,
     });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import {
   schoolsTable,
@@ -6,10 +6,24 @@ import {
 } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+interface SchoolParams {
+  schoolCode: string;
+}
+
+interface Session {
+  userId?: number;
+  role?: string;
+  schoolCode?: string | null;
+}
+
+interface RequestWithSession extends Request {
+  session: Session;
+}
+
 const router = Router();
 
 // Create a new school with admin account
-router.post("/create", async (req, res) => {
+router.post("/create", async (req: Request, res: Response) => {
   const { code, name, adminUsername, adminPassword } = req.body;
 
   if (!code || !name || !adminUsername || !adminPassword) {
@@ -55,25 +69,29 @@ router.post("/create", async (req, res) => {
     });
 
     res.status(201).json(school);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // List all schools
-router.get("/", async (_req, res) => {
+router.get("/", async (_req: Request, res: Response) => {
   try {
     const schools = await db.select().from(schoolsTable).orderBy(schoolsTable.id);
     res.json(schools);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Update school name
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request, res: Response) => {
   const { code, name } = req.body;
 
   if (!code || !name) {
@@ -92,14 +110,16 @@ router.post("/", async (req, res) => {
     }
 
     res.json(school);
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // Start new session (promote students)
-router.post("/:schoolCode/new-session", async (req, res) => {
+router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const classOrder = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
@@ -140,14 +160,16 @@ router.post("/:schoolCode/new-session", async (req, res) => {
     res.json({
       message: `New session started. ${promoted} students promoted, ${archived} students graduated and archived.`,
     });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
 // School admin login (also uses /auth/login, kept for compatibility)
-router.post("/admin/login", async (req, res) => {
+router.post("/admin/login", async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password || !schoolCode) {
@@ -178,7 +200,7 @@ router.post("/admin/login", async (req, res) => {
       .where(eq(schoolsTable.code, schoolCode))
       .limit(1);
 
-    const session = (req as any).session;
+    const session = (req as RequestWithSession).session = (req as RequestWithSession).session || {};
     session.userId = user.id;
     session.role = user.role;
     session.schoolCode = user.schoolCode;
@@ -192,9 +214,11 @@ router.post("/admin/login", async (req, res) => {
       fullName: user.fullName,
       class: user.class,
     });
+    return;
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+    return;
   }
 });
 
