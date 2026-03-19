@@ -1,20 +1,22 @@
 // API Base URL - uses environment variable with fallback
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
-// React Query hooks wrapper
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-// Export query key helpers
+// ─── Query Key Helpers ───────────────────────────────────────────────────────
+
+export const getCurrentUserQueryKey = () => ['currentUser'];
 export const getListSchoolsQueryKey = () => ['schools'];
+export const getListTeachersQueryKey = (schoolCode: string) => ['teachers', schoolCode];
+export const getListStudentsQueryKey = (schoolCode: string, className?: string) => ['students', schoolCode, className];
 export const getListExamsQueryKey = (schoolCode: string, filters?: any) => ['exams', schoolCode, filters];
 export const getExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
 export const getGetExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
-export const getListStudentsQueryKey = (schoolCode: string, filters?: any) => ['students', schoolCode, filters];
-export const getListTeachersQueryKey = (schoolCode: string) => ['teachers', schoolCode];
 export const getListResultsQueryKey = (schoolCode: string, filters?: any) => ['results', schoolCode, filters];
 export const getResultDetailQueryKey = (schoolCode: string, resultId: number) => ['result', schoolCode, resultId];
-export const getCurrentUserQueryKey = () => ['currentUser'];
 
-// Types for API responses
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export interface User {
     id: number;
     username: string;
@@ -72,11 +74,11 @@ export interface Result {
     subject?: string;
 }
 
-// API Client
+// ─── API Client ──────────────────────────────────────────────────────────────
+
 export const api = {
-    // Auth endpoints
     auth: {
-        login: async (username: string, password: string, schoolCode?: string) => {
+        login: async (username: string, password: string, schoolCode?: string): Promise<User> => {
             const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -84,7 +86,7 @@ export const api = {
                 credentials: 'include',
             });
             if (!response.ok) throw new Error('Login failed');
-            return response.json() as Promise<User>;
+            return response.json();
         },
 
         logout: async () => {
@@ -95,20 +97,21 @@ export const api = {
             return response.json();
         },
 
-        getCurrentUser: async () => {
+        getCurrentUser: async (): Promise<User | null> => {
             const response = await fetch(`${API_BASE_URL}/auth/me`, {
                 credentials: 'include',
             });
             if (!response.ok) return null;
-            return response.json() as Promise<User>;
+            return response.json();
         },
     },
 
-    // Schools endpoints
     schools: {
-        list: async () => {
-            const response = await fetch(`${API_BASE_URL}/schools`);
-            return response.json() as Promise<School[]>;
+        list: async (): Promise<School[]> => {
+            const response = await fetch(`${API_BASE_URL}/schools`, {
+                credentials: 'include',
+            });
+            return response.json();
         },
 
         create: async (data: { code: string; name: string; adminUsername: string; adminPassword: string }) => {
@@ -116,6 +119,7 @@ export const api = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
+                credentials: 'include',
             });
             return response.json();
         },
@@ -125,6 +129,7 @@ export const api = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code, name }),
+                credentials: 'include',
             });
             return response.json();
         },
@@ -132,25 +137,97 @@ export const api = {
         newSession: async (schoolCode: string) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/new-session`, {
                 method: 'POST',
+                credentials: 'include',
             });
             return response.json();
         },
     },
 
-    // Exams endpoints
+    teachers: {
+        list: async (schoolCode: string) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers`, {
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        create: async (schoolCode: string, data: { username: string; password: string; fullName: string }) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        delete: async (schoolCode: string, teacherId: number) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers/${teacherId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        getDetail: async (schoolCode: string, teacherId: number) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers/${teacherId}/detail`, {
+                credentials: 'include',
+            });
+            return response.json();
+        },
+    },
+
+    students: {
+        list: async (schoolCode: string, className?: string) => {
+            const params = className ? `?class=${encodeURIComponent(className)}` : '';
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students${params}`, {
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        create: async (schoolCode: string, data: { username: string; password: string; fullName: string; class: string }) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        delete: async (schoolCode: string, studentId: number) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
+        getDetail: async (schoolCode: string, studentId: number) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/detail`, {
+                credentials: 'include',
+            });
+            return response.json();
+        },
+    },
+
     exams: {
-        list: async (schoolCode: string, filters?: { class?: string; active?: boolean }) => {
+        list: async (schoolCode: string, filters?: { class?: string; active?: boolean }): Promise<Exam[]> => {
             const params = new URLSearchParams();
             if (filters?.class) params.append('class', filters.class);
             if (filters?.active !== undefined) params.append('active', String(filters.active));
-
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams?${params}`);
-            return response.json() as Promise<Exam[]>;
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams?${params}`, {
+                credentials: 'include',
+            });
+            return response.json();
         },
 
-        get: async (schoolCode: string, examId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}`);
-            return response.json() as Promise<Exam & { questions: Question[] }>;
+        get: async (schoolCode: string, examId: number): Promise<Exam & { questions: Question[] }> => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}`, {
+                credentials: 'include',
+            });
+            return response.json();
         },
 
         create: async (schoolCode: string, data: { title: string; subject: string; class: string; durationMinutes: number }) => {
@@ -166,6 +243,7 @@ export const api = {
         delete: async (schoolCode: string, examId: number) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}`, {
                 method: 'DELETE',
+                credentials: 'include',
             });
             return response.json();
         },
@@ -175,29 +253,27 @@ export const api = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isActive }),
+                credentials: 'include',
             });
             return response.json();
         },
 
         addQuestion: async (schoolCode: string, examId: number, data: {
-            text: string;
-            optionA: string;
-            optionB: string;
-            optionC: string;
-            optionD: string;
-            correctOption: string;
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
         }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
+                credentials: 'include',
             });
             return response.json();
         },
 
-        deleteQuestion: async (examId: number, questionId: number) => {
-            const response = await fetch(`${API_BASE_URL}/exams/${examId}/questions/${questionId}`, {
+        deleteQuestion: async (schoolCode: string, examId: number, questionId: number) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/${questionId}`, {
                 method: 'DELETE',
+                credentials: 'include',
             });
             return response.json();
         },
@@ -207,90 +283,44 @@ export const api = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
+                credentials: 'include',
             });
             return response.json();
         },
     },
 
-    // Students endpoints
-    students: {
-        list: async (schoolCode: string, className?: string) => {
-            const params = className ? `?class=${encodeURIComponent(className)}` : '';
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students${params}`);
-            return response.json();
-        },
-
-        create: async (schoolCode: string, data: { username: string; password: string; fullName: string; class: string }) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            return response.json();
-        },
-
-        delete: async (schoolCode: string, studentId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}`, {
-                method: 'DELETE',
-            });
-            return response.json();
-        },
-
-        getDetail: async (schoolCode: string, studentId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/detail`);
-            return response.json();
-        },
-    },
-
-    // Teachers endpoints
-    teachers: {
-        list: async (schoolCode: string) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers`);
-            return response.json();
-        },
-
-        create: async (schoolCode: string, data: { username: string; password: string; fullName: string }) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-            return response.json();
-        },
-
-        delete: async (schoolCode: string, teacherId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers/${teacherId}`, {
-                method: 'DELETE',
-            });
-            return response.json();
-        },
-
-        getDetail: async (schoolCode: string, teacherId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers/${teacherId}/detail`);
-            return response.json();
-        },
-    },
-
-    // Results endpoints
     results: {
         list: async (schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) => {
             const params = new URLSearchParams();
             if (filters?.examId) params.append('examId', String(filters.examId));
             if (filters?.studentId) params.append('studentId', String(filters.studentId));
             if (filters?.teacherId) params.append('teacherId', String(filters.teacherId));
-
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/results?${params}`);
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/results?${params}`, {
+                credentials: 'include',
+            });
             return response.json();
         },
 
         getDetail: async (schoolCode: string, resultId: number) => {
-            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/results/${resultId}/detail`);
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/results/${resultId}/detail`, {
+                credentials: 'include',
+            });
             return response.json();
         },
     },
 };
 
-// Auth hooks
+// ─── Options Type Helper ─────────────────────────────────────────────────────
+
+type MutationOptions<T = void> = {
+    mutation?: {
+        onSuccess?: (data?: T) => void;
+        onError?: (error: any) => void;
+    };
+};
+
+// ─── Auth Hooks ──────────────────────────────────────────────────────────────
+
 export function useLogin() {
     return useMutation({
         mutationFn: ({ username, password, schoolCode }: { username: string; password: string; schoolCode?: string }) =>
@@ -298,7 +328,7 @@ export function useLogin() {
     });
 }
 
-export function useLogout(options?: { mutation?: { onSuccess?: () => void } }) {
+export function useLogout(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.auth.logout,
@@ -306,226 +336,53 @@ export function useLogout(options?: { mutation?: { onSuccess?: () => void } }) {
             queryClient.clear();
             options?.mutation?.onSuccess?.();
         },
+        onError: options?.mutation?.onError,
     });
 }
 
 export function useCurrentUser() {
     return useQuery({
-        queryKey: ['currentUser'],
+        queryKey: getCurrentUserQueryKey(),
         queryFn: api.auth.getCurrentUser,
     });
 }
 
-// Schools hooks
+// ─── School Hooks ────────────────────────────────────────────────────────────
+
 export function useSchools() {
     return useQuery({
-        queryKey: ['schools'],
+        queryKey: getListSchoolsQueryKey(),
         queryFn: api.schools.list,
     });
 }
 
-export function useCreateSchool() {
+export function useCreateSchool(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: api.schools.create,
+        mutationFn: (data: { code: string; name: string; adminUsername: string; adminPassword: string }) =>
+            api.schools.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['schools'] });
-        },
-    });
-}
-
-// Exams hooks
-export function useExams(schoolCode: string, filters?: { class?: string; active?: boolean }) {
-    return useQuery({
-        queryKey: ['exams', schoolCode, filters],
-        queryFn: () => api.exams.list(schoolCode, filters),
-        enabled: !!schoolCode,
-    });
-}
-
-export function useExam(schoolCode: string, examId: number) {
-    return useQuery({
-        queryKey: ['exam', schoolCode, examId],
-        queryFn: () => api.exams.get(schoolCode, examId),
-        enabled: !!schoolCode && !!examId,
-    });
-}
-
-export function useCreateExam(schoolCode: string) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: { title: string; subject: string; class: string; durationMinutes: number }) =>
-            api.exams.create(schoolCode, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['exams', schoolCode] });
-        },
-    });
-}
-
-export function useDeleteExam(schoolCode: string) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (examId: number) => api.exams.delete(schoolCode, examId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['exams', schoolCode] });
-        },
-    });
-}
-
-// Students hooks
-export function useStudents(schoolCode: string, className?: string) {
-    return useQuery({
-        queryKey: ['students', schoolCode, className],
-        queryFn: () => api.students.list(schoolCode, className),
-        enabled: !!schoolCode,
-    });
-}
-
-export function useCreateStudent(options?: { mutation?: { onSuccess?: () => void } }) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string; class: string } }) =>
-            api.students.create(schoolCode, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
             options?.mutation?.onSuccess?.();
         },
+        onError: options?.mutation?.onError,
     });
 }
 
-// Results hooks
-export function useResults(schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) {
-    return useQuery({
-        queryKey: ['results', schoolCode, filters],
-        queryFn: () => api.results.list(schoolCode, filters),
-        enabled: !!schoolCode,
-    });
-}
-
-export function useResultDetail(schoolCode: string, resultId: number) {
-    return useQuery({
-        queryKey: ['result', schoolCode, resultId],
-        queryFn: () => api.results.getDetail(schoolCode, resultId),
-        enabled: !!schoolCode && !!resultId,
-    });
-}
-
-// Aliases to match frontend imports
-export const useGetMe = useCurrentUser;
-export const useGetExam = useExam;
-export function useListTeachers(schoolCode: string) {
-    return useQuery({
-        queryKey: ['teachers', schoolCode],
-        queryFn: () => api.teachers.list(schoolCode),
-        enabled: !!schoolCode,
-    });
-}
-export const useListStudents = useStudents;
-export const useListSchools = useSchools;
-export const useListResults = useResults;
-export const useListExams = useExams;
-
-// Mutation hooks
-export function useAddQuestion() {
+export function useUpdateSchoolName(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, examId, data }: {
-            schoolCode: string; examId: number; data: {
-                text: string;
-                optionA: string;
-                optionB: string;
-                optionC: string;
-                optionD: string;
-                correctOption: string;
-            }
-        }) => api.exams.addQuestion(schoolCode, examId, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['exam', variables.schoolCode, variables.examId] });
-        },
-    });
-}
-
-export function useDeleteQuestion() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ examId, questionId }: { examId: number; questionId: number }) =>
-            api.exams.deleteQuestion(examId, questionId),
+        mutationFn: ({ code, name }: { code: string; name: string }) =>
+            api.schools.update(code, name),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['exam'] });
-        },
-    });
-}
-
-export function useToggleExamStatus() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ schoolCode, examId, isActive }: { schoolCode: string; examId: number; isActive: boolean }) =>
-            api.exams.toggle(schoolCode, examId, isActive),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });
-            queryClient.invalidateQueries({ queryKey: ['exam', variables.schoolCode, variables.examId] });
-        },
-    });
-}
-
-export function useSubmitExam() {
-    return useMutation({
-        mutationFn: ({ schoolCode, examId, data }: {
-            schoolCode: string; examId: number; data: {
-                studentId: number;
-                fullName: string;
-                answers: Record<string, string>
-            }
-        }) => api.exams.submit(schoolCode, examId, data),
-    });
-}
-
-export function useCreateTeacher(options?: { mutation?: { onSuccess?: () => void } }) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string } }) =>
-            api.teachers.create(schoolCode, data),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['teachers', variables.schoolCode] });
+            queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
             options?.mutation?.onSuccess?.();
         },
+        onError: options?.mutation?.onError,
     });
 }
 
-export function useDeleteTeacher(options?: { mutation?: { onSuccess?: () => void } }) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ schoolCode, teacherId }: { schoolCode: string; teacherId: number }) =>
-            api.teachers.delete(schoolCode, teacherId),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['teachers', variables.schoolCode] });
-            options?.mutation?.onSuccess?.();
-        },
-    });
-}
-
-export function useDeleteStudent(options?: { mutation?: { onSuccess?: () => void } }) {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ schoolCode, studentId }: { schoolCode: string; studentId: number }) =>
-            api.students.delete(schoolCode, studentId),
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
-            options?.mutation?.onSuccess?.();
-        },
-    });
-}
-export function useUpdateSchoolName() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ code, name }: { code: string; name: string }) => api.schools.update(code, name),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['schools'] });
-        },
-    });
-}
-
-export function useStartNewSession(options?: { mutation?: { onSuccess?: () => void } }) {
+export function useStartNewSession(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ schoolCode }: { schoolCode: string }) =>
@@ -534,21 +391,218 @@ export function useStartNewSession(options?: { mutation?: { onSuccess?: () => vo
             queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
             options?.mutation?.onSuccess?.();
         },
+        onError: options?.mutation?.onError,
     });
 }
 
-export function useTeacherDetail(schoolCode: string, teacherId: number) {
+// ─── Teacher Hooks ───────────────────────────────────────────────────────────
+
+export function useListTeachers(schoolCode: string) {
+    return useQuery({
+        queryKey: getListTeachersQueryKey(schoolCode),
+        queryFn: () => api.teachers.list(schoolCode),
+        enabled: !!schoolCode,
+    });
+}
+
+export function useCreateTeacher(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string } }) =>
+            api.teachers.create(schoolCode, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getListTeachersQueryKey(variables.schoolCode) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useDeleteTeacher(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, teacherId }: { schoolCode: string; teacherId: number }) =>
+            api.teachers.delete(schoolCode, teacherId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getListTeachersQueryKey(variables.schoolCode) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useTeacherDetail(schoolCode: string, teacherId: number | null) {
     return useQuery({
         queryKey: ['teacher', schoolCode, teacherId],
-        queryFn: () => api.teachers.getDetail(schoolCode, teacherId),
+        queryFn: () => api.teachers.getDetail(schoolCode, teacherId!),
         enabled: !!schoolCode && !!teacherId,
     });
 }
 
-export function useStudentDetail(schoolCode: string, studentId: number) {
+// ─── Student Hooks ───────────────────────────────────────────────────────────
+
+export function useListStudents(schoolCode: string, className?: string) {
+    return useQuery({
+        queryKey: getListStudentsQueryKey(schoolCode, className),
+        queryFn: () => api.students.list(schoolCode, className),
+        enabled: !!schoolCode,
+    });
+}
+
+export function useCreateStudent(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string; class: string } }) =>
+            api.students.create(schoolCode, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useDeleteStudent(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, studentId }: { schoolCode: string; studentId: number }) =>
+            api.students.delete(schoolCode, studentId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useStudentDetail(schoolCode: string, studentId: number | null) {
     return useQuery({
         queryKey: ['student', schoolCode, studentId],
-        queryFn: () => api.students.getDetail(schoolCode, studentId),
+        queryFn: () => api.students.getDetail(schoolCode, studentId!),
         enabled: !!schoolCode && !!studentId,
     });
 }
+
+// ─── Exam Hooks ──────────────────────────────────────────────────────────────
+
+export function useListExams(schoolCode: string, filters?: { class?: string; active?: boolean }) {
+    return useQuery({
+        queryKey: getListExamsQueryKey(schoolCode, filters),
+        queryFn: () => api.exams.list(schoolCode, filters),
+        enabled: !!schoolCode,
+    });
+}
+
+export function useExam(schoolCode: string, examId: number) {
+    return useQuery({
+        queryKey: getExamQueryKey(schoolCode, examId),
+        queryFn: () => api.exams.get(schoolCode, examId),
+        enabled: !!schoolCode && !!examId,
+    });
+}
+
+export function useCreateExam(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { title: string; subject: string; class: string; durationMinutes: number } }) =>
+            api.exams.create(schoolCode, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useDeleteExam(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId }: { schoolCode: string; examId: number }) =>
+            api.exams.delete(schoolCode, examId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useToggleExamStatus(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, isActive }: { schoolCode: string; examId: number; isActive: boolean }) =>
+            api.exams.toggle(schoolCode, examId, isActive),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });
+            queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useAddQuestion(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, data }: {
+            schoolCode: string; examId: number; data: {
+                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
+            }
+        }) => api.exams.addQuestion(schoolCode, examId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useDeleteQuestion(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, questionId }: { schoolCode: string; examId: number; questionId: number }) =>
+            api.exams.deleteQuestion(schoolCode, examId, questionId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useSubmitExam(options?: MutationOptions) {
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, data }: {
+            schoolCode: string; examId: number; data: { studentId: number; fullName: string; answers: Record<string, string> }
+        }) => api.exams.submit(schoolCode, examId, data),
+        onSuccess: options?.mutation?.onSuccess,
+        onError: options?.mutation?.onError,
+    });
+}
+
+// ─── Results Hooks ───────────────────────────────────────────────────────────
+
+export function useListResults(schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) {
+    return useQuery({
+        queryKey: getListResultsQueryKey(schoolCode, filters),
+        queryFn: () => api.results.list(schoolCode, filters),
+        enabled: !!schoolCode,
+    });
+}
+
+export function useResultDetail(schoolCode: string, resultId: number | null) {
+    return useQuery({
+        queryKey: getResultDetailQueryKey(schoolCode, resultId!),
+        queryFn: () => api.results.getDetail(schoolCode, resultId!),
+        enabled: !!schoolCode && !!resultId,
+    });
+}
+
+// ─── Aliases ─────────────────────────────────────────────────────────────────
+
+export const useGetMe = useCurrentUser;
+export const useGetExam = useExam;
+export const useExams = useListExams;
+export const useStudents = useListStudents;
+export const useResults = useListResults;
+export const useListSchools = useSchools;
