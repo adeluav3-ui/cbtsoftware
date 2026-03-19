@@ -1,1 +1,1 @@
-export * as ApiTypes from "./generated/api";
+export * as ApiTypes from "./generated/api.js";
