@@ -8,7 +8,7 @@ export const getListSchoolsQueryKey = () => ['schools'];
 export const getListExamsQueryKey = (schoolCode: string, filters?: any) => ['exams', schoolCode, filters];
 export const getExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
 export const getGetExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
-export const getListStudentsQueryKey = (schoolCode: string, className?: string) => ['students', schoolCode, className];
+export const getListStudentsQueryKey = (schoolCode: string, filters?: any) => ['students', schoolCode, filters];
 export const getListTeachersQueryKey = (schoolCode: string) => ['teachers', schoolCode];
 export const getListResultsQueryKey = (schoolCode: string, filters?: any) => ['results', schoolCode, filters];
 export const getResultDetailQueryKey = (schoolCode: string, resultId: number) => ['result', schoolCode, resultId];
@@ -380,13 +380,14 @@ export function useStudents(schoolCode: string, className?: string) {
     });
 }
 
-export function useCreateStudent(schoolCode: string) {
+export function useCreateStudent(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (data: { username: string; password: string; fullName: string; class: string }) =>
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string; class: string } }) =>
             api.students.create(schoolCode, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
         },
     });
 }
@@ -478,37 +479,41 @@ export function useSubmitExam() {
     });
 }
 
-export function useCreateTeacher(schoolCode: string) {
+export function useCreateTeacher(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (data: { username: string; password: string; fullName: string }) =>
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { username: string; password: string; fullName: string } }) =>
             api.teachers.create(schoolCode, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers', schoolCode] });
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['teachers', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
         },
     });
 }
 
-export function useDeleteTeacher(schoolCode: string) {
+export function useDeleteTeacher(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (teacherId: number) => api.teachers.delete(schoolCode, teacherId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['teachers', schoolCode] });
+        mutationFn: ({ schoolCode, teacherId }: { schoolCode: string; teacherId: number }) =>
+            api.teachers.delete(schoolCode, teacherId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['teachers', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
         },
     });
 }
 
-export function useDeleteStudent(schoolCode: string) {
+export function useDeleteStudent(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (studentId: number) => api.students.delete(schoolCode, studentId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
+        mutationFn: ({ schoolCode, studentId }: { schoolCode: string; studentId: number }) =>
+            api.students.delete(schoolCode, studentId),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
         },
     });
 }
-
 export function useUpdateSchoolName() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -519,12 +524,14 @@ export function useUpdateSchoolName() {
     });
 }
 
-export function useStartNewSession(schoolCode: string) {
+export function useStartNewSession(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: () => api.schools.newSession(schoolCode),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
+        mutationFn: ({ schoolCode }: { schoolCode: string }) =>
+            api.schools.newSession(schoolCode),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['students', variables.schoolCode] });
+            options?.mutation?.onSuccess?.();
         },
     });
 }
