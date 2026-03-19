@@ -279,17 +279,15 @@ export const api = {
     },
 };
 
-
-
 // Auth hooks
-export const useLogin = () => {
+export function useLogin() {
     return useMutation({
         mutationFn: ({ username, password, schoolCode }: { username: string; password: string; schoolCode?: string }) =>
             api.auth.login(username, password, schoolCode),
     });
-};
+}
 
-export const useLogout = () => {
+export function useLogout() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.auth.logout,
@@ -297,24 +295,24 @@ export const useLogout = () => {
             queryClient.clear();
         },
     });
-};
+}
 
-export const useCurrentUser = () => {
+export function useCurrentUser() {
     return useQuery({
         queryKey: ['currentUser'],
         queryFn: api.auth.getCurrentUser,
     });
-};
+}
 
 // Schools hooks
-export const useSchools = () => {
+export function useSchools() {
     return useQuery({
         queryKey: ['schools'],
         queryFn: api.schools.list,
     });
-};
+}
 
-export const useCreateSchool = () => {
+export function useCreateSchool() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.schools.create,
@@ -322,26 +320,26 @@ export const useCreateSchool = () => {
             queryClient.invalidateQueries({ queryKey: ['schools'] });
         },
     });
-};
+}
 
 // Exams hooks
-export const useExams = (schoolCode: string, filters?: { class?: string; active?: boolean }) => {
+export function useExams(schoolCode: string, filters?: { class?: string; active?: boolean }) {
     return useQuery({
         queryKey: ['exams', schoolCode, filters],
         queryFn: () => api.exams.list(schoolCode, filters),
         enabled: !!schoolCode,
     });
-};
+}
 
-export const useExam = (schoolCode: string, examId: number) => {
+export function useExam(schoolCode: string, examId: number) {
     return useQuery({
         queryKey: ['exam', schoolCode, examId],
         queryFn: () => api.exams.get(schoolCode, examId),
         enabled: !!schoolCode && !!examId,
     });
-};
+}
 
-export const useCreateExam = (schoolCode: string) => {
+export function useCreateExam(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: { title: string; subject: string; class: string; durationMinutes: number }) =>
@@ -350,18 +348,18 @@ export const useCreateExam = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['exams', schoolCode] });
         },
     });
-};
+}
 
 // Students hooks
-export const useStudents = (schoolCode: string, className?: string) => {
+export function useStudents(schoolCode: string, className?: string) {
     return useQuery({
         queryKey: ['students', schoolCode, className],
         queryFn: () => api.students.list(schoolCode, className),
         enabled: !!schoolCode,
     });
-};
+}
 
-export const useCreateStudent = (schoolCode: string) => {
+export function useCreateStudent(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: { username: string; password: string; fullName: string; class: string }) =>
@@ -370,43 +368,42 @@ export const useCreateStudent = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
         },
     });
-};
+}
 
 // Results hooks
-export const useResults = (schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) => {
+export function useResults(schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) {
     return useQuery({
         queryKey: ['results', schoolCode, filters],
         queryFn: () => api.results.list(schoolCode, filters),
         enabled: !!schoolCode,
     });
-};
+}
 
-export const useResultDetail = (schoolCode: string, resultId: number) => {
+export function useResultDetail(schoolCode: string, resultId: number) {
     return useQuery({
         queryKey: ['result', schoolCode, resultId],
         queryFn: () => api.results.getDetail(schoolCode, resultId),
         enabled: !!schoolCode && !!resultId,
     });
-};
+}
 
-// Add these aliases to match your frontend imports
+// Aliases to match frontend imports
 export const useGetMe = useCurrentUser;
 export const useGetExam = useExam;
-export const useListTeachers = (schoolCode: string) => {
+export function useListTeachers(schoolCode: string) {
     return useQuery({
         queryKey: ['teachers', schoolCode],
         queryFn: () => api.teachers.list(schoolCode),
         enabled: !!schoolCode,
     });
-};
-
+}
 export const useListStudents = useStudents;
 export const useListSchools = useSchools;
 export const useListResults = useResults;
 export const useListExams = useExams;
 
-// Add missing mutation hooks
-export const useAddQuestion = () => {
+// Mutation hooks
+export function useAddQuestion() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
@@ -423,21 +420,20 @@ export const useAddQuestion = () => {
             queryClient.invalidateQueries({ queryKey: ['exam', variables.schoolCode, variables.examId] });
         },
     });
-};
+}
 
-export const useDeleteQuestion = () => {
+export function useDeleteQuestion() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ examId, questionId }: { examId: number; questionId: number }) =>
             api.exams.deleteQuestion(examId, questionId),
-        onSuccess: (_, variables) => {
-            // Invalidate all exam queries since we don't have schoolCode here
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['exam'] });
         },
     });
-};
+}
 
-export const useToggleExamStatus = () => {
+export function useToggleExamStatus() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ schoolCode, examId, isActive }: { schoolCode: string; examId: number; isActive: boolean }) =>
@@ -447,9 +443,9 @@ export const useToggleExamStatus = () => {
             queryClient.invalidateQueries({ queryKey: ['exam', variables.schoolCode, variables.examId] });
         },
     });
-};
+}
 
-export const useSubmitExam = () => {
+export function useSubmitExam() {
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
             schoolCode: string; examId: number; data: {
@@ -459,9 +455,9 @@ export const useSubmitExam = () => {
             }
         }) => api.exams.submit(schoolCode, examId, data),
     });
-};
+}
 
-export const useCreateTeacher = (schoolCode: string) => {
+export function useCreateTeacher(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: { username: string; password: string; fullName: string }) =>
@@ -470,9 +466,9 @@ export const useCreateTeacher = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['teachers', schoolCode] });
         },
     });
-};
+}
 
-export const useDeleteTeacher = (schoolCode: string) => {
+export function useDeleteTeacher(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (teacherId: number) => api.teachers.delete(schoolCode, teacherId),
@@ -480,9 +476,9 @@ export const useDeleteTeacher = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['teachers', schoolCode] });
         },
     });
-};
+}
 
-export const useDeleteStudent = (schoolCode: string) => {
+export function useDeleteStudent(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (studentId: number) => api.students.delete(schoolCode, studentId),
@@ -490,9 +486,9 @@ export const useDeleteStudent = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
         },
     });
-};
+}
 
-export const useUpdateSchoolName = () => {
+export function useUpdateSchoolName() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ code, name }: { code: string; name: string }) => api.schools.update(code, name),
@@ -500,9 +496,9 @@ export const useUpdateSchoolName = () => {
             queryClient.invalidateQueries({ queryKey: ['schools'] });
         },
     });
-};
+}
 
-export const useStartNewSession = (schoolCode: string) => {
+export function useStartNewSession(schoolCode: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: () => api.schools.newSession(schoolCode),
@@ -510,21 +506,20 @@ export const useStartNewSession = (schoolCode: string) => {
             queryClient.invalidateQueries({ queryKey: ['students', schoolCode] });
         },
     });
-};
+}
 
-// Also add the teacher detail hook if needed
-export const useTeacherDetail = (schoolCode: string, teacherId: number) => {
+export function useTeacherDetail(schoolCode: string, teacherId: number) {
     return useQuery({
         queryKey: ['teacher', schoolCode, teacherId],
         queryFn: () => api.teachers.getDetail(schoolCode, teacherId),
         enabled: !!schoolCode && !!teacherId,
     });
-};
+}
 
-export const useStudentDetail = (schoolCode: string, studentId: number) => {
+export function useStudentDetail(schoolCode: string, studentId: number) {
     return useQuery({
         queryKey: ['student', schoolCode, studentId],
         queryFn: () => api.students.getDetail(schoolCode, studentId),
         enabled: !!schoolCode && !!studentId,
     });
-};
+}
