@@ -5,6 +5,7 @@ import { useGetExam, useSubmitExam, Question } from "@workspace/api-client-react
 import { Card, Button, Modal } from "@/components/ui-elements";
 import { Clock, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { ResultDetailModal } from "@/components/result-detail-modal";
 
 export default function TakeExam() {
   const { examId: rawExamId } = useParams();
@@ -12,6 +13,7 @@ export default function TakeExam() {
   const { user } = useAuth();
   const schoolCode = user?.schoolCode || "";
   const [, setLocation] = useLocation();
+  const [submittedResultId, setSubmittedResultId] = useState<number | null>(null);
 
   const { data: exam, isLoading } = useGetExam(schoolCode, examId);
   const { mutate: submitExam, isPending: isSubmitting } = useSubmitExam();
@@ -21,7 +23,7 @@ export default function TakeExam() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [resultScore, setResultScore] = useState<{score: number, pct: number} | null>(null);
+  const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
 
   const shuffledQuestions = useMemo(() => {
     if (!exam?.questions) return [];
@@ -58,6 +60,12 @@ export default function TakeExam() {
     }, {
       onSuccess: (res) => {
         setResultScore({ score: res.score, pct: res.percentage });
+        setSubmittedResultId(res.id); // ← store result ID
+      },
+      onError: (err) => {
+        console.error("Submit failed:", err);
+        // Reset so student can retry
+        setIsFinished(false);
       }
     });
   };
@@ -109,11 +117,11 @@ export default function TakeExam() {
 
       {/* Main Layout */}
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8 flex flex-col md:flex-row gap-8">
-        
+
         {/* Question Area */}
         <div className="flex-1">
           {q ? (
-            <motion.div 
+            <motion.div
               key={q.id}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -123,7 +131,7 @@ export default function TakeExam() {
                 Question {currentIdx + 1} of {shuffledQuestions.length}
               </div>
               <h2 className="text-2xl font-semibold mb-8 text-foreground leading-relaxed">{q.text}</h2>
-              
+
               <div className="space-y-4">
                 {['A', 'B', 'C', 'D'].map(optKey => {
                   const val = q[`option${optKey}` as keyof Question];
@@ -132,15 +140,13 @@ export default function TakeExam() {
                     <button
                       key={optKey}
                       onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optKey }))}
-                      className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 flex items-center ${
-                        isSelected 
-                        ? 'border-primary bg-primary/10 ring-4 ring-primary/20' 
+                      className={`w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 flex items-center ${isSelected
+                        ? 'border-primary bg-primary/10 ring-4 ring-primary/20'
                         : 'border-border bg-background hover:border-primary/40'
-                      }`}
+                        }`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 shrink-0 transition-colors ${
-                        isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                      }`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 shrink-0 transition-colors ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                        }`}>
                         {optKey}
                       </div>
                       <span className="text-lg">{val as string}</span>
@@ -150,9 +156,9 @@ export default function TakeExam() {
               </div>
 
               <div className="flex justify-between mt-10 pt-6 border-t border-border/50">
-                <Button 
-                  variant="outline" 
-                  disabled={currentIdx === 0} 
+                <Button
+                  variant="outline"
+                  disabled={currentIdx === 0}
                   onClick={() => setCurrentIdx(p => p - 1)}
                 >
                   Previous
@@ -165,7 +171,7 @@ export default function TakeExam() {
               </div>
             </motion.div>
           ) : (
-             <div>No questions available.</div>
+            <div>No questions available.</div>
           )}
         </div>
 
@@ -181,10 +187,9 @@ export default function TakeExam() {
                   <button
                     key={sq.id}
                     onClick={() => setCurrentIdx(idx)}
-                    className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${
-                      isCurr ? 'ring-4 ring-primary bg-primary text-white' :
+                    className={`w-10 h-10 rounded-xl font-bold text-sm transition-all ${isCurr ? 'ring-4 ring-primary bg-primary text-white' :
                       isAns ? 'bg-secondary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
+                      }`}
                   >
                     {idx + 1}
                   </button>
@@ -193,7 +198,7 @@ export default function TakeExam() {
             </div>
             <div className="mt-8 pt-6 border-t border-border flex flex-col gap-3">
               <Button variant="destructive" className="w-full" onClick={() => {
-                if(confirm("Are you sure you want to submit? You cannot undo this.")) {
+                if (confirm("Are you sure you want to submit? You cannot undo this.")) {
                   handleFinalSubmit();
                 }
               }}>
@@ -204,22 +209,40 @@ export default function TakeExam() {
         </div>
       </main>
 
-      <Modal isOpen={isFinished} onClose={() => {}} title="Exam Completed">
+      <Modal isOpen={isFinished} onClose={() => { }} title="Exam Completed">
         <div className="text-center py-8">
           {isSubmitting ? (
             <div className="text-xl font-semibold animate-pulse">Calculating Results...</div>
           ) : resultScore ? (
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
               <CheckCircle2 className="w-24 h-24 text-success mx-auto mb-6" />
-              <h2 className="text-4xl font-bold font-display mb-2">{resultScore.pct}%</h2>
-              <p className="text-xl text-muted-foreground mb-8">You scored {resultScore.score} out of {shuffledQuestions.length}</p>
-              <Button size="lg" onClick={() => setLocation("/student")}>Return to Dashboard</Button>
+              <h2 className="text-4xl font-bold font-display mb-2">{resultScore.pct.toFixed(1)}%</h2>
+              <p className="text-xl text-muted-foreground mb-8">
+                You scored {resultScore.score} out of {shuffledQuestions.length}
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setSubmittedResultId(submittedResultId)}
+                >
+                  Review My Answers
+                </Button>
+                <Button size="lg" onClick={() => setLocation("/student")}>
+                  Return to Dashboard
+                </Button>
+              </div>
             </motion.div>
           ) : (
             <div>Processing...</div>
           )}
         </div>
       </Modal>
+      <ResultDetailModal
+        resultId={submittedResultId}
+        schoolCode={schoolCode}
+        onClose={() => setSubmittedResultId(null)}
+      />
     </div>
   );
 }

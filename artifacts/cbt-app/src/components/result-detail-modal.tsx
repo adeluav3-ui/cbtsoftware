@@ -9,7 +9,8 @@ interface ResultDetailModalProps {
 }
 
 async function fetchResultDetail(schoolCode: string, resultId: number) {
-  const res = await fetch(`/api/schools/${schoolCode}/results/${resultId}/detail`, {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
+  const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/results/${resultId}/detail`, {
     credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch result detail");
@@ -73,13 +74,12 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                 return (
                   <div
                     key={ans.id}
-                    className={`rounded-xl border p-4 ${
-                      skipped
+                    className={`rounded-xl border p-4 ${skipped
                         ? "border-yellow-300 bg-yellow-50/40"
                         : isCorrect
-                        ? "border-green-300 bg-green-50/40"
-                        : "border-red-300 bg-red-50/40"
-                    }`}
+                          ? "border-green-300 bg-green-50/40"
+                          : "border-red-300 bg-red-50/40"
+                      }`}
                   >
                     <div className="flex items-start gap-2 mb-3">
                       {skipped ? (
@@ -103,15 +103,14 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                         return (
                           <div
                             key={label}
-                            className={`text-sm rounded-lg px-3 py-2 border transition-all ${
-                              isCorrectOption && isStudentPick
+                            className={`text-sm rounded-lg px-3 py-2 border transition-all ${isCorrectOption && isStudentPick
                                 ? "bg-green-100 border-green-400 font-bold"
                                 : isCorrectOption
-                                ? "bg-green-50 border-green-300 font-semibold text-green-800"
-                                : isStudentPick
-                                ? "bg-red-100 border-red-400 font-bold text-red-800"
-                                : "bg-background border-border/40"
-                            }`}
+                                  ? "bg-green-50 border-green-300 font-semibold text-green-800"
+                                  : isStudentPick
+                                    ? "bg-red-100 border-red-400 font-bold text-red-800"
+                                    : "bg-background border-border/40"
+                              }`}
                           >
                             <span className="font-mono mr-1">{label}.</span> {value}
                             {isCorrectOption && (
