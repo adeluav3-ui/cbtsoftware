@@ -56,7 +56,7 @@ export default function TeacherDashboard() {
 
   // ── Students ─────────────────────────────────────
   const [classFilter, setClassFilter] = useState("JSS1");
-  const { data: students = [] } = useListStudents(schoolCode, classFilter);
+  const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
 
 
   const [isStudentModalOpen, setStudentModalOpen] = useState(false);
