@@ -6,13 +6,14 @@ import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCirc
 import { cn } from "./ui-elements";
 
 export function DashboardLayout({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) {
-  const { user, isLoading, refetch } = useAuth();
+  const { user, isLoading, refetch, setUser, } = useAuth();
   const [, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
   const { mutate: logout } = useLogout({
     mutation: {
       onSuccess: () => {
+        setUser(null);   // clear local user
         refetch();
         setLocation("/login");
       }

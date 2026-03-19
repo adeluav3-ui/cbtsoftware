@@ -13,7 +13,7 @@ export default function Login() {
   const [schoolCode, setSchoolCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [, setLocation] = useLocation();
-  const { refetch } = useAuth();
+  const { refetch, setUser } = useAuth();
 
   const { mutate: login, isPending } = useLogin();
 
@@ -28,8 +28,9 @@ export default function Login() {
         ...(activeTab !== "Super Admin" && { schoolCode })
       },
       {
+        // In onSuccess:
         onSuccess: (data) => {
-          // Navigate immediately, don't wait for refetch
+          setUser(data);  // set immediately, no refetch needed
           if (data.role === 'super_admin') setLocation("/super-admin");
           else if (data.role === 'school_admin') setLocation("/school-admin");
           else if (data.role === 'teacher') setLocation("/teacher");
