@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
-import { usersTable, examsTable, questionsTable, resultsTable } from "@workspace/db/schema";
+import { usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
 interface SchoolParams {
@@ -97,15 +97,65 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Delete a teacher
-router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) => {
+router.delete("/:teacherId", async (req, res) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
+    const id = parseInt(teacherId);
+
+    // 1. Get all exams by this teacher
+    const teacherExams = await db
+      .select({ id: examsTable.id })
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.teacherId, id),
+          eq(examsTable.schoolCode, schoolCode)
+        )
+      );
+
+    if (teacherExams.length > 0) {
+      const examIds = teacherExams.map(e => e.id);
+
+      for (const examId of examIds) {
+        // 2. Get all results for this exam
+        const examResults = await db
+          .select({ id: resultsTable.id })
+          .from(resultsTable)
+          .where(eq(resultsTable.examId, examId));
+
+        // 3. Delete result answers
+        for (const result of examResults) {
+          await db
+            .delete(resultAnswersTable)
+            .where(eq(resultAnswersTable.resultId, result.id));
+        }
+
+        // 4. Delete results
+        await db
+          .delete(resultsTable)
+          .where(eq(resultsTable.examId, examId));
+
+        // 5. Delete questions
+        await db
+          .delete(questionsTable)
+          .where(eq(questionsTable.examId, examId));
+      }
+
+      // 6. Delete exams
+      for (const examId of examIds) {
+        await db
+          .delete(examsTable)
+          .where(eq(examsTable.id, examId));
+      }
+    }
+
+    // 7. Finally delete the teacher
     const [deleted] = await db
       .delete(usersTable)
       .where(
         and(
-          eq(usersTable.id, parseInt(teacherId)),
+          eq(usersTable.id, id),
           eq(usersTable.schoolCode, schoolCode),
           eq(usersTable.role, "teacher")
         )
