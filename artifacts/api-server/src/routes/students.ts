@@ -191,8 +191,21 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
       .orderBy(resultsTable.submittedAt);
 
     // For each result, get answer breakdown
+    type Result = {
+      id: number;
+      examId: number | null;
+      fullName: string | null;
+      class: string | null;
+      score: number | null;
+      totalQuestions: number | null;
+      percentage: number | null;
+      submittedAt: Date | null;
+      examTitle: string | null;
+      subject: string | null;
+    };
+
     const resultsWithAnswers = await Promise.all(
-      results.map(async (result) => {
+      results.map(async (result: Result) => {
         const answers = await db
           .select()
           .from(resultAnswersTable)

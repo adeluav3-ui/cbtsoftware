@@ -165,8 +165,9 @@ router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Respon
       .orderBy(examsTable.createdAt);
 
     // For each exam, get questions and results
+    type Exam = typeof examsTable.$inferSelect;
     const examsWithDetails = await Promise.all(
-      exams.map(async (exam) => {
+      exams.map(async (exam: Exam) => {
         const questions = await db
           .select()
           .from(questionsTable)

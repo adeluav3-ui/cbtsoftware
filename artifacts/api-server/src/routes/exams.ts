@@ -76,7 +76,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Create exam
-router.post("/", async (req: RequestWithSession<SchoolParams>, res: Response) => {
+router.post("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const session = req.session;
   const { title, subject, class: examClass, durationMinutes } = req.body;
@@ -350,8 +350,9 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 
     // Save individual answers for detailed review
     if (questions.length > 0) {
+      type Question = typeof questionsTable.$inferSelect;
       await db.insert(resultAnswersTable).values(
-        questions.map((q) => ({
+        questions.map((q: Question) => ({
           resultId: result.id,
           questionId: q.id,
           questionText: q.text,
