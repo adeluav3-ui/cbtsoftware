@@ -91,18 +91,21 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
   }
 
   try {
-    // Ensure examClass is a string
-    const className = Array.isArray(examClass) ? examClass[0] : examClass;
+    // Force examClass to be a string
+    const className = String(examClass);
+
+    // Log to debug if needed
+    console.log(`Creating exam with class: ${className}`);
 
     const [exam] = await db
       .insert(examsTable)
       .values({
-        title,
-        subject,
-        class: className, // Use the string value
-        durationMinutes: parseInt(durationMinutes),
-        schoolCode,
-        teacherId,
+        title: String(title),
+        subject: String(subject),
+        class: className,
+        durationMinutes: Number(durationMinutes),
+        schoolCode: String(schoolCode),
+        teacherId: Number(teacherId),
         isActive: false,
       })
       .returning();
