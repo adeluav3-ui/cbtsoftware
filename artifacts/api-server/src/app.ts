@@ -5,7 +5,12 @@ import router from "./routes/index.js";  // Added /index.js
 
 const app: Express = express();
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: "https://cbtsoftware-cbt-app.vercel.app",  // exact origin, NOT "*"
+  credentials: true,   // Must be true for cookies
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -27,8 +32,9 @@ app.use((req, _res, next) => {
   const origJson = _res.json.bind(_res);
   _res.json = function (body: any) {
     _res.cookie("session_id", sessionId, {
+      sameSite: "none",   // Required for cross-origin
+      secure: true,       // Required when sameSite is "none"
       httpOnly: true,
-      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     return origJson(body);
