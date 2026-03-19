@@ -91,12 +91,15 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
   }
 
   try {
+    // Ensure examClass is a string
+    const className = Array.isArray(examClass) ? examClass[0] : examClass;
+
     const [exam] = await db
       .insert(examsTable)
       .values({
         title,
         subject,
-        class: examClass,
+        class: className, // Use the string value
         durationMinutes: parseInt(durationMinutes),
         schoolCode,
         teacherId,
@@ -112,7 +115,6 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
     return;
   }
 });
-
 // Get exam with questions
 router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
