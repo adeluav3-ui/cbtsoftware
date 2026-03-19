@@ -38,7 +38,7 @@ router.get("/", async (req, res) => {
         schoolCode: examsTable.schoolCode,
         teacherId: examsTable.teacherId,
         createdAt: examsTable.createdAt,
-        questionCount: sql<number>`(SELECT COUNT(*) FROM questions WHERE exam_id = ${examsTable.id})`.as("question_count"),
+        questionCount: sql<number>`(SELECT COUNT(*) FROM questions WHERE questions.exam_id = exams.id)`.as("question_count"),
       })
       .from(examsTable)
       .where(and(...conditions))
