@@ -1,3 +1,4 @@
+import 'dotenv/config'; // automatically loads .env
 import app from "./app";
 import { seedIfEmpty } from "./seed";
 
