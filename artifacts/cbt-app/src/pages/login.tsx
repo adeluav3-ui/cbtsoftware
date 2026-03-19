@@ -15,40 +15,40 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { refetch } = useAuth();
 
-  const { mutate: login, isPending } = useLogin({
-    mutation: {
-      onSuccess: (data) => {
-        refetch();
-        if (data.role === 'super_admin') setLocation("/super-admin");
-        else if (data.role === 'school_admin') setLocation("/school-admin");
-        else if (data.role === 'teacher') setLocation("/teacher");
-        else setLocation("/student");
-      },
-      onError: (err: any) => {
-        setErrorMsg(err.error || "Login failed. Please check your credentials.");
-      }
-    }
-  });
+  const { mutate: login, isPending } = useLogin();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
-    login({
-      data: {
+
+    login(
+      {
         username,
         password,
         ...(activeTab !== "Super Admin" && { schoolCode })
+      },
+      {
+        onSuccess: (data) => {
+          refetch();
+          if (data.role === 'super_admin') setLocation("/super-admin");
+          else if (data.role === 'school_admin') setLocation("/school-admin");
+          else if (data.role === 'teacher') setLocation("/teacher");
+          else setLocation("/student");
+        },
+        onError: (err: any) => {
+          setErrorMsg(err.error || "Login failed. Please check your credentials.");
+        }
       }
-    });
+    );
   };
 
   return (
     <div className="min-h-screen w-full flex bg-background">
       {/* Left side Image */}
       <div className="hidden lg:flex w-1/2 relative bg-primary/5 items-center justify-center overflow-hidden">
-        <img 
-          src={`${import.meta.env.BASE_URL}images/login-hero.png`} 
-          alt="Education Technology" 
+        <img
+          src={`${import.meta.env.BASE_URL}images/login-hero.png`}
+          alt="Education Technology"
           className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-multiply"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
@@ -67,7 +67,7 @@ export default function Login() {
 
       {/* Right side form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
@@ -78,13 +78,13 @@ export default function Login() {
           </div>
 
           <div className="flex justify-center mb-8">
-            <CustomTabs 
-              tabs={["Student", "Teacher", "School Admin", "Super Admin"]} 
-              activeTab={activeTab} 
+            <CustomTabs
+              tabs={["Student", "Teacher", "School Admin", "Super Admin"]}
+              activeTab={activeTab}
               onChange={(t) => {
                 setActiveTab(t);
                 setErrorMsg("");
-              }} 
+              }}
             />
           </div>
 
@@ -99,33 +99,33 @@ export default function Login() {
               {activeTab !== "Super Admin" && (
                 <div>
                   <Label>School Code</Label>
-                  <Input 
-                    value={schoolCode} 
-                    onChange={e => setSchoolCode(e.target.value)} 
-                    placeholder="Enter school code" 
-                    required 
+                  <Input
+                    value={schoolCode}
+                    onChange={e => setSchoolCode(e.target.value)}
+                    placeholder="Enter school code"
+                    required
                   />
                 </div>
               )}
-              
+
               <div>
                 <Label>Username</Label>
-                <Input 
-                  value={username} 
-                  onChange={e => setUsername(e.target.value)} 
-                  placeholder="Enter your username" 
-                  required 
+                <Input
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Enter your username"
+                  required
                 />
               </div>
 
               <div>
                 <Label>Password</Label>
-                <Input 
+                <Input
                   type="password"
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder="••••••••" 
-                  required 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
                 />
               </div>
 
