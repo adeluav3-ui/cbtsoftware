@@ -28,8 +28,8 @@ export default function Login() {
         ...(activeTab !== "Super Admin" && { schoolCode })
       },
       {
-        onSuccess: async (data) => {
-          await refetch(); // Wait for refetch to complete
+        onSuccess: (data) => {
+          // Navigate immediately, don't wait for refetch
           if (data.role === 'super_admin') setLocation("/super-admin");
           else if (data.role === 'school_admin') setLocation("/school-admin");
           else if (data.role === 'teacher') setLocation("/teacher");
