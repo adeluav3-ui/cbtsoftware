@@ -56,9 +56,8 @@ export default function TeacherDashboard() {
 
   // ── Students ─────────────────────────────────────
   const [classFilter, setClassFilter] = useState("JSS1");
-  const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, { class: classFilter }, {
-    query: { enabled: activeTab === "Students" }
-  });
+  const { data: students = [] } = useListStudents(schoolCode, classFilter);
+
 
   const [isStudentModalOpen, setStudentModalOpen] = useState(false);
   const [sFullName, setSFullName] = useState("");
@@ -69,7 +68,7 @@ export default function TeacherDashboard() {
   const { mutate: createStudent, isPending: isCSPending } = useCreateStudent({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, { class: classFilter }) });
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         setStudentModalOpen(false);
         setSFullName(""); setSUsername(""); setSPassword(""); setSClass("JSS1");
       }
@@ -84,9 +83,7 @@ export default function TeacherDashboard() {
 
   // ── Results ───────────────────────────────────────
   const teacherExamIds = new Set(exams.map(e => e.id));
-  const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode, {}, {
-    query: { enabled: activeTab === "Results" && exams.length > 0 }
-  });
+  const { data: allResults = [] } = useListResults(schoolCode);
   const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
@@ -124,7 +121,7 @@ export default function TeacherDashboard() {
                 </Badge>
                 <div className="flex space-x-1">
                   <button
-                    onClick={() => toggleStatus({ schoolCode, examId: exam.id, data: { isActive: !exam.isActive } })}
+                    onClick={() => toggleStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
                     className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     title="Toggle Status"
                   >
