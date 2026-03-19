@@ -298,12 +298,13 @@ export function useLogin() {
     });
 }
 
-export function useLogout() {
+export function useLogout(options?: { mutation?: { onSuccess?: () => void } }) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: api.auth.logout,
         onSuccess: () => {
             queryClient.clear();
+            options?.mutation?.onSuccess?.();
         },
     });
 }
