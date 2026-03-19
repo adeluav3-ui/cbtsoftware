@@ -1,5 +1,5 @@
 import 'dotenv/config'; // automatically loads .env
-import app from "./app";
+import app from "./app.js";
 import { seedIfEmpty } from "./seed";
 
 const rawPort = process.env["PORT"];
