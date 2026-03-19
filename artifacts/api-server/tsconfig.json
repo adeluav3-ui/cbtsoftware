@@ -1,11 +1,26 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "types": ["node"]
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@workspace/db": [
+        "../../lib/db/src"
+      ],
+      "@workspace/db/*": [
+        "../../lib/db/src/*"
+      ],
+      "@workspace/api-zod": [
+        "../../lib/api-zod/src"
+      ],
+      "@workspace/api-zod/*": [
+        "../../lib/api-zod/src/*"
+      ]
+    }
   },
-  "include": ["src"],
+  "include": [
+    "src/**/*"
+  ],
   "references": [
     {
       "path": "../../lib/db"
