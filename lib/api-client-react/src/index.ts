@@ -3,6 +3,17 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrend
 // React Query hooks wrapper
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
+// Export query key helpers
+export const getListSchoolsQueryKey = () => ['schools'];
+export const getListExamsQueryKey = (schoolCode: string, filters?: any) => ['exams', schoolCode, filters];
+export const getExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
+export const getGetExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
+export const getListStudentsQueryKey = (schoolCode: string, className?: string) => ['students', schoolCode, className];
+export const getListTeachersQueryKey = (schoolCode: string) => ['teachers', schoolCode];
+export const getListResultsQueryKey = (schoolCode: string, filters?: any) => ['results', schoolCode, filters];
+export const getResultDetailQueryKey = (schoolCode: string, resultId: number) => ['result', schoolCode, resultId];
+export const getCurrentUserQueryKey = () => ['currentUser'];
+
 // Types for API responses
 export interface User {
     id: number;
@@ -344,6 +355,16 @@ export function useCreateExam(schoolCode: string) {
     return useMutation({
         mutationFn: (data: { title: string; subject: string; class: string; durationMinutes: number }) =>
             api.exams.create(schoolCode, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exams', schoolCode] });
+        },
+    });
+}
+
+export function useDeleteExam(schoolCode: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (examId: number) => api.exams.delete(schoolCode, examId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['exams', schoolCode] });
         },
