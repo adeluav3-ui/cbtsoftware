@@ -1,5 +1,7 @@
 // API Base URL - uses environment variable with fallback
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
+// React Query hooks wrapper
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Types for API responses
 export interface User {
@@ -277,8 +279,7 @@ export const api = {
     },
 };
 
-// React Query hooks wrapper
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
 
 // Auth hooks
 export const useLogin = () => {
