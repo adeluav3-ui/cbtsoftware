@@ -1,8 +1,18 @@
 import { createContext, useContext, ReactNode } from "react";
-import { useGetMe, LoginResponse } from "@workspace/api-client-react";
+import { useCurrentUser } from "@workspace/api-client-react";
+
+type User = {
+  id: number;
+  username: string;
+  role: string;
+  schoolCode: string | null;
+  schoolName: string | null;
+  fullName: string | null;
+  class: string | null;
+};
 
 type AuthContextType = {
-  user: LoginResponse | null;
+  user: User | null;
   isLoading: boolean;
   refetch: () => void;
 };
@@ -10,18 +20,13 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
-  refetch: () => {},
+  refetch: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: user, isLoading, refetch } = useGetMe({
-    query: {
-      retry: false,
-      staleTime: 5 * 60 * 1000,
-    }
-  });
+  const { data: user, isLoading, refetch } = useCurrentUser();
 
   return (
     <AuthContext.Provider value={{ user: user || null, isLoading, refetch }}>
