@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, CreateQuestionRequestCorrectOption } from "@workspace/api-client-react";
+import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
@@ -23,7 +23,7 @@ export default function TeacherExamDetails() {
   const [optB, setOptB] = useState("");
   const [optC, setOptC] = useState("");
   const [optD, setOptD] = useState("");
-  const [correctOpt, setCorrectOpt] = useState<CreateQuestionRequestCorrectOption>("A");
+  const [correctOpt, setCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
 
   const { mutate: addQuestion, isPending } = useAddQuestion({
     mutation: {
@@ -75,7 +75,7 @@ export default function TeacherExamDetails() {
           {exam.isActive ? (
             <Button
               variant="outline"
-              onClick={() => toggleStatus({ schoolCode, examId, data: { isActive: false } })}
+              onClick={() => toggleStatus({ schoolCode, examId, isActive: false })}
               isLoading={isToggling}
               className="border-destructive/40 text-destructive hover:bg-destructive/10"
             >
@@ -84,7 +84,7 @@ export default function TeacherExamDetails() {
           ) : (
             <Button
               variant="secondary"
-              onClick={() => toggleStatus({ schoolCode, examId, data: { isActive: true } })}
+              onClick={() => toggleStatus({ schoolCode, examId, isActive: true })}
               isLoading={isToggling}
               className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/25"
             >
@@ -100,7 +100,7 @@ export default function TeacherExamDetails() {
       <div className="space-y-4">
         {exam.questions.map((q, i) => (
           <Card key={q.id} className="p-6 relative group">
-            <button 
+            <button
               onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
               className="absolute top-4 right-4 p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg opacity-0 group-hover:opacity-100 transition-all"
             >
@@ -138,11 +138,11 @@ export default function TeacherExamDetails() {
         <form onSubmit={handleAdd} className="space-y-4">
           <div>
             <Label>Question Text</Label>
-            <textarea 
-              value={qText} 
-              onChange={e => setQText(e.target.value)} 
-              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px]" 
-              required 
+            <textarea
+              value={qText}
+              onChange={e => setQText(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px]"
+              required
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
