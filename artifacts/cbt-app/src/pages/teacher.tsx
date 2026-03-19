@@ -83,7 +83,7 @@ export default function TeacherDashboard() {
 
   // ── Results ───────────────────────────────────────
   const teacherExamIds = new Set(exams.map(e => e.id));
-  const { data: allResults = [] } = useListResults(schoolCode);
+  const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode);
   const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
