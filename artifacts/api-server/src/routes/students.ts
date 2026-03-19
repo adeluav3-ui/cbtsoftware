@@ -114,11 +114,45 @@ router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) 
   const { schoolCode, studentId } = req.params;
 
   try {
+    const id = parseInt(studentId);
+
+    // 1. Get all result IDs for this student
+    const studentResults = await db
+      .select({ id: resultsTable.id })
+      .from(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.studentId, id),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      );
+
+    // 2. Delete result answers first
+    if (studentResults.length > 0) {
+      const resultIds = studentResults.map(r => r.id);
+      for (const resultId of resultIds) {
+        await db
+          .delete(resultAnswersTable)
+          .where(eq(resultAnswersTable.resultId, resultId));
+      }
+    }
+
+    // 3. Delete results
+    await db
+      .delete(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.studentId, id),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      );
+
+    // 4. Now delete the student
     const [deleted] = await db
       .delete(usersTable)
       .where(
         and(
-          eq(usersTable.id, parseInt(studentId)),
+          eq(usersTable.id, id),
           eq(usersTable.schoolCode, schoolCode),
           eq(usersTable.role, "student")
         )
@@ -137,7 +171,6 @@ router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) 
     return;
   }
 });
-
 // Get a student's full profile: all results with answer breakdown
 router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
