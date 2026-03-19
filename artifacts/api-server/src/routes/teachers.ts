@@ -97,7 +97,7 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Delete a teacher
-router.delete("/:teacherId", async (req, res) => {
+router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
