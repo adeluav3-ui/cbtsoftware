@@ -102,7 +102,8 @@ export function Badge({ children, variant = "default", className }: { children: 
   );
 }
 
-export function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
+export function Modal({ isOpen, onClose, title, children, size = "md" }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode, size?: "md" | "lg" | "xl" }) {
+  const maxW = size === "xl" ? "max-w-4xl" : size === "lg" ? "max-w-2xl" : "max-w-lg";
   return (
     <AnimatePresence>
       {isOpen && (
@@ -118,7 +119,7 @@ export function Modal({ isOpen, onClose, title, children }: { isOpen: boolean, o
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="bg-card w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10 border border-white/20"
+            className={`bg-card w-full ${maxW} rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] relative z-10 border border-white/20`}
           >
             <div className="p-6 border-b border-border/50 flex justify-between items-center bg-muted/30">
               <h2 className="text-xl font-bold font-display">{title}</h2>

@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey } from "@workspace/api-client-react";
 import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
+import { ResultDetailModal } from "@/components/result-detail-modal";
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -26,6 +27,8 @@ export default function TeacherDashboard() {
     query: { enabled: activeTab === "Results" && exams.length > 0 }
   });
   const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
+
+  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
   const [isExamModalOpen, setExamModalOpen] = useState(false);
   const [eTitle, setETitle] = useState("");
@@ -147,8 +150,13 @@ export default function TeacherDashboard() {
                       const pct = r.percentage ?? 0;
                       const grade = pct >= 70 ? "Pass" : "Fail";
                       return (
-                        <tr key={r.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
-                          <td className="px-5 py-3.5 font-semibold">{r.fullName}</td>
+                        <tr
+                          key={r.id}
+                          className="border-b border-border/40 hover:bg-primary/5 transition-colors cursor-pointer"
+                          onClick={() => setSelectedResultId(r.id)}
+                          title="Click to view full answer breakdown"
+                        >
+                          <td className="px-5 py-3.5 font-semibold text-primary underline-offset-2 hover:underline">{r.fullName}</td>
                           <td className="px-5 py-3.5 text-muted-foreground">{r.class}</td>
                           <td className="px-5 py-3.5 font-medium">{r.examTitle || "—"}</td>
                           <td className="px-5 py-3.5 text-muted-foreground">{r.subject || "—"}</td>
@@ -190,6 +198,12 @@ export default function TeacherDashboard() {
           <Button type="submit" className="w-full mt-4" isLoading={isCEPending}>Create Exam</Button>
         </form>
       </Modal>
+
+      <ResultDetailModal
+        resultId={selectedResultId}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedResultId(null)}
+      />
     </DashboardLayout>
   );
 }

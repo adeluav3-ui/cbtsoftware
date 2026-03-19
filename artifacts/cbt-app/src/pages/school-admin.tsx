@@ -5,7 +5,11 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, Users, RotateCw } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight } from "lucide-react";
+import { TeacherDetailModal } from "@/components/teacher-detail-modal";
+import { StudentDetailModal } from "@/components/student-detail-modal";
+import { ResultDetailModal } from "@/components/result-detail-modal";
+import { format } from "date-fns";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -19,6 +23,13 @@ export default function SchoolAdminDashboard() {
   const { data: teachers = [] } = useListTeachers(schoolCode);
   const { data: students = [] } = useListStudents(schoolCode, { class: classFilter });
   const { data: results = [] } = useListResults(schoolCode);
+
+  // Detail modal state
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | null>(null);
+  const [selectedTeacherName, setSelectedTeacherName] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState("");
+  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
   const [isTeacherModalOpen, setTeacherModalOpen] = useState(false);
   const [tUsername, setTUsername] = useState("");
@@ -90,7 +101,10 @@ export default function SchoolAdminDashboard() {
       {activeTab === "Teachers" && (
         <Card className="p-0 overflow-hidden">
           <div className="p-6 border-b border-border/50 flex justify-between items-center bg-muted/20">
-            <h2 className="text-lg font-bold">Teacher Directory</h2>
+            <div>
+              <h2 className="text-lg font-bold">Teacher Directory</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Click a row to view all exams and student results</p>
+            </div>
             <Button size="sm" onClick={() => setTeacherModalOpen(true)}>
               <UserPlus className="w-4 h-4 mr-2" /> Add Teacher
             </Button>
@@ -105,13 +119,22 @@ export default function SchoolAdminDashboard() {
             </thead>
             <tbody>
               {teachers.map(t => (
-                <tr key={t.id} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="px-6 py-4 font-semibold">{t.fullName}</td>
+                <tr
+                  key={t.id}
+                  className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => { setSelectedTeacherId(t.id); setSelectedTeacherName(t.fullName || t.username); }}
+                >
+                  <td className="px-6 py-4 font-semibold text-primary">{t.fullName}</td>
                   <td className="px-6 py-4 text-muted-foreground font-mono">{t.username}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => deleteTeacher({ schoolCode, teacherId: t.id })}>
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => { e.stopPropagation(); deleteTeacher({ schoolCode, teacherId: t.id }); }}
+                    >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </td>
                 </tr>
               ))}
@@ -126,9 +149,12 @@ export default function SchoolAdminDashboard() {
       {activeTab === "Students" && (
         <Card className="p-0 overflow-hidden">
           <div className="p-6 border-b border-border/50 flex flex-col sm:flex-row justify-between items-center bg-muted/20 gap-4">
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-semibold text-muted-foreground mr-2">Filter Class:</span>
-              <CustomTabs tabs={CLASSES} activeTab={classFilter} onChange={setClassFilter} />
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-semibold text-muted-foreground mr-2">Filter Class:</span>
+                <CustomTabs tabs={CLASSES} activeTab={classFilter} onChange={setClassFilter} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Click a student row to view their full exam history</p>
             </div>
             <Button size="sm" onClick={() => setStudentModalOpen(true)}>
               <UserPlus className="w-4 h-4 mr-2" /> Add Student
@@ -145,14 +171,23 @@ export default function SchoolAdminDashboard() {
             </thead>
             <tbody>
               {students.map(s => (
-                <tr key={s.id} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="px-6 py-4 font-semibold">{s.fullName}</td>
+                <tr
+                  key={s.id}
+                  className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
+                >
+                  <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
                   <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
                   <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => deleteStudent({ schoolCode, studentId: s.id })}>
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
+                    >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </td>
                 </tr>
               ))}
@@ -166,6 +201,9 @@ export default function SchoolAdminDashboard() {
 
       {activeTab === "Results" && (
         <Card className="p-0 overflow-hidden">
+          <div className="p-4 border-b border-border/50 bg-muted/20">
+            <p className="text-xs text-muted-foreground">Click any result row to view the full question & answer breakdown</p>
+          </div>
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
@@ -174,27 +212,44 @@ export default function SchoolAdminDashboard() {
                 <th className="px-6 py-4 font-semibold">Exam Title</th>
                 <th className="px-6 py-4 font-semibold">Score</th>
                 <th className="px-6 py-4 font-semibold">Percentage</th>
+                <th className="px-6 py-4 font-semibold text-center">Grade</th>
+                <th className="px-6 py-4 font-semibold">Submitted</th>
               </tr>
             </thead>
             <tbody>
-              {results.map(r => (
-                <tr key={r.id} className="border-b border-border/50 hover:bg-muted/20">
-                  <td className="px-6 py-4 font-semibold">{r.fullName}</td>
-                  <td className="px-6 py-4"><Badge>{r.class}</Badge></td>
-                  <td className="px-6 py-4 font-medium text-primary">{r.examTitle || r.subject}</td>
-                  <td className="px-6 py-4">{r.score} / {r.totalQuestions}</td>
-                  <td className="px-6 py-4 font-bold">{r.percentage}%</td>
-                </tr>
-              ))}
+              {results.map(r => {
+                const pct = r.percentage ?? 0;
+                return (
+                  <tr
+                    key={r.id}
+                    className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={() => setSelectedResultId(r.id)}
+                  >
+                    <td className="px-6 py-4 font-semibold text-primary">{r.fullName}</td>
+                    <td className="px-6 py-4"><Badge>{r.class}</Badge></td>
+                    <td className="px-6 py-4 font-medium">{r.examTitle || r.subject}</td>
+                    <td className="px-6 py-4 font-bold">{r.score} / {r.totalQuestions}</td>
+                    <td className="px-6 py-4 font-semibold">{pct.toFixed(1)}%</td>
+                    <td className="px-6 py-4 text-center">
+                      <Badge variant={pct >= 70 ? "success" : "destructive"}>
+                        {pct >= 70 ? "Pass" : "Fail"}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 text-muted-foreground text-sm">
+                      {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
               {results.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">No results available yet.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No results available yet.</td></tr>
               )}
             </tbody>
           </table>
         </Card>
       )}
 
-      {/* Modals */}
+      {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">
         <form onSubmit={e => { e.preventDefault(); createTeacher({ schoolCode, data: { username: tUsername, password: tPassword, fullName: tFullName }}); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={tFullName} onChange={e => setTFullName(e.target.value)} required /></div>
@@ -204,6 +259,7 @@ export default function SchoolAdminDashboard() {
         </form>
       </Modal>
 
+      {/* Add Student Modal */}
       <Modal isOpen={isStudentModalOpen} onClose={() => setStudentModalOpen(false)} title="Add New Student">
         <form onSubmit={e => { e.preventDefault(); createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass }}); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} required /></div>
@@ -219,6 +275,7 @@ export default function SchoolAdminDashboard() {
         </form>
       </Modal>
 
+      {/* New Session Modal */}
       <Modal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Start New Academic Session">
         <div className="space-y-4 text-muted-foreground">
           <p>Are you sure you want to start a new academic session?</p>
@@ -229,6 +286,27 @@ export default function SchoolAdminDashboard() {
           </div>
         </div>
       </Modal>
+
+      {/* Detail modals */}
+      <TeacherDetailModal
+        teacherId={selectedTeacherId}
+        teacherName={selectedTeacherName}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedTeacherId(null)}
+      />
+
+      <StudentDetailModal
+        studentId={selectedStudentId}
+        studentName={selectedStudentName}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedStudentId(null)}
+      />
+
+      <ResultDetailModal
+        resultId={selectedResultId}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedResultId(null)}
+      />
     </DashboardLayout>
   );
 }

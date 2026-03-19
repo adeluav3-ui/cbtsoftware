@@ -33,6 +33,7 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
       isOpen={resultId !== null}
       onClose={onClose}
       title={`Result Detail — ${data?.fullName ?? "..."}`}
+      size="lg"
     >
       {isLoading || !data ? (
         <div className="py-12 text-center text-muted-foreground">Loading details…</div>
