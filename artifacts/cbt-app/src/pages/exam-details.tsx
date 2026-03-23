@@ -6,7 +6,9 @@ import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus } fr
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload } from "lucide-react";
+import { BulkUploadModal } from "@/components/bulk-upload-modal";
+import { useBulkAddQuestions } from "@workspace/api-client-react";
 
 export default function TeacherExamDetails() {
   const { examId: rawExamId } = useParams();
@@ -24,6 +26,17 @@ export default function TeacherExamDetails() {
   const [optC, setOptC] = useState("");
   const [optD, setOptD] = useState("");
   const [correctOpt, setCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
+
+  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
+
+  const { mutate: bulkAddQuestions, isPending: isBulkPending } = useBulkAddQuestions({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
+        setBulkModalOpen(false);
+      }
+    }
+  });
 
   const { mutate: addQuestion, isPending } = useAddQuestion({
     mutation: {
@@ -91,78 +104,90 @@ export default function TeacherExamDetails() {
               <Radio className="w-4 h-4 mr-2" /> Publish Exam
             </Button>
           )}
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Question
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* existing publish/unpublish button */}
+            <Button variant="outline" onClick={() => setBulkModalOpen(true)}>
+              <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+            </Button>
+            <Button onClick={() => setModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Question
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <div className="space-y-4">
-        {exam.questions.map((q, i) => (
-          <Card key={q.id} className="p-6 relative group">
-            <button
-              onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
-              className="absolute top-4 right-4 p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-            <div className="flex items-start mb-4 pr-10">
-              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold mr-4 shrink-0">
-                {i + 1}
-              </span>
-              <p className="text-lg font-semibold text-foreground">{q.text}</p>
+        <div className="space-y-4">
+          {exam.questions.map((q, i) => (
+            <Card key={q.id} className="p-6 relative group">
+              <button
+                onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
+                className="absolute top-4 right-4 p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+              <div className="flex items-start mb-4 pr-10">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold mr-4 shrink-0">
+                  {i + 1}
+                </span>
+                <p className="text-lg font-semibold text-foreground">{q.text}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-12">
+                {['A', 'B', 'C', 'D'].map(optKey => {
+                  const optVal = q[`option${optKey}` as keyof typeof q];
+                  const isCorrect = q.correctOption === optKey;
+                  return (
+                    <div key={optKey} className={`p-3 rounded-xl border ${isCorrect ? 'bg-success/10 border-success/30 text-success-foreground font-semibold' : 'bg-muted/30 border-border/50 text-muted-foreground'}`}>
+                      <span className="font-bold mr-2">{optKey}.</span> {optVal}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+
+          {exam.questions.length === 0 && (
+            <div className="py-20 text-center text-muted-foreground bg-muted/20 rounded-3xl border-2 border-dashed border-border">
+              <HelpCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
+              <p className="font-semibold text-lg">No questions added yet.</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-12">
-              {['A', 'B', 'C', 'D'].map(optKey => {
-                const optVal = q[`option${optKey}` as keyof typeof q];
-                const isCorrect = q.correctOption === optKey;
-                return (
-                  <div key={optKey} className={`p-3 rounded-xl border ${isCorrect ? 'bg-success/10 border-success/30 text-success-foreground font-semibold' : 'bg-muted/30 border-border/50 text-muted-foreground'}`}>
-                    <span className="font-bold mr-2">{optKey}.</span> {optVal}
-                  </div>
-                );
-              })}
+          )}
+        </div>
+
+        <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Add New Question">
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div>
+              <Label>Question Text</Label>
+              <textarea
+                value={qText}
+                onChange={e => setQText(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px]"
+                required
+              />
             </div>
-          </Card>
-        ))}
-
-        {exam.questions.length === 0 && (
-          <div className="py-20 text-center text-muted-foreground bg-muted/20 rounded-3xl border-2 border-dashed border-border">
-            <HelpCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p className="font-semibold text-lg">No questions added yet.</p>
-          </div>
-        )}
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
+              <div><Label>Option B</Label><Input value={optB} onChange={e => setOptB(e.target.value)} required /></div>
+              <div><Label>Option C</Label><Input value={optC} onChange={e => setOptC(e.target.value)} required /></div>
+              <div><Label>Option D</Label><Input value={optD} onChange={e => setOptD(e.target.value)} required /></div>
+            </div>
+            <div>
+              <Label>Correct Option</Label>
+              <Select value={correctOpt} onChange={e => setCorrectOpt(e.target.value as any)}>
+                <option value="A">Option A</option>
+                <option value="B">Option B</option>
+                <option value="C">Option C</option>
+                <option value="D">Option D</option>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full mt-4" isLoading={isPending}>Save Question</Button>
+          </form>
+        </Modal>
+        <BulkUploadModal
+          isOpen={isBulkModalOpen}
+          onClose={() => setBulkModalOpen(false)}
+          onUpload={(questions) => bulkAddQuestions({ schoolCode, examId, questions })}
+          isPending={isBulkPending}
+        />
       </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Add New Question">
-        <form onSubmit={handleAdd} className="space-y-4">
-          <div>
-            <Label>Question Text</Label>
-            <textarea
-              value={qText}
-              onChange={e => setQText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px]"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
-            <div><Label>Option B</Label><Input value={optB} onChange={e => setOptB(e.target.value)} required /></div>
-            <div><Label>Option C</Label><Input value={optC} onChange={e => setOptC(e.target.value)} required /></div>
-            <div><Label>Option D</Label><Input value={optD} onChange={e => setOptD(e.target.value)} required /></div>
-          </div>
-          <div>
-            <Label>Correct Option</Label>
-            <Select value={correctOpt} onChange={e => setCorrectOpt(e.target.value as any)}>
-              <option value="A">Option A</option>
-              <option value="B">Option B</option>
-              <option value="C">Option C</option>
-              <option value="D">Option D</option>
-            </Select>
-          </div>
-          <Button type="submit" className="w-full mt-4" isLoading={isPending}>Save Question</Button>
-        </form>
-      </Modal>
     </DashboardLayout>
   );
 }

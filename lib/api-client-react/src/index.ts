@@ -223,6 +223,18 @@ export const api = {
             return response.json();
         },
 
+        bulkAddQuestions: async (schoolCode: string, examId: number, questions: Array<{
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
+        }>) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ questions }),
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
         get: async (schoolCode: string, examId: number): Promise<Exam & { questions: Question[] }> => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}`, {
                 credentials: 'include',
@@ -490,6 +502,25 @@ export function useListExams(schoolCode: string, filters?: { class?: string; act
         queryKey: getListExamsQueryKey(schoolCode, filters),
         queryFn: () => api.exams.list(schoolCode, filters),
         enabled: !!schoolCode,
+    });
+}
+
+export function useBulkAddQuestions(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, questions }: {
+            schoolCode: string;
+            examId: number;
+            questions: Array<{
+                text: string; optionA: string; optionB: string;
+                optionC: string; optionD: string; correctOption: string;
+            }>
+        }) => api.exams.bulkAddQuestions(schoolCode, examId, questions),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
     });
 }
 
