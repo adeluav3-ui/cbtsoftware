@@ -170,6 +170,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
           {children}
         </div>
       </main>
+      <OfflineBanner />
     </div>
   );
 }
