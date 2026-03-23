@@ -220,43 +220,6 @@ router.post("/:examId/toggle", async (req: Request<ExamParams>, res: Response) =
   }
 });
 
-// Add question to exam
-router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
-  const { schoolCode, examId } = req.params;
-  const { text, optionA, optionB, optionC, optionD, correctOption } = req.body;
-
-  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
-    return res.status(400).json({ error: "All question fields are required" });
-  }
-
-  if (!["A", "B", "C", "D"].includes(correctOption)) {
-    return res.status(400).json({ error: "correctOption must be A, B, C, or D" });
-  }
-
-  try {
-    const [question] = await db
-      .insert(questionsTable)
-      .values({
-        examId: parseInt(examId),
-        text,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
-        correctOption,
-        schoolCode,
-      })
-      .returning();
-
-    res.status(201).json(question);
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
 // Bulk add questions
 router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
@@ -303,6 +266,45 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
     return;
   }
 });
+
+// Add question to exam
+router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { text, optionA, optionB, optionC, optionD, correctOption } = req.body;
+
+  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+    return res.status(400).json({ error: "All question fields are required" });
+  }
+
+  if (!["A", "B", "C", "D"].includes(correctOption)) {
+    return res.status(400).json({ error: "correctOption must be A, B, C, or D" });
+  }
+
+  try {
+    const [question] = await db
+      .insert(questionsTable)
+      .values({
+        examId: parseInt(examId),
+        text,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        schoolCode,
+      })
+      .returning();
+
+    res.status(201).json(question);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+
 
 // Delete question
 router.delete("/:examId/questions/:questionId", async (req: Request<QuestionParams>, res: Response) => {
