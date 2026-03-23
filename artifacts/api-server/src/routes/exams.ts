@@ -257,6 +257,53 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
   }
 });
 
+// Bulk add questions
+router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { questions } = req.body;
+
+  if (!questions || !Array.isArray(questions) || questions.length === 0) {
+    return res.status(400).json({ error: "Questions array is required" });
+  }
+
+  const validOptions = ["A", "B", "C", "D"];
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    if (!q.text || !q.optionA || !q.optionB || !q.optionC || !q.optionD || !q.correctOption) {
+      return res.status(400).json({ error: `Question ${i + 1} is missing required fields` });
+    }
+    if (!validOptions.includes(q.correctOption)) {
+      return res.status(400).json({ error: `Question ${i + 1} has invalid correctOption: must be A, B, C or D` });
+    }
+  }
+
+  try {
+    const inserted = await db
+      .insert(questionsTable)
+      .values(
+        questions.map((q: any) => ({
+          examId: parseInt(examId),
+          text: String(q.text),
+          optionA: String(q.optionA),
+          optionB: String(q.optionB),
+          optionC: String(q.optionC),
+          optionD: String(q.optionD),
+          correctOption: String(q.correctOption),
+          schoolCode,
+        }))
+      )
+      .returning();
+
+    res.status(201).json({ inserted: inserted.length, questions: inserted });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Delete question
 router.delete("/:examId/questions/:questionId", async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
