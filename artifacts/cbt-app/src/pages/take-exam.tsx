@@ -16,7 +16,13 @@ export default function TakeExam() {
   const [submittedResultId, setSubmittedResultId] = useState<number | null>(null);
   const [showReview, setShowReview] = useState(false);
 
-  const { data: exam, isLoading } = useGetExam(schoolCode, examId);
+  const { data: examData, isLoading } = useGetExam(schoolCode, examId);
+
+  // Fall back to cached exam if offline
+  const exam = examData || (() => {
+    const cached = localStorage.getItem(`exam_${examId}`);
+    return cached ? JSON.parse(cached) : null;
+  })();
   const { mutate: submitExam, isPending: isSubmitting } = useSubmitExam();
 
   const [hasStarted, setHasStarted] = useState(false);
@@ -39,9 +45,21 @@ export default function TakeExam() {
       handleFinalSubmit();
     }
   }, [hasStarted, timeLeft, isFinished]);
+  useEffect(() => {
+    if (hasStarted && Object.keys(answers).length > 0) {
+      localStorage.setItem(`answers_${examId}`, JSON.stringify(answers));
+    }
+  }, [answers, examId, hasStarted]);
 
-  const startExam = () => {
+  useEffect(() => {
+    const saved = localStorage.getItem(`answers_${examId}`);
+    if (saved) setAnswers(JSON.parse(saved));
+  }, [examId]);
+
+  const startExam = async () => {
     if (exam) {
+      // Pre-cache exam data in localStorage as offline backup
+      localStorage.setItem(`exam_${examId}`, JSON.stringify(exam));
       setTimeLeft(exam.durationMinutes * 60);
       setHasStarted(true);
     }
@@ -87,12 +105,14 @@ export default function TakeExam() {
       }
     }, {
       onSuccess: (res) => {
+        // ← REPLACE your existing onSuccess with this
+        localStorage.removeItem(`exam_${examId}`);
+        localStorage.removeItem(`answers_${examId}`);
         setResultScore({ score: res.score, pct: res.percentage });
-        setSubmittedResultId(res.id); // ← store result ID
+        setSubmittedResultId(res.id);
       },
       onError: (err) => {
         console.error("Submit failed:", err);
-        // Reset so student can retry
         setIsFinished(false);
       }
     });

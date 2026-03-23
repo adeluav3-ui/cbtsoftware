@@ -5,6 +5,30 @@ import { useLogout } from "@workspace/api-client-react";
 import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "./ui-elements";
 
+function OfflineBanner() {
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
+
+  if (!isOffline) return null;
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-destructive text-white px-6 py-3 rounded-xl shadow-lg font-semibold text-sm z-50">
+      You are offline — some features may be unavailable
+    </div>
+  );
+}
+
+
 export function DashboardLayout({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) {
   const { user, isLoading, refetch, setUser, } = useAuth();
   const [, setLocation] = useLocation();
