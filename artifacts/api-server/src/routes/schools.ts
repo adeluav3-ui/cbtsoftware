@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
-import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
+import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
@@ -335,6 +335,97 @@ router.post("/admin/login", async (req: Request, res: Response) => {
       fullName: user.fullName,
       class: user.class,
     });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get grading scheme for a school
+router.get("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+
+  try {
+    const [scheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
+      .limit(1);
+
+    if (!scheme) {
+      // Return default scheme
+      res.json({
+        midTermTotal: 20,
+        midTermCbt: 10,
+        midTermTheory: 10,
+        examTotal: 60,
+        examCbt: 30,
+        examTheory: 30,
+        classActivityTotal: 20,
+      });
+      return;
+    }
+
+    res.json(scheme);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update grading scheme for a school
+router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { midTermTotal, midTermCbt, midTermTheory, examTotal, examCbt, examTheory, classActivityTotal } = req.body;
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
+      .limit(1);
+
+    let result;
+    if (existing) {
+      // Update existing
+      [result] = await db
+        .update(gradingSchemesTable)
+        .set({
+          midTermTotal,
+          midTermCbt,
+          midTermTheory,
+          examTotal,
+          examCbt,
+          examTheory,
+          classActivityTotal,
+          updatedAt: new Date(),
+        })
+        .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
+        .returning();
+    } else {
+      // Insert new
+      [result] = await db
+        .insert(gradingSchemesTable)
+        .values({
+          schoolCode: schoolCodeStr,
+          midTermTotal,
+          midTermCbt,
+          midTermTheory,
+          examTotal,
+          examCbt,
+          examTheory,
+          classActivityTotal,
+        })
+        .returning();
+    }
+
+    res.json(result);
     return;
   } catch (err) {
     console.error(err);

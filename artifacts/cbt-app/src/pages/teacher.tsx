@@ -12,6 +12,7 @@ import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-cl
 import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { ResultDetailModal } from "@/components/result-detail-modal";
+import { EnterScoresModal } from "@/components/enter-scores-modal";
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -30,6 +31,19 @@ export default function TeacherDashboard() {
   const [eSubject, setESubject] = useState("");
   const [eClass, setEClass] = useState("JSS1");
   const [eDuration, setEDuration] = useState("45");
+  const [eAssessmentType, setEAssessmentType] = useState("exam");
+
+  // Scores modal state
+  const [scoresModalOpen, setScoresModalOpen] = useState(false);
+  const [selectedStudentForScores, setSelectedStudentForScores] = useState<{
+    studentId: number;
+    studentName: string;
+    examId: number;
+    examTitle: string;
+    assessmentType: string;
+    theoryScore: number;
+    activityScore: number;
+  } | null>(null);
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -51,7 +65,7 @@ export default function TeacherDashboard() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createExam({ schoolCode, data: { title: eTitle, subject: eSubject, class: eClass, durationMinutes: parseInt(eDuration) } });
+    createExam({ schoolCode, data: { title: eTitle, subject: eSubject, class: eClass, durationMinutes: parseInt(eDuration), assessmentType: eAssessmentType } });
   };
 
   // ── Students ─────────────────────────────────────
@@ -246,6 +260,7 @@ export default function TeacherDashboard() {
                       <th className="px-5 py-4 font-semibold text-center">%</th>
                       <th className="px-5 py-4 font-semibold text-center">Grade</th>
                       <th className="px-5 py-4 font-semibold">Submitted</th>
+                      <th className="px-5 py-4 font-semibold text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -254,13 +269,22 @@ export default function TeacherDashboard() {
                       return (
                         <tr
                           key={r.id}
-                          className="border-b border-border/40 hover:bg-primary/5 transition-colors cursor-pointer"
-                          onClick={() => setSelectedResultId(r.id)}
-                          title="Click to view full answer breakdown"
+                          className="border-b border-border/40 hover:bg-primary/5 transition-colors"
                         >
-                          <td className="px-5 py-3.5 font-semibold text-primary">{r.fullName}</td>
+                          <td
+                            className="px-5 py-3.5 font-semibold text-primary cursor-pointer"
+                            onClick={() => setSelectedResultId(r.id)}
+                            title="Click to view full answer breakdown"
+                          >
+                            {r.fullName}
+                          </td>
                           <td className="px-5 py-3.5 text-muted-foreground">{r.class}</td>
-                          <td className="px-5 py-3.5 font-medium">{r.examTitle || "—"}</td>
+                          <td
+                            className="px-5 py-3.5 font-medium cursor-pointer"
+                            onClick={() => setSelectedResultId(r.id)}
+                          >
+                            {r.examTitle || "—"}
+                          </td>
                           <td className="px-5 py-3.5 text-muted-foreground">{r.subject || "—"}</td>
                           <td className="px-5 py-3.5 text-center font-bold">{r.score}/{r.totalQuestions}</td>
                           <td className="px-5 py-3.5 text-center font-semibold">{pct.toFixed(1)}%</td>
@@ -272,6 +296,27 @@ export default function TeacherDashboard() {
                           <td className="px-5 py-3.5 text-muted-foreground text-sm">
                             {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
                           </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStudentForScores({
+                                  studentId: r.studentId,
+                                  studentName: r.fullName,
+                                  examId: r.examId,
+                                  examTitle: r.examTitle || r.subject || "Exam",
+                                  assessmentType: r.assessmentType || "exam",
+                                  theoryScore: 0,
+                                  activityScore: 0,
+                                });
+                                setScoresModalOpen(true);
+                              }}
+                            >
+                              <Settings className="w-3 h-3 mr-1" /> Enter Scores
+                            </Button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -282,7 +327,6 @@ export default function TeacherDashboard() {
           )}
         </>
       )}
-
       {/* ── Create Exam Modal ────────────────────────── */}
       <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
         <form onSubmit={handleCreate} className="space-y-4">
@@ -298,6 +342,19 @@ export default function TeacherDashboard() {
             <div>
               <Label>Duration (Minutes)</Label>
               <Input type="number" min="1" value={eDuration} onChange={e => setEDuration(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Assessment Type</Label>
+              <Select value={eAssessmentType} onChange={e => setEAssessmentType(e.target.value)}>
+                <option value="mid_term">Mid-Term Test</option>
+                <option value="exam">Final Exam</option>
+                <option value="class_activity">Class Activity</option>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {eAssessmentType === "mid_term" && "CBT + Theory scores (teacher enters theory)"}
+                {eAssessmentType === "exam" && "CBT + Theory scores (teacher enters theory)"}
+                {eAssessmentType === "class_activity" && "Only class activity score (teacher enters manually)"}
+              </p>
             </div>
           </div>
           <Button type="submit" className="w-full mt-4" isLoading={isCEPending}>Create Exam</Button>
@@ -325,6 +382,34 @@ export default function TeacherDashboard() {
           <Button type="submit" className="w-full mt-2" isLoading={isCSPending}>Enrol Student</Button>
         </form>
       </Modal>
+
+      <ResultDetailModal
+        resultId={selectedResultId}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedResultId(null)}
+      />
+      {/* Enter Scores Modal */}
+      {selectedStudentForScores && (
+        <EnterScoresModal
+          isOpen={scoresModalOpen}
+          onClose={() => {
+            setScoresModalOpen(false);
+            setSelectedStudentForScores(null);
+          }}
+          examId={selectedStudentForScores.examId}
+          examTitle={selectedStudentForScores.examTitle}
+          assessmentType={selectedStudentForScores.assessmentType}
+          studentId={selectedStudentForScores.studentId}
+          studentName={selectedStudentForScores.studentName}
+          schoolCode={schoolCode}
+          existingTheoryScore={selectedStudentForScores.theoryScore}
+          existingActivityScore={selectedStudentForScores.activityScore}
+          onSuccess={() => {
+            // Refresh results to show updated scores
+            queryClient.invalidateQueries({ queryKey: ["results", schoolCode] });
+          }}
+        />
+      )}
 
       <ResultDetailModal
         resultId={selectedResultId}

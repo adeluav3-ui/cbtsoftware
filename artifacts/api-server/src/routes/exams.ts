@@ -6,6 +6,8 @@ import {
   resultsTable,
   resultAnswersTable,
   usersTable,
+  gradingSchemesTable,
+  studentScoresTable,
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
@@ -79,7 +81,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 router.post("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const session = req.session;
-  const { title, subject, class: examClass, durationMinutes } = req.body;
+  const { title, subject, class: examClass, durationMinutes, assessmentType } = req.body;
 
   if (!title || !subject || !examClass || !durationMinutes) {
     return res.status(400).json({ error: "Title, subject, class and duration required" });
@@ -107,6 +109,7 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
         schoolCode: String(schoolCode),
         teacherId: Number(teacherId),
         isActive: false,
+        assessmentType: assessmentType || "exam",
       })
       .returning();
 
@@ -332,7 +335,7 @@ router.delete("/:examId/questions/:questionId", async (req: Request<QuestionPara
   }
 });
 
-// Submit exam
+// Submit exam with grading scheme support based on assessment type
 router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, fullName, answers } = req.body;
@@ -364,17 +367,60 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       .from(questionsTable)
       .where(eq(questionsTable.examId, parseInt(examId)));
 
-    // Grade
-    let score = 0;
+    // Grade CBT portion
+    let cbtScore = 0;
     for (const q of questions) {
       const studentAnswer = answers[q.id.toString()];
       if (studentAnswer && studentAnswer === q.correctOption) {
-        score++;
+        cbtScore++;
       }
     }
 
     const totalQuestions = questions.length;
-    const percentage = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
+    const cbtPercentage = totalQuestions > 0 ? (cbtScore / totalQuestions) * 100 : 0;
+
+    // Get grading scheme for this school
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+
+    // Default grading scheme if none exists
+    const defaultScheme = {
+      midTermTotal: 20,
+      midTermCbt: 10,
+      midTermTheory: 10,
+      examTotal: 60,
+      examCbt: 30,
+      examTheory: 30,
+      classActivityTotal: 20,
+    };
+
+    const scheme = gradingScheme || defaultScheme;
+
+    // Calculate based on assessment type
+    let componentTotal = 0;
+    let componentCbt = 0;
+    let componentTheory = 0;
+
+    if (exam.assessmentType === 'mid_term') {
+      componentTotal = scheme.midTermTotal;
+      componentCbt = scheme.midTermCbt;
+      componentTheory = scheme.midTermTheory;
+    } else if (exam.assessmentType === 'exam') {
+      componentTotal = scheme.examTotal;
+      componentCbt = scheme.examCbt;
+      componentTheory = scheme.examTheory;
+    } else {
+      // Class Activity - no CBT portion
+      componentTotal = scheme.classActivityTotal;
+      componentCbt = 0;
+      componentTheory = 0;
+    }
+
+    // Calculate scaled CBT score
+    const scaledCbtScore = componentCbt > 0 ? (cbtPercentage / 100) * componentCbt : 0;
 
     // Get student's class
     const [student] = await db
@@ -393,9 +439,9 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
         studentId: parseInt(studentId),
         fullName,
         class: studentClass,
-        score,
+        score: cbtScore,
         totalQuestions,
-        percentage,
+        percentage: (cbtScore / totalQuestions) * 100,
         schoolCode,
       })
       .returning();
@@ -420,11 +466,164 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       );
     }
 
+    // Save to student_scores table with CBT score
+    await db
+      .insert(studentScoresTable)
+      .values({
+        studentId: parseInt(studentId),
+        examId: parseInt(examId),
+        schoolCode,
+        cbtScore: cbtScore,
+        theoryScore: 0,
+        classActivityScore: 0,
+        totalScore: Math.round(scaledCbtScore),
+        percentage: componentTotal > 0 ? Math.round((scaledCbtScore / componentTotal) * 100) : 0,
+      })
+      .onConflictDoUpdate({
+        target: [studentScoresTable.studentId, studentScoresTable.examId],
+        set: {
+          cbtScore: cbtScore,
+          totalScore: Math.round(scaledCbtScore),
+          percentage: componentTotal > 0 ? Math.round((scaledCbtScore / componentTotal) * 100) : 0,
+          updatedAt: new Date(),
+        },
+      });
+
     res.json({
       ...result,
       examTitle: exam.title,
       subject: exam.subject,
+      assessmentType: exam.assessmentType,
+      cbtScore: cbtScore,
+      scaledScore: Math.round(scaledCbtScore),
+      totalPossible: componentTotal,
     });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Teacher enters theory and class activity scores
+// Teacher enters theory and class activity scores
+router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { studentId, theoryScore, classActivityScore } = req.body;
+
+  if (!studentId) {
+    return res.status(400).json({ error: "studentId required" });
+  }
+
+  try {
+    // Get exam to know assessment type
+    const [exam] = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.id, parseInt(examId)),
+          eq(examsTable.schoolCode, schoolCode)
+        )
+      )
+      .limit(1);
+
+    if (!exam) {
+      return res.status(404).json({ error: "Exam not found" });
+    }
+
+    // Get grading scheme
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+
+    const defaultScheme = {
+      midTermTotal: 20,
+      midTermCbt: 10,
+      midTermTheory: 10,
+      examTotal: 60,
+      examCbt: 30,
+      examTheory: 30,
+      classActivityTotal: 20,
+    };
+
+    const scheme = gradingScheme || defaultScheme;
+
+    // Get component totals based on assessment type
+    let componentCbt = 0;
+    let componentTheory = 0;
+    let componentTotal = 0;
+
+    if (exam.assessmentType === 'mid_term') {
+      componentCbt = scheme.midTermCbt;
+      componentTheory = scheme.midTermTheory;
+      componentTotal = scheme.midTermTotal;
+    } else if (exam.assessmentType === 'exam') {
+      componentCbt = scheme.examCbt;
+      componentTheory = scheme.examTheory;
+      componentTotal = scheme.examTotal;
+    } else {
+      // Class Activity
+      componentTotal = scheme.classActivityTotal;
+    }
+
+    // Get existing student score
+    const [existing] = await db
+      .select()
+      .from(studentScoresTable)
+      .where(
+        and(
+          eq(studentScoresTable.studentId, parseInt(studentId)),
+          eq(studentScoresTable.examId, parseInt(examId))
+        )
+      )
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ error: "Student score record not found" });
+    }
+
+    // Calculate total score based on assessment type
+    let totalScore = 0;
+    if (exam.assessmentType === 'class_activity') {
+      totalScore = (classActivityScore || 0);
+    } else {
+      totalScore = (existing.cbtScore || 0) + (theoryScore || 0);
+    }
+
+    const maxTotal = componentTotal;
+    const percentage = maxTotal > 0 ? (totalScore / maxTotal) * 100 : 0;
+
+    // Update student scores
+    const updateData: any = {
+      totalScore: totalScore,
+      percentage: Math.round(percentage),
+      updatedAt: new Date(),
+    };
+
+    if (exam.assessmentType !== 'class_activity') {
+      updateData.theoryScore = theoryScore || 0;
+    }
+
+    if (exam.assessmentType === 'class_activity') {
+      updateData.classActivityScore = classActivityScore || 0;
+    }
+
+    const [updated] = await db
+      .update(studentScoresTable)
+      .set(updateData)
+      .where(
+        and(
+          eq(studentScoresTable.studentId, parseInt(studentId)),
+          eq(studentScoresTable.examId, parseInt(examId))
+        )
+      )
+      .returning();
+
+    res.json(updated);
     return;
   } catch (err) {
     console.error(err);

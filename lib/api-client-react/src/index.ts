@@ -40,6 +40,7 @@ export interface Exam {
     subject: string;
     class: string;
     durationMinutes: number;
+    assessmentType?: string;
     isActive: boolean;
     schoolCode: string;
     teacherId: number;
@@ -70,6 +71,7 @@ export interface Result {
     totalQuestions: number;
     percentage: number;
     schoolCode: string;
+    assessmentType?: string;
     submittedAt: string;
     examTitle?: string;
     subject?: string;
@@ -536,7 +538,7 @@ export function useExam(schoolCode: string, examId: number) {
 export function useCreateExam(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { title: string; subject: string; class: string; durationMinutes: number } }) =>
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { title: string; subject: string; class: string; durationMinutes: number; assessmentType?: string; } }) =>
             api.exams.create(schoolCode, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });

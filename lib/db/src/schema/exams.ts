@@ -11,6 +11,7 @@ export const examsTable = pgTable("exams", {
   isActive: boolean("is_active").notNull().default(false),
   schoolCode: text("school_code").notNull(),
   teacherId: integer("teacher_id").notNull(),
+  assessmentType: text("assessment_type").default("exam"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

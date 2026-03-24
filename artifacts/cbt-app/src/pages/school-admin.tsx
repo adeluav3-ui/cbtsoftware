@@ -49,6 +49,22 @@ export default function SchoolAdminDashboard() {
   const [sClass, setSClass] = useState("JSS1");
 
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
+  const [gradingModalOpen, setGradingModalOpen] = useState(false);
+
+  // Grading scheme state
+  const [gradingScheme, setGradingScheme] = useState({
+    midTermTotal: 20,
+    midTermCbt: 10,
+    midTermTheory: 10,
+    examTotal: 60,
+    examCbt: 30,
+    examTheory: 30,
+    classActivityTotal: 20,
+  });
+  const [isLoadingScheme, setIsLoadingScheme] = useState(false);
+  const [isSavingScheme, setIsSavingScheme] = useState(false);
+  const [schemeError, setSchemeError] = useState("");
+  const [schemeSuccess, setSchemeSuccess] = useState("");
 
   const { mutate: createTeacher, isPending: isCTPending } = useCreateTeacher({
     mutation: {
@@ -146,6 +162,60 @@ export default function SchoolAdminDashboard() {
     setPasscodeModalOpen(true);
   };
 
+  // Fetch grading scheme
+  const fetchGradingScheme = async () => {
+    setIsLoadingScheme(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setGradingScheme(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch grading scheme", err);
+    } finally {
+      setIsLoadingScheme(false);
+    }
+  };
+
+  // Update grading scheme
+  const updateGradingScheme = async () => {
+    setIsSavingScheme(true);
+    setSchemeError("");
+    setSchemeSuccess("");
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gradingScheme),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSchemeError(data.error || "Failed to update grading scheme");
+        return;
+      }
+
+      setSchemeSuccess("Grading scheme updated successfully!");
+      setTimeout(() => setSchemeSuccess(""), 3000);
+    } catch (err) {
+      setSchemeError("Network error. Please try again.");
+    } finally {
+      setIsSavingScheme(false);
+    }
+  };
+
+  // Open modal and fetch scheme
+  const openGradingModal = () => {
+    fetchGradingScheme();
+    setGradingModalOpen(true);
+  };
+
   return (
     <DashboardLayout allowedRoles={["school_admin"]}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -166,7 +236,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6">
-        <CustomTabs tabs={["Teachers", "Students", "Results"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Grading"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {activeTab === "Teachers" && (
@@ -317,6 +387,121 @@ export default function SchoolAdminDashboard() {
               )}
             </tbody>
           </table>
+        </Card>
+      )}
+
+      {activeTab === "Grading" && (
+        <Card className="p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold font-display">Grading Scheme Configuration</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Configure how exam scores are calculated. CBT scores are auto-graded, theory and class activity scores are entered by teachers.
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            {/* Mid-term Component */}
+            <div className="border-b border-border pb-6">
+              <h3 className="text-lg font-semibold mb-4">Mid-term Assessment</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Total Points</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.midTermTotal}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTotal: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">CBT Portion</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.midTermCbt}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermCbt: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Theory Portion</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.midTermTheory}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTheory: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Exam Component */}
+            <div className="border-b border-border pb-6">
+              <h3 className="text-lg font-semibold mb-4">Final Exam</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Total Points</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.examTotal}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, examTotal: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">CBT Portion</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.examCbt}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, examCbt: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Theory Portion</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.examTheory}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, examTheory: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Class Activity */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Class Activity</h3>
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Total Points</label>
+                  <Input
+                    type="number"
+                    value={gradingScheme.classActivityTotal}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, classActivityTotal: parseInt(e.target.value) || 0 })}
+                    className="w-full max-w-md"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {schemeError && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
+                {schemeError}
+              </div>
+            )}
+
+            {schemeSuccess && (
+              <div className="bg-success/10 text-success p-3 rounded-lg text-sm">
+                {schemeSuccess}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4">
+              <Button onClick={updateGradingScheme} isLoading={isSavingScheme}>
+                Save Grading Scheme
+              </Button>
+            </div>
+          </div>
         </Card>
       )}
 
