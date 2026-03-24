@@ -254,6 +254,7 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
           optionD: String(q.optionD),
           correctOption: String(q.correctOption),
           schoolCode,
+          imageUrl: q.imageUrl || null,
         }))
       )
       .returning();
@@ -270,14 +271,10 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
 // Add question to exam
 router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
-  const { text, optionA, optionB, optionC, optionD, correctOption } = req.body;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl } = req.body;
 
   if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
     return res.status(400).json({ error: "All question fields are required" });
-  }
-
-  if (!["A", "B", "C", "D"].includes(correctOption)) {
-    return res.status(400).json({ error: "correctOption must be A, B, C, or D" });
   }
 
   try {
@@ -292,6 +289,7 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
         optionD,
         correctOption,
         schoolCode,
+        imageUrl: imageUrl || null, // Add this line
       })
       .returning();
 

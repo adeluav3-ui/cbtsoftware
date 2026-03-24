@@ -178,7 +178,19 @@ export default function TakeExam() {
               <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-6">
                 Question {currentIdx + 1} of {shuffledQuestions.length}
               </div>
-              <h2 className="text-2xl font-semibold mb-8 text-foreground leading-relaxed">{q.text}</h2>
+              <div className="mb-8">
+                <h2 className="text-2xl font-semibold text-foreground leading-relaxed">{q.text}</h2>
+                {q.imageUrl && (
+                  <div className="mt-4">
+                    <img
+                      src={q.imageUrl}
+                      alt="Question illustration"
+                      className="max-w-full max-h-64 object-contain rounded-lg border border-border mx-auto"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-4">
                 {['A', 'B', 'C', 'D'].map(optKey => {

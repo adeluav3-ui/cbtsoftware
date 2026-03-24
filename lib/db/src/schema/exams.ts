@@ -24,6 +24,7 @@ export const questionsTable = pgTable("questions", {
   optionD: text("option_d").notNull(),
   correctOption: text("correct_option").notNull(), // A, B, C, D
   schoolCode: text("school_code").notNull(),
+  imageUrl: text("image_url"), // NEW - nullable, stores Supabase Storage URL
 });
 
 export const insertExamSchema = createInsertSchema(examsTable).omit({ id: true, createdAt: true });

@@ -271,7 +271,7 @@ export const api = {
         },
 
         addQuestion: async (schoolCode: string, examId: number, data: {
-            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null;
         }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions`, {
                 method: 'POST',
@@ -577,7 +577,7 @@ export function useAddQuestion(options?: MutationOptions) {
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
             schoolCode: string; examId: number; data: {
-                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
+                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null;
             }
         }) => api.exams.addQuestion(schoolCode, examId, data),
         onSuccess: (_, variables) => {

@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
 import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
+import { supabase } from "@/lib/supabase";
 
 export default function TeacherExamDetails() {
   const { examId: rawExamId } = useParams();
@@ -26,6 +27,41 @@ export default function TeacherExamDetails() {
   const [optC, setOptC] = useState("");
   const [optD, setOptD] = useState("");
   const [correctOpt, setCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
+  const [imageUrl, setImageUrl] = useState(""); // NEW: for image URL
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+
+    try {
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `questions/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('question-images') // Create this bucket first in Supabase
+        .upload(filePath, file);
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('question-images')
+        .getPublicUrl(filePath);
+
+      setImageUrl(publicUrl);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Bulk upload modal state
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
@@ -44,7 +80,13 @@ export default function TeacherExamDetails() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
         setModalOpen(false);
-        setQText(""); setOptA(""); setOptB(""); setOptC(""); setOptD(""); setCorrectOpt("A");
+        setQText("");
+        setOptA("");
+        setOptB("");
+        setOptC("");
+        setOptD("");
+        setCorrectOpt("A");
+        setImageUrl("");
       }
     }
   });
@@ -65,7 +107,15 @@ export default function TeacherExamDetails() {
     e.preventDefault();
     addQuestion({
       schoolCode, examId,
-      data: { text: qText, optionA: optA, optionB: optB, optionC: optC, optionD: optD, correctOption: correctOpt }
+      data: {
+        text: qText,
+        optionA: optA,
+        optionB: optB,
+        optionC: optC,
+        optionD: optD,
+        correctOption: correctOpt,
+        imageUrl: imageUrl || null  // Add this line
+      }
     });
   };
 
@@ -153,8 +203,8 @@ export default function TeacherExamDetails() {
                   <div
                     key={optKey}
                     className={`p-3 rounded-xl border ${isCorrect
-                        ? 'bg-success/10 border-success/30 text-success-foreground font-semibold'
-                        : 'bg-muted/30 border-border/50 text-muted-foreground'
+                      ? 'bg-success/10 border-success/30 text-success-foreground font-semibold'
+                      : 'bg-muted/30 border-border/50 text-muted-foreground'
                       }`}
                   >
                     <span className="font-bold mr-2">{optKey}.</span> {optVal as string}
@@ -182,9 +232,37 @@ export default function TeacherExamDetails() {
             <textarea
               value={qText}
               onChange={e => setQText(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px]"
+              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-25"
               required
             />
+          </div>
+          {/* NEW: Image Upload Section */}
+          <div>
+            <Label>Question Image (Optional)</Label>
+            <div className="mt-1 flex items-center gap-4">
+              <label className={`cursor-pointer px-4 py-2 rounded-lg border-2 border-dashed border-border hover:border-primary transition-colors ${isUploading ? 'opacity-50' : ''}`}>
+                <span className="text-sm">Choose Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+              </label>
+              {imageUrl && (
+                <div className="relative">
+                  <img src={imageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl("")}
+                    className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
