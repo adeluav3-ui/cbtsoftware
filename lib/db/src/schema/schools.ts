@@ -7,7 +7,10 @@ export const schoolsTable = pgTable("schools", {
   code: text("code").notNull().unique(),
   name: text("name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  retakePasscode: text("retake_passcode").default("1234"),
 });
+
+
 
 export const insertSchoolSchema = createInsertSchema(schoolsTable).omit({ id: true, createdAt: true });
 export type InsertSchool = z.infer<typeof insertSchoolSchema>;

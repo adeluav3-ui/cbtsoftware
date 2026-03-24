@@ -1,10 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
-import {
-  schoolsTable,
-  usersTable,
-} from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -159,6 +156,130 @@ router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: 
 
     res.json({
       message: `New session started. ${promoted} students promoted, ${archived} students graduated and archived.`,
+    });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get school's retake passcode (for school admin)
+router.get("/:schoolCode/retake-passcode", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+
+  try {
+    const [school] = await db
+      .select({ retakePasscode: schoolsTable.retakePasscode })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({ passcode: school.retakePasscode });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update school's retake passcode (for school admin)
+router.post("/:schoolCode/retake-passcode", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { passcode } = req.body;
+
+  if (!passcode || typeof passcode !== "string" || passcode.length !== 4 || !/^\d{4}$/.test(passcode)) {
+    return res.status(400).json({ error: "Passcode must be a 4-digit number" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ retakePasscode: passcode })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({ success: true, passcode: updated.retakePasscode });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Submit exam retake with passcode verification
+router.post("/:schoolCode/exams/:examId/retake", async (req: Request, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const examIdNum = Number(examId);
+  const { studentId, passcode } = req.body;
+
+  if (!studentId || !passcode) {
+    return res.status(400).json({ error: "studentId and passcode are required" });
+  }
+
+  try {
+    // Get school's passcode
+    const [school] = await db
+      .select({ retakePasscode: schoolsTable.retakePasscode })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    // Verify passcode
+    if (school.retakePasscode !== passcode) {
+      return res.status(403).json({ error: "Invalid passcode" });
+    }
+
+    // Get student's previous result for this exam
+    const [previousResult] = await db
+      .select()
+      .from(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.examId, examIdNum),
+          eq(resultsTable.studentId, Number(studentId)),
+          eq(resultsTable.schoolCode, schoolCodeStr)
+        )
+      )
+      .orderBy(desc(resultsTable.submittedAt))
+      .limit(1);
+
+    if (!previousResult) {
+      return res.status(404).json({ error: "No previous result found to retake" });
+    }
+
+    // Delete previous result answers first (due to foreign key)
+    await db
+      .delete(resultAnswersTable)
+      .where(eq(resultAnswersTable.resultId, previousResult.id));
+
+    // Delete previous result
+    await db
+      .delete(resultsTable)
+      .where(eq(resultsTable.id, previousResult.id));
+
+    res.json({
+      success: true,
+      message: "Previous result cleared. Student can now retake the exam.",
+      examId: examIdNum
     });
     return;
   } catch (err) {

@@ -24,6 +24,12 @@ export default function SchoolAdminDashboard() {
   const { data: students = [] } = useListStudents(schoolCode, classFilter);
   const { data: results = [] } = useListResults(schoolCode);
 
+  const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
+  const [currentPasscode, setCurrentPasscode] = useState("");
+  const [newPasscode, setNewPasscode] = useState("");
+  const [passcodeError, setPasscodeError] = useState("");
+  const [isLoadingPasscode, setIsLoadingPasscode] = useState(false);
+  const [isUpdatingPasscode, setIsUpdatingPasscode] = useState(false);
   // Detail modal state
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | null>(null);
   const [selectedTeacherName, setSelectedTeacherName] = useState("");
@@ -81,6 +87,65 @@ export default function SchoolAdminDashboard() {
     }
   });
 
+  // Fetch current retake passcode
+  const fetchCurrentPasscode = async () => {
+    setIsLoadingPasscode(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/retake-passcode`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setCurrentPasscode(data.passcode);
+      }
+    } catch (err) {
+      console.error("Failed to fetch passcode", err);
+    } finally {
+      setIsLoadingPasscode(false);
+    }
+  };
+
+  // Update retake passcode
+  const updatePasscode = async () => {
+    if (!/^\d{4}$/.test(newPasscode)) {
+      setPasscodeError("Passcode must be exactly 4 digits");
+      return;
+    }
+
+    setIsUpdatingPasscode(true);
+    setPasscodeError("");
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/retake-passcode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode: newPasscode }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setPasscodeError(data.error || "Failed to update passcode");
+        return;
+      }
+
+      setCurrentPasscode(newPasscode);
+      setPasscodeModalOpen(false);
+      setNewPasscode("");
+    } catch (err) {
+      setPasscodeError("Network error. Please try again.");
+    } finally {
+      setIsUpdatingPasscode(false);
+    }
+  };
+
+  // Open modal and fetch current passcode
+  const openPasscodeModal = () => {
+    fetchCurrentPasscode();
+    setPasscodeModalOpen(true);
+  };
+
   return (
     <DashboardLayout allowedRoles={["school_admin"]}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -88,10 +153,16 @@ export default function SchoolAdminDashboard() {
           <h1 className="text-3xl font-display font-bold">School Administration</h1>
           <p className="text-muted-foreground mt-1">Manage personnel, students, and academic records.</p>
         </div>
-        <Button variant="outline" onClick={() => setSessionModalOpen(true)}>
-          <RotateCw className="w-4 h-4 mr-2 text-primary" />
-          Start New Session
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={openPasscodeModal}>
+            <RotateCw className="w-4 h-4 mr-2" />
+            Retake Passcode
+          </Button>
+          <Button variant="outline" onClick={() => setSessionModalOpen(true)}>
+            <RotateCw className="w-4 h-4 mr-2 text-primary" />
+            Start New Session
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">
@@ -307,6 +378,61 @@ export default function SchoolAdminDashboard() {
         schoolCode={schoolCode}
         onClose={() => setSelectedResultId(null)}
       />
+
+      {/* Retake Passcode Modal */}
+      <Modal
+        isOpen={passcodeModalOpen}
+        onClose={() => setPasscodeModalOpen(false)}
+        title="Retake Exam Passcode"
+      >
+        <div className="space-y-4">
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <label className="text-sm font-medium text-muted-foreground">Current Passcode</label>
+            <div className="text-2xl font-mono font-bold tracking-wider mt-1">
+              {isLoadingPasscode ? "Loading..." : currentPasscode || "1234"}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">New Passcode (4 digits)</label>
+            <Input
+              type="password"
+              maxLength={4}
+              placeholder="Enter new 4-digit passcode"
+              value={newPasscode}
+              onChange={(e) => {
+                setNewPasscode(e.target.value.replace(/[^0-9]/g, '').slice(0, 4));
+                setPasscodeError("");
+              }}
+              className="text-center text-2xl tracking-widest"
+            />
+          </div>
+
+          {passcodeError && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
+              {passcodeError}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Students will need this 4-digit code to retake exams. Keep it secure.
+          </p>
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setPasscodeModalOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              onClick={updatePasscode}
+              isLoading={isUpdatingPasscode}
+              disabled={!newPasscode}
+              className="flex-1"
+            >
+              Update Passcode
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   );
 }
