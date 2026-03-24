@@ -32,9 +32,9 @@ export default function TakeExam() {
   const [isFinished, setIsFinished] = useState(false);
   const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
 
-  const shuffledQuestions = useMemo(() => {
+  const questions = useMemo(() => {
     if (!exam?.questions) return [];
-    return [...exam.questions].sort(() => Math.random() - 0.5);
+    return exam.questions; // Keep original order
   }, [exam?.questions]);
 
   useEffect(() => {
@@ -45,6 +45,7 @@ export default function TakeExam() {
       handleFinalSubmit();
     }
   }, [hasStarted, timeLeft, isFinished]);
+
   useEffect(() => {
     if (hasStarted && Object.keys(answers).length > 0) {
       localStorage.setItem(`answers_${examId}`, JSON.stringify(answers));
@@ -77,7 +78,6 @@ export default function TakeExam() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasStarted, isFinished]);
 
-
   useEffect(() => {
     if (!hasStarted || isFinished) return;
 
@@ -105,7 +105,6 @@ export default function TakeExam() {
       }
     }, {
       onSuccess: (res) => {
-        // ← REPLACE your existing onSuccess with this
         localStorage.removeItem(`exam_${examId}`);
         localStorage.removeItem(`answers_${examId}`);
         setResultScore({ score: res.score, pct: res.percentage });
@@ -147,7 +146,7 @@ export default function TakeExam() {
   const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
   const isLowTime = timeLeft < 300; // less than 5 mins
 
-  const q = shuffledQuestions[currentIdx];
+  const q = questions[currentIdx];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -176,7 +175,7 @@ export default function TakeExam() {
               className="bg-card rounded-3xl p-8 shadow-xl border border-border/50"
             >
               <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-6">
-                Question {currentIdx + 1} of {shuffledQuestions.length}
+                Question {currentIdx + 1} of {questions.length}
               </div>
               <div className="mb-8">
                 <h2 className="text-2xl font-semibold text-foreground leading-relaxed">{q.text}</h2>
@@ -223,7 +222,7 @@ export default function TakeExam() {
                 >
                   Previous
                 </Button>
-                {currentIdx === shuffledQuestions.length - 1 ? (
+                {currentIdx === questions.length - 1 ? (
                   <Button variant="primary" onClick={handleFinalSubmit}>Submit Exam</Button>
                 ) : (
                   <Button onClick={() => setCurrentIdx(p => p + 1)}>Next Question</Button>
@@ -240,7 +239,7 @@ export default function TakeExam() {
           <Card className="p-6 sticky top-24">
             <h3 className="font-bold mb-4 font-display">Navigation</h3>
             <div className="grid grid-cols-5 gap-2">
-              {shuffledQuestions.map((sq, idx) => {
+              {questions.map((sq, idx) => {
                 const isAns = !!answers[sq.id.toString()];
                 const isCurr = idx === currentIdx;
                 return (
@@ -278,7 +277,7 @@ export default function TakeExam() {
               <CheckCircle2 className="w-24 h-24 text-success mx-auto mb-6" />
               <h2 className="text-4xl font-bold font-display mb-2">{resultScore.pct.toFixed(1)}%</h2>
               <p className="text-xl text-muted-foreground mb-8">
-                You scored {resultScore.score} out of {shuffledQuestions.length}
+                You scored {resultScore.score} out of {questions.length}
               </p>
               <div className="flex flex-col gap-3">
                 <Button
