@@ -57,6 +57,7 @@ export interface Question {
     optionD: string;
     correctOption: string;
     schoolCode: string;
+    imageUrl?: string | null;
 }
 
 export interface Result {

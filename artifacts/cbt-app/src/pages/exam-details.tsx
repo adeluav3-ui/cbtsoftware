@@ -193,7 +193,19 @@ export default function TeacherExamDetails() {
               <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold mr-4 shrink-0">
                 {i + 1}
               </span>
-              <p className="text-lg font-semibold text-foreground">{q.text}</p>
+              <div className="flex-1">
+                <p className="text-lg font-semibold text-foreground">{q.text}</p>
+                {q.imageUrl && (
+                  <div className="mt-3">
+                    <img
+                      src={q.imageUrl}
+                      alt="Question illustration"
+                      className="max-h-48 object-contain rounded-lg border border-border"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-12">
               {['A', 'B', 'C', 'D'].map(optKey => {
