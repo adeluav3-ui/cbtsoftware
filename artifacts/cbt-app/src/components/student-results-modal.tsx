@@ -34,6 +34,7 @@ export function StudentResultsModal({
     const [subjects, setSubjects] = useState<SubjectResult[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [overallAverage, setOverallAverage] = useState(0);
+    const [completedSubjectsCount, setCompletedSubjectsCount] = useState(0);
 
     useEffect(() => {
         if (isOpen && studentId) {
@@ -41,7 +42,6 @@ export function StudentResultsModal({
         }
     }, [isOpen, studentId]);
 
-    // In student-results-modal.tsx, update the fetchResults function
     const fetchResults = async () => {
         setIsLoading(true);
         try {
@@ -51,27 +51,51 @@ export function StudentResultsModal({
             );
             const data = await response.json();
 
-            // Process the data to show the correct scores
+            // Process the data - only show percentage when all components are entered
             const processedSubjects = data.map((subject: any) => {
-                // For display, we need to know if all components are entered
-                const hasAllComponents = subject.midTermScore !== null &&
-                    subject.classActivityScore !== null &&
-                    subject.examScore !== null;
+                // Check if each component exists (not null and not undefined)
+                const hasMidTerm = subject.midTermScore !== null && subject.midTermScore !== undefined;
+                const hasActivity = subject.classActivityScore !== null && subject.classActivityScore !== undefined;
+                const hasExam = subject.examScore !== null && subject.examScore !== undefined;
+
+                // All three components must be entered for a complete result
+                const allComponentsEntered = hasMidTerm && hasActivity && hasExam;
+
+                let totalScore = null;
+                let percentage = null;
+                let grade = null;
+
+                if (allComponentsEntered) {
+                    // Sum all three components (each is already out of its respective max)
+                    totalScore = (subject.midTermScore || 0) + (subject.classActivityScore || 0) + (subject.examScore || 0);
+                    percentage = totalScore; // Since total is out of 100
+
+                    if (percentage >= 70) grade = 'A';
+                    else if (percentage >= 60) grade = 'B';
+                    else if (percentage >= 50) grade = 'C';
+                    else if (percentage >= 40) grade = 'D';
+                    else grade = 'F';
+                }
 
                 return {
-                    ...subject,
-                    totalScore: hasAllComponents ? (subject.midTermScore + subject.classActivityScore + subject.examScore) : null,
-                    percentage: hasAllComponents ? subject.percentage : null,
-                    grade: hasAllComponents ? subject.grade : null,
+                    subjectName: subject.subjectName,
+                    midTermScore: subject.midTermScore,
+                    classActivityScore: subject.classActivityScore,
+                    examScore: subject.examScore,
+                    totalScore: totalScore,
+                    percentage: percentage,
+                    grade: grade,
                 };
             });
 
             setSubjects(processedSubjects);
 
             // Calculate overall average only from subjects with all components
-            const completedSubjects = processedSubjects.filter((s: any) => s.percentage !== null);
+            const completedSubjects = processedSubjects.filter((s: SubjectResult) => s.percentage !== null);
+            setCompletedSubjectsCount(completedSubjects.length);
+
             if (completedSubjects.length > 0) {
-                const total = completedSubjects.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0);
+                const total = completedSubjects.reduce((acc: number, s: SubjectResult) => acc + (s.percentage || 0), 0);
                 setOverallAverage(total / completedSubjects.length);
             } else {
                 setOverallAverage(0);
@@ -110,8 +134,15 @@ export function StudentResultsModal({
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-muted-foreground">Overall Average</p>
-                        <p className={`text-2xl font-bold ${overallAverage >= 70 ? "text-green-600" : "text-destructive"}`}>
-                            {overallAverage.toFixed(1)}%
+                        {completedSubjectsCount > 0 ? (
+                            <p className={`text-2xl font-bold ${overallAverage >= 70 ? "text-green-600" : "text-destructive"}`}>
+                                {overallAverage.toFixed(1)}%
+                            </p>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No complete results</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {completedSubjectsCount} subject{completedSubjectsCount !== 1 ? 's' : ''} completed
                         </p>
                     </div>
                 </div>
@@ -135,36 +166,52 @@ export function StudentResultsModal({
                                     <th className="px-4 py-3 font-semibold text-center">Exam (60%)</th>
                                     <th className="px-4 py-3 font-semibold text-center">Total (100%)</th>
                                     <th className="px-4 py-3 font-semibold text-center">Grade</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {subjects.map((subject) => (
-                                    <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
-                                        <td className="px-4 py-3 font-medium">{subject.subjectName}</td>
-                                        <td className="px-4 py-3 text-center">{getScoreDisplay(subject.midTermScore)}</td>
-                                        <td className="px-4 py-3 text-center">{getScoreDisplay(subject.classActivityScore)}</td>
-                                        <td className="px-4 py-3 text-center">{getScoreDisplay(subject.examScore)}</td>
-                                        <td className="px-4 py-3 text-center font-bold">
-                                            {subject.totalScore !== null ? `${subject.totalScore}/100` : "—"}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {subject.grade ? (
-                                                <Badge className={getGradeColor(subject.grade)}>
-                                                    {subject.grade}
-                                                </Badge>
-                                            ) : (
-                                                "—"
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {subjects.map((subject) => {
+                                    const hasMidTerm = subject.midTermScore !== null;
+                                    const hasActivity = subject.classActivityScore !== null;
+                                    const hasExam = subject.examScore !== null;
+                                    const isComplete = hasMidTerm && hasActivity && hasExam;
+
+                                    return (
+                                        <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
+                                            <td className="px-4 py-3 font-medium">{subject.subjectName}</td>
+                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.midTermScore)}</td>
+                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.classActivityScore)}</td>
+                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.examScore)}</td>
+                                            <td className="px-4 py-3 text-center font-bold">
+                                                {isComplete ? `${subject.totalScore}/100` : "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {subject.grade ? (
+                                                    <Badge className={getGradeColor(subject.grade)}>
+                                                        {subject.grade}
+                                                    </Badge>
+                                                ) : (
+                                                    "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {isComplete ? (
+                                                    <Badge variant="success">Complete</Badge>
+                                                ) : (
+                                                    <Badge variant="default">In Progress</Badge>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
                 )}
 
                 <div className="pt-4 text-xs text-muted-foreground text-center border-t border-border">
-                    Scores are automatically calculated when all components are entered
+                    Scores are calculated when all three components (Mid-Term, Class Activity, and Exam) are entered.
+                    {completedSubjectsCount === 0 && " No complete results yet."}
                 </div>
             </div>
         </Modal>
