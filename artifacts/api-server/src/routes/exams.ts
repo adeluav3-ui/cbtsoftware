@@ -479,6 +479,7 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Submit exam with grading scheme support
+// Submit exam with grading scheme support
 router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, fullName, answers } = req.body;
@@ -607,11 +608,17 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       .limit(1);
 
     if (existingScore) {
-      // Update existing record
+      // Update existing record - only set the CBT portion, preserve theory that might have been entered
       const updateData: any = { updatedAt: new Date() };
-      if (exam.assessmentType === 'mid_term') updateData.midTermScore = Math.round(scaledCbtScore);
-      if (exam.assessmentType === 'exam') updateData.examScore = Math.round(scaledCbtScore);
-      if (exam.assessmentType === 'class_activity') updateData.classActivityScore = Math.round(scaledCbtScore);
+
+      if (exam.assessmentType === 'mid_term') {
+        // Store only the CBT portion, theory will be added separately
+        updateData.midTermScore = Math.round(scaledCbtScore);
+      } else if (exam.assessmentType === 'exam') {
+        updateData.examScore = Math.round(scaledCbtScore);
+      } else if (exam.assessmentType === 'class_activity') {
+        updateData.classActivityScore = Math.round(scaledCbtScore);
+      }
 
       await db
         .update(subjectScoresTable)
@@ -623,7 +630,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
           )
         );
     } else {
-      // Insert new record
+      // Insert new record with only CBT portion
       await db
         .insert(subjectScoresTable)
         .values({
@@ -655,6 +662,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Teacher enters theory and class activity scores
+// Teacher enters theory and class activity scores
 router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, theoryScore, classActivityScore } = req.body;
@@ -679,6 +687,33 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       return res.status(404).json({ error: "Exam not found" });
     }
 
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+
+    const defaultScheme = {
+      midTermTotal: 20,
+      midTermCbt: 10,
+      midTermTheory: 10,
+      examTotal: 60,
+      examCbt: 30,
+      examTheory: 30,
+      classActivityTotal: 20,
+    };
+
+    const scheme = gradingScheme || defaultScheme;
+
+    let componentTotal = 0;
+    if (exam.assessmentType === 'mid_term') {
+      componentTotal = scheme.midTermTotal;
+    } else if (exam.assessmentType === 'exam') {
+      componentTotal = scheme.examTotal;
+    } else {
+      componentTotal = scheme.classActivityTotal;
+    }
+
     const [existing] = await db
       .select()
       .from(subjectScoresTable)
@@ -695,16 +730,35 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
     }
 
     const updateData: any = { updatedAt: new Date() };
+    let totalScore = 0;
 
     if (exam.assessmentType === 'class_activity') {
       updateData.classActivityScore = classActivityScore || 0;
+      totalScore = updateData.classActivityScore;
     } else if (exam.assessmentType === 'mid_term') {
-      // For mid-term, add theory score to existing midTermScore (which already has CBT)
-      updateData.midTermScore = (existing.midTermScore || 0) + (theoryScore || 0);
+      // Get current CBT portion
+      const cbtPortion = existing.midTermScore || 0;
+      const theoryAdded = theoryScore || 0;
+      totalScore = cbtPortion + theoryAdded;
+      updateData.midTermScore = totalScore;
     } else if (exam.assessmentType === 'exam') {
-      // For exam, add theory score to existing examScore (which already has CBT)
-      updateData.examScore = (existing.examScore || 0) + (theoryScore || 0);
+      // Get current CBT portion
+      const cbtPortion = existing.examScore || 0;
+      const theoryAdded = theoryScore || 0;
+      totalScore = cbtPortion + theoryAdded;
+      updateData.examScore = totalScore;
     }
+
+    const percentage = (totalScore / componentTotal) * 100;
+    updateData.totalScore = totalScore;
+    updateData.percentage = Math.round(percentage);
+
+    // Calculate grade
+    if (percentage >= 70) updateData.grade = 'A';
+    else if (percentage >= 60) updateData.grade = 'B';
+    else if (percentage >= 50) updateData.grade = 'C';
+    else if (percentage >= 40) updateData.grade = 'D';
+    else updateData.grade = 'F';
 
     const [updated] = await db
       .update(subjectScoresTable)

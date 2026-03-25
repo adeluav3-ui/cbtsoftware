@@ -41,6 +41,7 @@ export function StudentResultsModal({
         }
     }, [isOpen, studentId]);
 
+    // In student-results-modal.tsx, update the fetchResults function
     const fetchResults = async () => {
         setIsLoading(true);
         try {
@@ -49,16 +50,28 @@ export function StudentResultsModal({
                 { credentials: "include" }
             );
             const data = await response.json();
-            setSubjects(data);
 
-            // Calculate overall average (only from subjects with all components entered)
-            const completedSubjects = data.filter((s: SubjectResult) => {
-                // Only count if all three components are not null
-                return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+            // Process the data to show the correct scores
+            const processedSubjects = data.map((subject: any) => {
+                // For display, we need to know if all components are entered
+                const hasAllComponents = subject.midTermScore !== null &&
+                    subject.classActivityScore !== null &&
+                    subject.examScore !== null;
+
+                return {
+                    ...subject,
+                    totalScore: hasAllComponents ? (subject.midTermScore + subject.classActivityScore + subject.examScore) : null,
+                    percentage: hasAllComponents ? subject.percentage : null,
+                    grade: hasAllComponents ? subject.grade : null,
+                };
             });
 
+            setSubjects(processedSubjects);
+
+            // Calculate overall average only from subjects with all components
+            const completedSubjects = processedSubjects.filter((s: any) => s.percentage !== null);
             if (completedSubjects.length > 0) {
-                const total = completedSubjects.reduce((acc: number, s: SubjectResult) => acc + (s.percentage || 0), 0);
+                const total = completedSubjects.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0);
                 setOverallAverage(total / completedSubjects.length);
             } else {
                 setOverallAverage(0);
