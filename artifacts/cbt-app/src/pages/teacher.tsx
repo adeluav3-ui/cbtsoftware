@@ -119,7 +119,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const fetchSubjectScores = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subject-scores`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/subject-scores`, {
           credentials: "include",
         });
         const data = await response.json();
