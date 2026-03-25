@@ -51,11 +51,17 @@ export function StudentResultsModal({
             const data = await response.json();
             setSubjects(data);
 
-            // Calculate overall average (only from subjects with all components)
-            const completedSubjects = data.filter((s: SubjectResult) => s.percentage !== null);
+            // Calculate overall average (only from subjects with all components entered)
+            const completedSubjects = data.filter((s: SubjectResult) => {
+                // Only count if all three components are not null
+                return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+            });
+
             if (completedSubjects.length > 0) {
                 const total = completedSubjects.reduce((acc: number, s: SubjectResult) => acc + (s.percentage || 0), 0);
                 setOverallAverage(total / completedSubjects.length);
+            } else {
+                setOverallAverage(0);
             }
         } catch (err) {
             console.error("Failed to fetch results", err);

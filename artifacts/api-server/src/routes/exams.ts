@@ -384,16 +384,7 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       componentTotal = scheme.classActivityTotal;
     }
 
-    const subjectScoresList = await db
-      .select()
-      .from(subjectScoresTable)
-      .where(
-        and(
-          eq(subjectScoresTable.subjectName, exam.subject),
-          eq(subjectScoresTable.schoolCode, schoolCode)
-        )
-      );
-
+    // Get all results for this exam
     const resultsList = await db
       .select()
       .from(resultsTable)
@@ -404,21 +395,41 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
         )
       );
 
+    // Get all subject scores for these students
+    const studentIds = resultsList.map(r => r.studentId);
+    const subjectScoresList = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.subjectName, exam.subject),
+          eq(subjectScoresTable.schoolCode, schoolCode),
+          sql`${subjectScoresTable.studentId} IN (${studentIds.join(',')})`
+        )
+      );
+
     const mergedResults = resultsList.map(result => {
       const scoreRecord = subjectScoresList.find(s => s.studentId === result.studentId);
       const rawCbtPercentage = (result.score / result.totalQuestions) * 100;
       const scaledCbtScore = (rawCbtPercentage / 100) * componentCbt;
 
       let componentScore = 0;
+      let theoryPortion = 0;
       let totalScore = 0;
       let finalPercentage = 0;
 
       if (exam.assessmentType === 'mid_term') {
-        componentScore = scoreRecord?.midTermScore || 0;
+        // Get the stored midTermScore (which includes CBT + any theory entered)
+        const storedMidTerm = scoreRecord?.midTermScore || 0;
+        // Theory portion is what was added after the CBT
+        theoryPortion = storedMidTerm - scaledCbtScore;
+        componentScore = storedMidTerm;
         totalScore = componentScore;
         finalPercentage = (totalScore / componentTotal) * 100;
       } else if (exam.assessmentType === 'exam') {
-        componentScore = scoreRecord?.examScore || 0;
+        const storedExam = scoreRecord?.examScore || 0;
+        theoryPortion = storedExam - scaledCbtScore;
+        componentScore = storedExam;
         totalScore = componentScore;
         finalPercentage = (totalScore / componentTotal) * 100;
       } else {
@@ -435,6 +446,7 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
         cbtTotal: result.totalQuestions,
         cbtPercentage: rawCbtPercentage,
         scaledCbtScore: Math.round(scaledCbtScore),
+        theoryScore: Math.max(0, Math.round(theoryPortion)),
         componentScore: Math.round(componentScore),
         totalScore: Math.round(totalScore),
         maxScore: componentTotal,
