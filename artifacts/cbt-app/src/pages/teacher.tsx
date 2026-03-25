@@ -13,6 +13,7 @@ import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users
 import { format } from "date-fns";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
+import { StudentDetailModal } from "@/components/student-detail-modal"; // Add this import
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -44,6 +45,10 @@ export default function TeacherDashboard() {
     theoryScore: number;
     activityScore: number;
   } | null>(null);
+
+  // Student detail modal state
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState("");
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -181,6 +186,7 @@ export default function TeacherDashboard() {
           )}
         </div>
       )}
+
       {/* ── Students Tab ──────────────────────────────── */}
       {activeTab === "Students" && (
         <Card className="p-0 overflow-hidden">
@@ -220,15 +226,25 @@ export default function TeacherDashboard() {
                 </tr>
               ) : (
                 students.map(s => (
-                  <tr key={s.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4 font-semibold">{s.fullName}</td>
+                  <tr
+                    key={s.id}
+                    className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSelectedStudentId(s.id);
+                      setSelectedStudentName(s.fullName || s.username);
+                    }}
+                  >
+                    <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
                     <td className="px-6 py-4 text-muted-foreground font-mono text-sm">{s.username}</td>
                     <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
                     <td className="px-6 py-4 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteStudent({ schoolCode, studentId: s.id })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteStudent({ schoolCode, studentId: s.id });
+                        }}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -333,6 +349,7 @@ export default function TeacherDashboard() {
           )}
         </>
       )}
+
       {/* ── Create Exam Modal ────────────────────────── */}
       <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
         <form onSubmit={handleCreate} className="space-y-4">
@@ -394,6 +411,7 @@ export default function TeacherDashboard() {
         schoolCode={schoolCode}
         onClose={() => setSelectedResultId(null)}
       />
+
       {/* Enter Scores Modal */}
       {selectedStudentForScores && (
         <EnterScoresModal
@@ -411,16 +429,17 @@ export default function TeacherDashboard() {
           existingTheoryScore={selectedStudentForScores.theoryScore}
           existingActivityScore={selectedStudentForScores.activityScore}
           onSuccess={() => {
-            // Refresh results to show updated scores
             queryClient.invalidateQueries({ queryKey: ["results", schoolCode] });
           }}
         />
       )}
 
-      <ResultDetailModal
-        resultId={selectedResultId}
+      {/* Student Detail Modal */}
+      <StudentDetailModal
+        studentId={selectedStudentId}
+        studentName={selectedStudentName}
         schoolCode={schoolCode}
-        onClose={() => setSelectedResultId(null)}
+        onClose={() => setSelectedStudentId(null)}
       />
     </DashboardLayout>
   );
