@@ -5,7 +5,7 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -58,6 +58,80 @@ export default function SchoolAdminDashboard() {
   const [newSubjectLevel, setNewSubjectLevel] = useState<"junior" | "senior">("junior");
   const [subjectError, setSubjectError] = useState("");
   const [isAddingSubject, setIsAddingSubject] = useState(false);
+
+  // Bulk subject upload state
+  const [bulkSubjectModalOpen, setBulkSubjectModalOpen] = useState(false);
+  const [bulkSubjectsText, setBulkSubjectsText] = useState("");
+  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"junior" | "senior">("junior");
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [bulkSubjectError, setBulkSubjectError] = useState("");
+  const [bulkSubjectSuccess, setBulkSubjectSuccess] = useState("");
+
+  // Bulk add subjects
+  const handleBulkAddSubjects = async () => {
+    if (!bulkSubjectsText.trim()) {
+      setBulkSubjectError("Please enter at least one subject");
+      return;
+    }
+
+    setIsBulkAdding(true);
+    setBulkSubjectError("");
+    setBulkSubjectSuccess("");
+
+    // Parse subjects - one per line
+    const subjectNames = bulkSubjectsText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    if (subjectNames.length === 0) {
+      setBulkSubjectError("No valid subjects found");
+      setIsBulkAdding(false);
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const failedSubjects: string[] = [];
+
+    for (const subjectName of subjectNames) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: subjectName, level: bulkSubjectsLevel }),
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+          failedSubjects.push(subjectName);
+        }
+      } catch (err) {
+        failCount++;
+        failedSubjects.push(subjectName);
+      }
+    }
+
+    if (successCount > 0) {
+      await fetchSubjects();
+      setBulkSubjectSuccess(`Added ${successCount} subjects successfully. ${failCount > 0 ? `${failCount} failed.` : ""}`);
+    }
+
+    if (failCount > 0 && successCount === 0) {
+      setBulkSubjectError(`Failed to add ${failCount} subjects. Check for duplicates or network issues.`);
+    }
+
+    setIsBulkAdding(false);
+
+    // Clear after 3 seconds
+    setTimeout(() => {
+      setBulkSubjectSuccess("");
+      setBulkSubjectError("");
+    }, 3000);
+  };
 
   // Grading scheme state
   const [gradingScheme, setGradingScheme] = useState({
@@ -601,9 +675,14 @@ export default function SchoolAdminDashboard() {
                 Add subjects for Junior Secondary (JSS1-3) and Senior Secondary (SSS1-3)
               </p>
             </div>
-            <Button onClick={() => setSubjectModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Add Subject
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setBulkSubjectModalOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+              </Button>
+              <Button onClick={() => setSubjectModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Add Subject
+              </Button>
+            </div>
           </div>
 
           {isSubjectsLoading ? (
@@ -706,8 +785,103 @@ export default function SchoolAdminDashboard() {
               </div>
             </form>
           </Modal>
+          {/* Bulk Upload Modal */}
+          <Modal isOpen={bulkSubjectModalOpen} onClose={() => setBulkSubjectModalOpen(false)} title="Bulk Upload Subjects" size="lg">
+            <div className="space-y-4">
+              <div>
+                <Label>Level</Label>
+                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "junior" | "senior")}>
+                  <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
+                  <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Subjects (one per line)</Label>
+                <textarea
+                  value={bulkSubjectsText}
+                  onChange={e => setBulkSubjectsText(e.target.value)}
+                  placeholder="Mathematics&#10;English Language&#10;Basic Science&#10;Social Studies&#10;..."
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-50 font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Enter one subject per line. Duplicate subjects will be ignored.
+                </p>
+              </div>
+
+              {bulkSubjectError && (
+                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
+                  {bulkSubjectError}
+                </div>
+              )}
+
+              {bulkSubjectSuccess && (
+                <div className="bg-success/10 text-success p-3 rounded-lg text-sm">
+                  {bulkSubjectSuccess}
+                </div>
+              )}
+
+              <div className="bg-muted/20 p-3 rounded-lg">
+                <p className="text-sm font-semibold mb-2">Common Subjects:</p>
+                <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                  {bulkSubjectsLevel === "junior" ? (
+                    <>
+                      <span>• Mathematics</span>
+                      <span>• English Language</span>
+                      <span>• Basic Science</span>
+                      <span>• Basic Technology</span>
+                      <span>• Social Studies</span>
+                      <span>• Civic Education</span>
+                      <span>• Christian Religious Studies</span>
+                      <span>• Islamic Religious Studies</span>
+                      <span>• Business Studies</span>
+                      <span>• Computer Studies</span>
+                      <span>• French</span>
+                      <span>• Home Economics</span>
+                      <span>• Agricultural Science</span>
+                      <span>• Cultural & Creative Arts</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>• Mathematics</span>
+                      <span>• English Language</span>
+                      <span>• Physics</span>
+                      <span>• Chemistry</span>
+                      <span>• Biology</span>
+                      <span>• Economics</span>
+                      <span>• Government</span>
+                      <span>• Literature in English</span>
+                      <span>• Christian Religious Studies</span>
+                      <span>• Islamic Religious Studies</span>
+                      <span>• Geography</span>
+                      <span>• Commerce</span>
+                      <span>• Accounting</span>
+                      <span>• Further Mathematics</span>
+                      <span>• Civic Education</span>
+                      <span>• Computer Science</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setBulkSubjectModalOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkAddSubjects}
+                  isLoading={isBulkAdding}
+                  disabled={!bulkSubjectsText.trim()}
+                  className="flex-1"
+                >
+                  Upload Subjects
+                </Button>
+              </div>
+            </div>
+          </Modal>
         </Card>
       )}
+
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">
