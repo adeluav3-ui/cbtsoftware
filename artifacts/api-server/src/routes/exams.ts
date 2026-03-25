@@ -156,17 +156,69 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
 // Delete exam
 router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const examIdNum = parseInt(examId);
 
   try {
+    // 1. First, get all results for this exam
+    const examResults = await db
+      .select({ id: resultsTable.id })
+      .from(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.examId, examIdNum),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      );
+
+    // 2. Delete result_answers for all results
+    if (examResults.length > 0) {
+      for (const result of examResults) {
+        await db
+          .delete(resultAnswersTable)
+          .where(eq(resultAnswersTable.resultId, result.id));
+      }
+    }
+
+    // 3. Delete results
+    await db
+      .delete(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.examId, examIdNum),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      );
+
+    // 4. Delete questions
     await db
       .delete(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)));
+      .where(eq(questionsTable.examId, examIdNum));
 
+    // 5. Delete subject_scores for this exam's subject
+    // Get the exam to know the subject
+    const [exam] = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCode)
+        )
+      )
+      .limit(1);
+
+    if (exam) {
+      // Delete subject_scores for this exam's subject (optional - only if you want to clean up)
+      // Note: Be careful as this might delete scores from other exams of the same subject
+      // For now, we'll skip this to avoid accidental deletion
+    }
+
+    // 6. Finally, delete the exam
     const [deleted] = await db
       .delete(examsTable)
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
+          eq(examsTable.id, examIdNum),
           eq(examsTable.schoolCode, schoolCode)
         )
       )
@@ -176,10 +228,10 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
       return res.status(404).json({ error: "Exam not found" });
     }
 
-    res.json({ message: "Exam deleted" });
+    res.json({ message: "Exam deleted successfully" });
     return;
   } catch (err) {
-    console.error(err);
+    console.error("Error deleting exam:", err);
     res.status(500).json({ error: "Server error" });
     return;
   }
