@@ -632,4 +632,142 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
   }
 });
 
+// Get all student scores for an exam with theory and activity scores
+router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+
+  try {
+    // Get exam with assessment type
+    const [exam] = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.id, parseInt(examId)),
+          eq(examsTable.schoolCode, schoolCode)
+        )
+      )
+      .limit(1);
+
+    if (!exam) {
+      return res.status(404).json({ error: "Exam not found" });
+    }
+
+    // Get grading scheme
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+
+    const defaultScheme = {
+      midTermTotal: 20,
+      midTermCbt: 10,
+      midTermTheory: 10,
+      examTotal: 60,
+      examCbt: 30,
+      examTheory: 30,
+      classActivityTotal: 20,
+    };
+
+    const scheme = gradingScheme || defaultScheme;
+
+    // Get component totals based on assessment type
+    let componentTotal = 0;
+    let componentCbt = 0;
+    let componentTheory = 0;
+
+    if (exam.assessmentType === 'mid_term') {
+      componentTotal = scheme.midTermTotal;
+      componentCbt = scheme.midTermCbt;
+      componentTheory = scheme.midTermTheory;
+    } else if (exam.assessmentType === 'exam') {
+      componentTotal = scheme.examTotal;
+      componentCbt = scheme.examCbt;
+      componentTheory = scheme.examTheory;
+    } else {
+      componentTotal = scheme.classActivityTotal;
+      componentCbt = 0;
+      componentTheory = 0;
+    }
+
+    // Get all student scores for this exam
+    const studentScores = await db
+      .select()
+      .from(studentScoresTable)
+      .where(
+        and(
+          eq(studentScoresTable.examId, parseInt(examId)),
+          eq(studentScoresTable.schoolCode, schoolCode)
+        )
+      );
+
+    // Get all results for this exam (for CBT score)
+    const results = await db
+      .select()
+      .from(resultsTable)
+      .where(
+        and(
+          eq(resultsTable.examId, parseInt(examId)),
+          eq(resultsTable.schoolCode, schoolCode)
+        )
+      );
+
+    // Merge data
+    const mergedResults = results.map(result => {
+      const scoreRecord = studentScores.find(s => s.studentId === result.studentId);
+      const rawCbtPercentage = (result.score / result.totalQuestions) * 100;
+      const scaledCbtScore = (rawCbtPercentage / 100) * componentCbt;
+
+      let finalTotal = 0;
+      let finalPercentage = 0;
+
+      if (exam.assessmentType === 'class_activity') {
+        finalTotal = scoreRecord?.classActivityScore || 0;
+        finalPercentage = (finalTotal / componentTotal) * 100;
+      } else {
+        finalTotal = scaledCbtScore + (scoreRecord?.theoryScore || 0);
+        finalPercentage = (finalTotal / componentTotal) * 100;
+      }
+
+      return {
+        studentId: result.studentId,
+        studentName: result.fullName,
+        studentClass: result.class,
+        cbtRawScore: result.score,
+        cbtTotal: result.totalQuestions,
+        cbtPercentage: rawCbtPercentage,
+        scaledCbtScore: Math.round(scaledCbtScore),
+        theoryScore: scoreRecord?.theoryScore || 0,
+        classActivityScore: scoreRecord?.classActivityScore || 0,
+        totalScore: Math.round(finalTotal),
+        maxScore: componentTotal,
+        percentage: Math.round(finalPercentage),
+        grade: finalPercentage >= 70 ? 'A' : finalPercentage >= 60 ? 'B' : finalPercentage >= 50 ? 'C' : finalPercentage >= 40 ? 'D' : 'F',
+        submittedAt: result.submittedAt,
+      };
+    });
+
+    res.json({
+      exam: {
+        id: exam.id,
+        title: exam.title,
+        subject: exam.subject,
+        assessmentType: exam.assessmentType,
+      },
+      gradingScheme: {
+        componentTotal,
+        componentCbt,
+        componentTheory,
+      },
+      results: mergedResults,
+    });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;

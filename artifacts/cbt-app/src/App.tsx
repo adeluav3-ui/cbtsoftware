@@ -13,6 +13,7 @@ import TeacherExamDetails from "@/pages/exam-details";
 import StudentDashboard from "@/pages/student";
 import TakeExam from "@/pages/take-exam";
 import NotFound from "@/pages/not-found";
+import ExamResults from "@/pages/teacher/ExamResults";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,7 +28,7 @@ function RootRedirect() {
   const { user, isLoading } = useAuth();
   if (isLoading) return null;
   if (!user) return <Redirect to="/login" />;
-  
+
   if (user.role === 'super_admin') return <Redirect to="/super-admin" />;
   if (user.role === 'school_admin') return <Redirect to="/school-admin" />;
   if (user.role === 'teacher') return <Redirect to="/teacher" />;
@@ -38,7 +39,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      
+
       {/* Protected Routes inside Dashboards check their own auth */}
       <Route path="/super-admin" component={SuperAdminDashboard} />
       <Route path="/school-admin" component={SchoolAdminDashboard} />
@@ -46,7 +47,8 @@ function Router() {
       <Route path="/teacher/exams/:examId" component={TeacherExamDetails} />
       <Route path="/student" component={StudentDashboard} />
       <Route path="/exam/:examId" component={TakeExam} />
-      
+      <Route path="/teacher/exams/:examId/results" component={ExamResults} />
+
       <Route path="/" component={RootRedirect} />
       <Route component={NotFound} />
     </Switch>

@@ -158,10 +158,17 @@ export default function TeacherDashboard() {
               </div>
               <Button
                 variant="secondary"
-                className="w-full mt-4"
+                className="w-full mt-2"
                 onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
               >
                 <Settings className="w-4 h-4 mr-2" /> Manage Questions
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full mt-2"
+                onClick={() => setLocation(`/teacher/exams/${exam.id}/results`)}
+              >
+                <ClipboardList className="w-4 h-4 mr-2" /> View Results
               </Button>
             </Card>
           ))}
@@ -174,7 +181,6 @@ export default function TeacherDashboard() {
           )}
         </div>
       )}
-
       {/* ── Students Tab ──────────────────────────────── */}
       {activeTab === "Students" && (
         <Card className="p-0 overflow-hidden">
