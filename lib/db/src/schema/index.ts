@@ -3,19 +3,11 @@ export * from "./users.js";
 export * from "./exams.js";
 export * from "./results.js";
 export * from "./result_answers.js";
+export * from "./grading_schemes.js";
+export * from "./subject_scores.js";
 
-// Export grading schemes
-export {
-    gradingSchemesTable,
-    insertGradingSchemeSchema,
-    type InsertGradingScheme,
-    type GradingScheme
-} from "./grading_schemes.js";
+// Export grading schemes explicitly
+export { gradingSchemesTable, insertGradingSchemeSchema, type InsertGradingScheme, type GradingScheme } from "./grading_schemes.js";
 
-// Export student scores
-export {
-    studentScoresTable,
-    insertStudentScoreSchema,
-    type InsertStudentScore,
-    type StudentScore
-} from "./student_scores.js";
+// Export subject scores explicitly
+export { subjectScoresTable, insertSubjectScoreSchema, type InsertSubjectScore, type SubjectScore } from "./subject_scores.js";
