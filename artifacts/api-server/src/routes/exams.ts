@@ -161,7 +161,7 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
   try {
     // 1. First, get all results for this exam
     const examResults = await db
-      .select({ id: resultsTable.id })
+      .select({ id: resultsTable.id, studentId: resultsTable.studentId })
       .from(resultsTable)
       .where(
         and(
@@ -189,13 +189,7 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
         )
       );
 
-    // 4. Delete questions
-    await db
-      .delete(questionsTable)
-      .where(eq(questionsTable.examId, examIdNum));
-
-    // 5. Delete subject_scores for this exam's subject
-    // Get the exam to know the subject
+    // 4. Get the exam to know the subject
     const [exam] = await db
       .select()
       .from(examsTable)
@@ -207,13 +201,79 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
       )
       .limit(1);
 
-    if (exam) {
-      // Delete subject_scores for this exam's subject (optional - only if you want to clean up)
-      // Note: Be careful as this might delete scores from other exams of the same subject
-      // For now, we'll skip this to avoid accidental deletion
+    // 5. Delete subject scores for this specific exam
+    // We need to subtract the scores from subject_scores table
+    if (exam && examResults.length > 0) {
+      for (const result of examResults) {
+        // Get the current subject score for this student
+        const [subjectScore] = await db
+          .select()
+          .from(subjectScoresTable)
+          .where(
+            and(
+              eq(subjectScoresTable.studentId, result.studentId),
+              eq(subjectScoresTable.subjectName, exam.subject),
+              eq(subjectScoresTable.schoolCode, schoolCode)
+            )
+          )
+          .limit(1);
+
+        if (subjectScore) {
+          // Determine which component to update based on exam type
+          const updateData: any = { updatedAt: new Date() };
+
+          if (exam.assessmentType === 'mid_term') {
+            // Reset mid-term score
+            updateData.midTermScore = null;
+          } else if (exam.assessmentType === 'exam') {
+            // Reset exam score
+            updateData.examScore = null;
+          } else if (exam.assessmentType === 'class_activity') {
+            // Reset class activity score
+            updateData.classActivityScore = null;
+          }
+
+          // Also reset total and percentage if any component becomes null
+          const hasMidTerm = updateData.midTermScore !== undefined ? false : (subjectScore.midTermScore !== null);
+          const hasExam = updateData.examScore !== undefined ? false : (subjectScore.examScore !== null);
+          const hasActivity = updateData.classActivityScore !== undefined ? false : (subjectScore.classActivityScore !== null);
+
+          const allComponentsExist = hasMidTerm && hasActivity && hasExam;
+
+          if (!allComponentsExist) {
+            updateData.totalScore = null;
+            updateData.percentage = null;
+            updateData.grade = null;
+          } else {
+            // Recalculate total if all components exist
+            const midTerm = subjectScore.midTermScore || 0;
+            const activity = subjectScore.classActivityScore || 0;
+            const examScore = subjectScore.examScore || 0;
+            const total = midTerm + activity + examScore;
+            updateData.totalScore = total;
+            updateData.percentage = total;
+
+            if (total >= 70) updateData.grade = 'A';
+            else if (total >= 60) updateData.grade = 'B';
+            else if (total >= 50) updateData.grade = 'C';
+            else if (total >= 40) updateData.grade = 'D';
+            else updateData.grade = 'F';
+          }
+
+          await db
+            .update(subjectScoresTable)
+            .set(updateData)
+            .where(eq(subjectScoresTable.id, subjectScore.id));
+        }
+      }
     }
 
-    // 6. Finally, delete the exam
+    // 6. Delete questions
+    await db
+      .delete(questionsTable)
+      .where(eq(questionsTable.examId, examIdNum));
+
+    // 7. Finally, delete the exam
     const [deleted] = await db
       .delete(examsTable)
       .where(
