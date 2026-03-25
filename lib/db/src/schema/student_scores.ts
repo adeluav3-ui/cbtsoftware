@@ -1,7 +1,7 @@
 import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 
-export const studentScoresTable = pgTable("student_scores", {
+export const subjectScoresTable = pgTable("student_scores", {
     id: serial("id").primaryKey(),
     studentId: integer("student_id").notNull(),
     examId: integer("exam_id").notNull(),
@@ -17,6 +17,6 @@ export const studentScoresTable = pgTable("student_scores", {
     uniqueStudentExam: unique().on(table.studentId, table.examId),
 }));
 
-export const insertStudentScoreSchema = createInsertSchema(studentScoresTable).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertStudentScore = typeof studentScoresTable.$inferInsert;
-export type StudentScore = typeof studentScoresTable.$inferSelect;
+export const insertStudentScoreSchema = createInsertSchema(subjectScoresTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStudentScore = typeof subjectScoresTable.$inferInsert;
+export type StudentScore = typeof subjectScoresTable.$inferSelect;
