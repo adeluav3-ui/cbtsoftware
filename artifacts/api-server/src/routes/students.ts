@@ -483,4 +483,23 @@ router.post("/:studentId/subject-scores", async (req: Request<StudentParams>, re
   }
 });
 
+// Get all subject scores for a school
+router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+
+  try {
+    const scores = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(eq(subjectScoresTable.schoolCode, schoolCode));
+
+    res.json(scores);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;
