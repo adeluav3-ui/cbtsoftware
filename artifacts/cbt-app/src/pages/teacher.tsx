@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +13,14 @@ import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users
 import { format } from "date-fns";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
-import { StudentDetailModal } from "@/components/student-detail-modal"; // Add this import
+import { StudentResultsModal } from "@/components/student-results-modal";
+
+interface Student {
+  id: number;
+  fullName: string;
+  username: string;
+  class: string;
+}
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -49,6 +56,9 @@ export default function TeacherDashboard() {
   // Student detail modal state
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedStudentName, setSelectedStudentName] = useState("");
+  const [selectedStudentClass, setSelectedStudentClass] = useState("");
+  const [studentResultsModalOpen, setStudentResultsModalOpen] = useState(false);
+  const [subjectScores, setSubjectScores] = useState<any[]>([]);
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -77,7 +87,6 @@ export default function TeacherDashboard() {
   const [classFilter, setClassFilter] = useState("JSS1");
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
 
-
   const [isStudentModalOpen, setStudentModalOpen] = useState(false);
   const [sFullName, setSFullName] = useState("");
   const [sUsername, setSUsername] = useState("");
@@ -96,7 +105,7 @@ export default function TeacherDashboard() {
 
   const { mutate: deleteStudent } = useDeleteStudent({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, { class: classFilter }) })
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) })
     }
   });
 
@@ -105,6 +114,25 @@ export default function TeacherDashboard() {
   const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode);
   const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
+
+  // Fetch subject scores
+  useEffect(() => {
+    const fetchSubjectScores = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subject-scores`, {
+          credentials: "include",
+        });
+        const data = await response.json();
+        setSubjectScores(data);
+      } catch (err) {
+        console.error("Failed to fetch subject scores", err);
+      }
+    };
+
+    if (schoolCode) {
+      fetchSubjectScores();
+    }
+  }, [schoolCode]);
 
   return (
     <DashboardLayout allowedRoles={["teacher", "school_admin"]}>
@@ -225,13 +253,15 @@ export default function TeacherDashboard() {
                   </td>
                 </tr>
               ) : (
-                students.map(s => (
+                students.map((s: Student) => (
                   <tr
                     key={s.id}
                     className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
                     onClick={() => {
                       setSelectedStudentId(s.id);
                       setSelectedStudentName(s.fullName || s.username);
+                      setSelectedStudentClass(s.class);
+                      setStudentResultsModalOpen(true);
                     }}
                   >
                     <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
@@ -259,95 +289,101 @@ export default function TeacherDashboard() {
 
       {/* ── Results Tab ───────────────────────────────── */}
       {activeTab === "Results" && (
-        <>
-          {resultsLoading ? (
-            <Card className="p-12 text-center text-muted-foreground">Loading results…</Card>
-          ) : results.length === 0 ? (
-            <div className="py-20 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border">
-              <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p className="font-semibold text-lg">No results yet.</p>
-              <p className="text-sm mt-1">Results will appear here once students submit your exams.</p>
-            </div>
-          ) : (
-            <Card className="p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                      <th className="px-5 py-4 font-semibold">Student Name</th>
-                      <th className="px-5 py-4 font-semibold">Class</th>
-                      <th className="px-5 py-4 font-semibold">Exam</th>
-                      <th className="px-5 py-4 font-semibold">Subject</th>
-                      <th className="px-5 py-4 font-semibold text-center">Score</th>
-                      <th className="px-5 py-4 font-semibold text-center">%</th>
-                      <th className="px-5 py-4 font-semibold text-center">Grade</th>
-                      <th className="px-5 py-4 font-semibold">Submitted</th>
-                      <th className="px-5 py-4 font-semibold text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map(r => {
-                      const pct = r.percentage ?? 0;
-                      return (
-                        <tr
-                          key={r.id}
-                          className="border-b border-border/40 hover:bg-primary/5 transition-colors"
-                        >
-                          <td
-                            className="px-5 py-3.5 font-semibold text-primary cursor-pointer"
-                            onClick={() => setSelectedResultId(r.id)}
-                            title="Click to view full answer breakdown"
-                          >
-                            {r.fullName}
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground">{r.class}</td>
-                          <td
-                            className="px-5 py-3.5 font-medium cursor-pointer"
-                            onClick={() => setSelectedResultId(r.id)}
-                          >
-                            {r.examTitle || "—"}
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground">{r.subject || "—"}</td>
-                          <td className="px-5 py-3.5 text-center font-bold">{r.score}/{r.totalQuestions}</td>
-                          <td className="px-5 py-3.5 text-center font-semibold">{pct.toFixed(1)}%</td>
-                          <td className="px-5 py-3.5 text-center">
-                            <Badge variant={pct >= 70 ? "success" : "destructive"}>
-                              {pct >= 70 ? "Pass" : "Fail"}
-                            </Badge>
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground text-sm">
-                            {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
-                          </td>
-                          <td className="px-5 py-3.5 text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedStudentForScores({
-                                  studentId: r.studentId,
-                                  studentName: r.fullName,
-                                  examId: r.examId,
-                                  examTitle: r.examTitle || r.subject || "Exam",
-                                  assessmentType: r.assessmentType || "exam",
-                                  theoryScore: 0,
-                                  activityScore: 0,
-                                });
-                                setScoresModalOpen(true);
-                              }}
-                            >
-                              <Settings className="w-3 h-3 mr-1" /> Enter Scores
-                            </Button>
-                          </td>
+        <Card className="p-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-2">Student Results by Class</h3>
+            <p className="text-sm text-muted-foreground">Click on any student to view their complete results</p>
+          </div>
+
+          <div className="space-y-8">
+            {CLASSES.map(className => {
+              const classStudents = students.filter((s: Student) => s.class === className);
+
+              if (classStudents.length === 0) return null;
+
+              return (
+                <div key={className}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <h4 className="text-xl font-bold font-display text-primary">{className}</h4>
+                    <Badge variant="default">{classStudents.length} students</Badge>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                          <th className="px-4 py-3 font-semibold">Student Name</th>
+                          <th className="px-4 py-3 font-semibold">Username</th>
+                          <th className="px-4 py-3 font-semibold text-center">Subjects</th>
+                          <th className="px-4 py-3 font-semibold text-center">Overall %</th>
+                          <th className="px-4 py-3 font-semibold text-center">Status</th>
+                          <th className="px-4 py-3 font-semibold text-center">Actions</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {classStudents.map((student: Student) => {
+                          const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
+                          const completedSubjects = studentSubjectScores.filter((s: any) => s.percentage !== null);
+                          const overallAvg = completedSubjects.length > 0
+                            ? completedSubjects.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completedSubjects.length
+                            : 0;
+
+                          return (
+                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="px-4 py-3 font-semibold text-primary">
+                                {student.fullName}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground text-sm">
+                                {student.username}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {studentSubjectScores.length}
+                              </td>
+                              <td className="px-4 py-3 text-center font-bold">
+                                {completedSubjects.length > 0 ? (
+                                  <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>
+                                    {overallAvg.toFixed(1)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Badge variant={overallAvg >= 70 ? "success" : "default"}>
+                                  {overallAvg >= 70 ? "Passing" : overallAvg > 0 ? "Needs Improvement" : "No Results"}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedStudentId(student.id);
+                                    setSelectedStudentName(student.fullName || student.username);
+                                    setSelectedStudentClass(student.class);
+                                    setStudentResultsModalOpen(true);
+                                  }}
+                                >
+                                  <ClipboardList className="w-4 h-4 mr-1" /> View Results
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+
+            {students.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                No students enrolled yet. Add students in the Students tab.
               </div>
-            </Card>
-          )}
-        </>
+            )}
+          </div>
+        </Card>
       )}
 
       {/* ── Create Exam Modal ────────────────────────── */}
@@ -434,12 +470,14 @@ export default function TeacherDashboard() {
         />
       )}
 
-      {/* Student Detail Modal */}
-      <StudentDetailModal
-        studentId={selectedStudentId}
+      {/* Student Results Modal */}
+      <StudentResultsModal
+        isOpen={studentResultsModalOpen}
+        onClose={() => setStudentResultsModalOpen(false)}
+        studentId={selectedStudentId !== null ? selectedStudentId : 0}
         studentName={selectedStudentName}
+        studentClass={selectedStudentClass}
         schoolCode={schoolCode}
-        onClose={() => setSelectedStudentId(null)}
       />
     </DashboardLayout>
   );

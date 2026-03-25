@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
-import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable } from "@workspace/db/schema";
+import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
@@ -426,6 +426,25 @@ router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) =
     }
 
     res.json(result);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get all subject scores for a school
+router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+
+  try {
+    const scores = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(eq(subjectScoresTable.schoolCode, schoolCode));
+
+    res.json(scores);
     return;
   } catch (err) {
     console.error(err);
