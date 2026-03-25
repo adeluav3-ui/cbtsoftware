@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
-import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable } from "@workspace/db/schema";
+import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
@@ -445,6 +445,93 @@ router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) 
       .where(eq(subjectScoresTable.schoolCode, schoolCode));
 
     res.json(scores);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get all subjects for a school
+router.get("/:schoolCode/subjects", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { level } = req.query;
+
+  try {
+    const conditions: any[] = [eq(subjectsTable.schoolCode, schoolCodeStr)];
+
+    if (level && typeof level === "string") {
+      conditions.push(eq(subjectsTable.level, level));
+    }
+
+    const subjects = await db
+      .select()
+      .from(subjectsTable)
+      .where(and(...conditions))
+      .orderBy(subjectsTable.name);
+
+    res.json(subjects);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Add a subject
+router.post("/:schoolCode/subjects", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { name, level } = req.body;
+
+  if (!name || !level || !['junior', 'senior'].includes(level)) {
+    return res.status(400).json({ error: "Subject name and valid level (junior/senior) required" });
+  }
+
+  try {
+    const [subject] = await db
+      .insert(subjectsTable)
+      .values({
+        name: name.trim(),
+        level,
+        schoolCode: schoolCodeStr,
+      })
+      .returning();
+
+    res.status(201).json(subject);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Delete a subject
+router.delete("/:schoolCode/subjects/:subjectId", async (req: Request, res: Response) => {
+  const { schoolCode, subjectId } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const subjectIdNum = Number(String(subjectId)); // Convert to number safely
+
+  try {
+    const [deleted] = await db
+      .delete(subjectsTable)
+      .where(
+        and(
+          eq(subjectsTable.id, subjectIdNum),
+          eq(subjectsTable.schoolCode, schoolCodeStr)
+        )
+      )
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Subject not found" });
+    }
+
+    res.json({ message: "Subject deleted" });
     return;
   } catch (err) {
     console.error(err);

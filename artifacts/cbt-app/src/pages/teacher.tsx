@@ -59,6 +59,7 @@ export default function TeacherDashboard() {
   const [selectedStudentClass, setSelectedStudentClass] = useState("");
   const [studentResultsModalOpen, setStudentResultsModalOpen] = useState(false);
   const [subjectScores, setSubjectScores] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<{ id: number; name: string; level: string }[]>([]);
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -114,6 +115,27 @@ export default function TeacherDashboard() {
   const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode);
   const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
+
+  const fetchSubjects = async (level: string) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects?level=${level}`,
+        { credentials: "include" }
+      );
+      const data = await response.json();
+      setSubjects(data);
+    } catch (err) {
+      console.error("Failed to fetch subjects", err);
+    }
+  };
+
+  // Determine level based on selected class (JSS = junior, SSS = senior)
+  useEffect(() => {
+    if (eClass && schoolCode) {
+      const level = eClass.startsWith('JSS') ? 'junior' : 'senior';
+      fetchSubjects(level);
+    }
+  }, [eClass, schoolCode]);
 
   // Fetch subject scores
   useEffect(() => {
@@ -315,6 +337,7 @@ export default function TeacherDashboard() {
                           <th className="px-4 py-3 font-semibold">Student Name</th>
                           <th className="px-4 py-3 font-semibold">Username</th>
                           <th className="px-4 py-3 font-semibold text-center">Subjects</th>
+                          <th className="px-4 py-3 font-semibold text-center">Completed</th>
                           <th className="px-4 py-3 font-semibold text-center">Overall %</th>
                           <th className="px-4 py-3 font-semibold text-center">Status</th>
                           <th className="px-4 py-3 font-semibold text-center">Actions</th>
@@ -322,22 +345,54 @@ export default function TeacherDashboard() {
                       </thead>
                       <tbody>
                         {classStudents.map((student: Student) => {
+                          // Get this student's subject scores
                           const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
-                          const completedSubjects = studentSubjectScores.filter((s: any) => s.percentage !== null);
-                          const overallAvg = completedSubjects.length > 0
-                            ? completedSubjects.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completedSubjects.length
-                            : 0;
+
+                          // Calculate completed subjects (all three components entered)
+                          const completedSubjects = studentSubjectScores.filter((s: any) => {
+                            return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+                          });
+
+                          // Calculate overall average from completed subjects
+                          let overallAvg = 0;
+                          if (completedSubjects.length > 0) {
+                            const totalPercentages = completedSubjects.reduce((acc: number, s: any) => {
+                              // Calculate percentage from total score (which should be out of 100)
+                              const totalScore = (s.midTermScore || 0) + (s.classActivityScore || 0) + (s.examScore || 0);
+                              return acc + totalScore;
+                            }, 0);
+                            overallAvg = totalPercentages / completedSubjects.length;
+                          }
 
                           return (
-                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20">
-                              <td className="px-4 py-3 font-semibold text-primary">
+                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer">
+                              <td
+                                className="px-4 py-3 font-semibold text-primary"
+                                onClick={() => {
+                                  setSelectedStudentId(student.id);
+                                  setSelectedStudentName(student.fullName || student.username);
+                                  setSelectedStudentClass(student.class);
+                                  setStudentResultsModalOpen(true);
+                                }}
+                              >
                                 {student.fullName}
                               </td>
-                              <td className="px-4 py-3 text-muted-foreground text-sm">
+                              <td
+                                className="px-4 py-3 text-muted-foreground text-sm"
+                                onClick={() => {
+                                  setSelectedStudentId(student.id);
+                                  setSelectedStudentName(student.fullName || student.username);
+                                  setSelectedStudentClass(student.class);
+                                  setStudentResultsModalOpen(true);
+                                }}
+                              >
                                 {student.username}
                               </td>
                               <td className="px-4 py-3 text-center">
                                 {studentSubjectScores.length}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {completedSubjects.length}
                               </td>
                               <td className="px-4 py-3 text-center font-bold">
                                 {completedSubjects.length > 0 ? (
@@ -349,8 +404,8 @@ export default function TeacherDashboard() {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <Badge variant={overallAvg >= 70 ? "success" : "default"}>
-                                  {overallAvg >= 70 ? "Passing" : overallAvg > 0 ? "Needs Improvement" : "No Results"}
+                                <Badge variant={overallAvg >= 70 ? "success" : completedSubjects.length > 0 ? "warning" : "default"}>
+                                  {overallAvg >= 70 ? "Passing" : completedSubjects.length > 0 ? "Needs Improvement" : "No Results"}
                                 </Badge>
                               </td>
                               <td className="px-4 py-3 text-center">
@@ -390,7 +445,20 @@ export default function TeacherDashboard() {
       <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
         <form onSubmit={handleCreate} className="space-y-4">
           <div><Label>Exam Title</Label><Input value={eTitle} onChange={e => setETitle(e.target.value)} placeholder="e.g. Mid-Term Test" required /></div>
-          <div><Label>Subject</Label><Input value={eSubject} onChange={e => setESubject(e.target.value)} placeholder="e.g. Mathematics" required /></div>
+          <div>
+            <Label>Subject</Label>
+            <Select value={eSubject} onChange={e => setESubject(e.target.value)} required>
+              <option value="">Select a subject</option>
+              {subjects.map(subject => (
+                <option key={subject.id} value={subject.name}>{subject.name}</option>
+              ))}
+            </Select>
+            {subjects.length === 0 && eClass && (
+              <p className="text-xs text-warning mt-1">
+                No subjects added for this class level. Ask the school admin to add subjects.
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Class</Label>

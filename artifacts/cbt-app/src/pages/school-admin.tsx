@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -50,6 +50,14 @@ export default function SchoolAdminDashboard() {
 
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
+  // Subjects state
+  const [subjects, setSubjects] = useState<{ id: number; name: string; level: string }[]>([]);
+  const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
+  const [subjectModalOpen, setSubjectModalOpen] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [newSubjectLevel, setNewSubjectLevel] = useState<"junior" | "senior">("junior");
+  const [subjectError, setSubjectError] = useState("");
+  const [isAddingSubject, setIsAddingSubject] = useState(false);
 
   // Grading scheme state
   const [gradingScheme, setGradingScheme] = useState({
@@ -102,6 +110,85 @@ export default function SchoolAdminDashboard() {
       }
     }
   });
+
+  // Fetch subjects
+  const fetchSubjects = async () => {
+    setIsSubjectsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      setSubjects(data);
+    } catch (err) {
+      console.error("Failed to fetch subjects", err);
+    } finally {
+      setIsSubjectsLoading(false);
+    }
+  };
+
+  // Add subject
+  const handleAddSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubjectName.trim()) {
+      setSubjectError("Subject name is required");
+      return;
+    }
+
+    setIsAddingSubject(true);
+    setSubjectError("");
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newSubjectName.trim(), level: newSubjectLevel }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setSubjectError(data.error || "Failed to add subject");
+        return;
+      }
+
+      await fetchSubjects();
+      setSubjectModalOpen(false);
+      setNewSubjectName("");
+      setNewSubjectLevel("junior");
+    } catch (err) {
+      setSubjectError("Network error. Please try again.");
+    } finally {
+      setIsAddingSubject(false);
+    }
+  };
+
+  // Delete subject
+  const handleDeleteSubject = async (subjectId: number) => {
+    if (!confirm("Are you sure you want to delete this subject? This will affect all exams that use this subject.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects/${subjectId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        await fetchSubjects();
+      }
+    } catch (err) {
+      console.error("Failed to delete subject", err);
+    }
+  };
+
+  // Fetch subjects when component mounts
+  useEffect(() => {
+    if (schoolCode) {
+      fetchSubjects();
+    }
+  }, [schoolCode]);
 
   // Fetch current retake passcode
   const fetchCurrentPasscode = async () => {
@@ -236,7 +323,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Grading"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Grading", "Subjects"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {activeTab === "Teachers" && (
@@ -502,6 +589,123 @@ export default function SchoolAdminDashboard() {
               </Button>
             </div>
           </div>
+        </Card>
+      )}
+
+      {activeTab === "Subjects" && (
+        <Card className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-xl font-bold font-display">Subject Management</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Add subjects for Junior Secondary (JSS1-3) and Senior Secondary (SSS1-3)
+              </p>
+            </div>
+            <Button onClick={() => setSubjectModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Subject
+            </Button>
+          </div>
+
+          {isSubjectsLoading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading subjects...</div>
+          ) : subjects.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-xl">
+              <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
+              <p className="font-semibold">No subjects added yet</p>
+              <p className="text-sm mt-1">Click "Add Subject" to start adding subjects for your school</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Junior Secondary Subjects */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-lg font-semibold">Junior Secondary (JSS1-3)</h3>
+                  <Badge variant="default">{subjects.filter(s => s.level === 'junior').length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {subjects.filter(s => s.level === 'junior').length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No junior subjects added</p>
+                  ) : (
+                    subjects.filter(s => s.level === 'junior').map(subject => (
+                      <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
+                        <span className="font-medium">{subject.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSubject(subject.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Senior Secondary Subjects */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-lg font-semibold">Senior Secondary (SSS1-3)</h3>
+                  <Badge variant="default">{subjects.filter(s => s.level === 'senior').length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {subjects.filter(s => s.level === 'senior').length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No senior subjects added</p>
+                  ) : (
+                    subjects.filter(s => s.level === 'senior').map(subject => (
+                      <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
+                        <span className="font-medium">{subject.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSubject(subject.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Subject Modal */}
+          <Modal isOpen={subjectModalOpen} onClose={() => setSubjectModalOpen(false)} title="Add New Subject">
+            <form onSubmit={handleAddSubject} className="space-y-4">
+              <div>
+                <Label>Subject Name</Label>
+                <Input
+                  value={newSubjectName}
+                  onChange={e => setNewSubjectName(e.target.value)}
+                  placeholder="e.g., Mathematics, English, Physics"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Level</Label>
+                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "junior" | "senior")}>
+                  <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
+                  <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
+                </Select>
+              </div>
+              {subjectError && (
+                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
+                  {subjectError}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setSubjectModalOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" isLoading={isAddingSubject} className="flex-1">
+                  Add Subject
+                </Button>
+              </div>
+            </form>
+          </Modal>
         </Card>
       )}
 
