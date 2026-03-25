@@ -582,26 +582,48 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       );
     }
 
-    await db
-      .insert(subjectScoresTable)
-      .values({
-        studentId: parseInt(studentId),
-        subjectName: exam.subject,
-        className: studentClass,
-        schoolCode,
-        ...(exam.assessmentType === 'mid_term' && { midTermScore: Math.round(scaledCbtScore) }),
-        ...(exam.assessmentType === 'exam' && { examScore: Math.round(scaledCbtScore) }),
-        ...(exam.assessmentType === 'class_activity' && { classActivityScore: Math.round(scaledCbtScore) }),
-      })
-      .onConflictDoUpdate({
-        target: [subjectScoresTable.studentId, subjectScoresTable.subjectName],
-        set: {
+    // Check if record exists
+    const [existingScore] = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.subjectName, exam.subject)
+        )
+      )
+      .limit(1);
+
+    if (existingScore) {
+      // Update existing record
+      const updateData: any = { updatedAt: new Date() };
+      if (exam.assessmentType === 'mid_term') updateData.midTermScore = Math.round(scaledCbtScore);
+      if (exam.assessmentType === 'exam') updateData.examScore = Math.round(scaledCbtScore);
+      if (exam.assessmentType === 'class_activity') updateData.classActivityScore = Math.round(scaledCbtScore);
+
+      await db
+        .update(subjectScoresTable)
+        .set(updateData)
+        .where(
+          and(
+            eq(subjectScoresTable.studentId, parseInt(studentId)),
+            eq(subjectScoresTable.subjectName, exam.subject)
+          )
+        );
+    } else {
+      // Insert new record
+      await db
+        .insert(subjectScoresTable)
+        .values({
+          studentId: parseInt(studentId),
+          subjectName: exam.subject,
+          className: studentClass,
+          schoolCode,
           ...(exam.assessmentType === 'mid_term' && { midTermScore: Math.round(scaledCbtScore) }),
           ...(exam.assessmentType === 'exam' && { examScore: Math.round(scaledCbtScore) }),
           ...(exam.assessmentType === 'class_activity' && { classActivityScore: Math.round(scaledCbtScore) }),
-          updatedAt: new Date(),
-        },
-      });
+        });
+    }
 
     res.json({
       ...result,
