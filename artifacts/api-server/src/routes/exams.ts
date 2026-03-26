@@ -507,8 +507,28 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
         )
       );
 
-    // Get all subject scores for these students
+    if (resultsList.length === 0) {
+      res.json({
+        exam: {
+          id: exam.id,
+          title: exam.title,
+          subject: exam.subject,
+          assessmentType: exam.assessmentType,
+        },
+        gradingScheme: {
+          componentTotal,
+          componentCbt,
+          componentTheory,
+        },
+        results: [],
+      });
+      return;
+    }
+
+    // Get student IDs from results
     const studentIds = resultsList.map(r => r.studentId);
+
+    // Get subject scores for these students
     const subjectScoresList = await db
       .select()
       .from(subjectScoresTable)
@@ -527,27 +547,17 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
 
       let componentScore = 0;
       let theoryPortion = 0;
-      let totalScore = 0;
-      let finalPercentage = 0;
 
       if (exam.assessmentType === 'mid_term') {
-        // Get the stored midTermScore (which includes CBT + any theory entered)
         const storedMidTerm = scoreRecord?.midTermScore || 0;
-        // Theory portion is what was added after the CBT
         theoryPortion = storedMidTerm - scaledCbtScore;
         componentScore = storedMidTerm;
-        totalScore = componentScore;
-        finalPercentage = (totalScore / componentTotal) * 100;
       } else if (exam.assessmentType === 'exam') {
         const storedExam = scoreRecord?.examScore || 0;
         theoryPortion = storedExam - scaledCbtScore;
         componentScore = storedExam;
-        totalScore = componentScore;
-        finalPercentage = (totalScore / componentTotal) * 100;
       } else {
         componentScore = scoreRecord?.classActivityScore || 0;
-        totalScore = componentScore;
-        finalPercentage = (totalScore / componentTotal) * 100;
       }
 
       return {
@@ -559,11 +569,9 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
         cbtPercentage: rawCbtPercentage,
         scaledCbtScore: Math.round(scaledCbtScore),
         theoryScore: Math.max(0, Math.round(theoryPortion)),
+        classActivityScore: scoreRecord?.classActivityScore || 0,
         componentScore: Math.round(componentScore),
-        totalScore: Math.round(totalScore),
         maxScore: componentTotal,
-        percentage: Math.round(finalPercentage),
-        grade: finalPercentage >= 70 ? 'A' : finalPercentage >= 60 ? 'B' : finalPercentage >= 50 ? 'C' : finalPercentage >= 40 ? 'D' : 'F',
         submittedAt: result.submittedAt,
       };
     });
