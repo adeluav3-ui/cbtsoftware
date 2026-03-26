@@ -136,10 +136,10 @@ export default function Login() {
             </form>
           </Card>
         </motion.div>
-        <footer className="mt-6 text-center text-sm text-muted-foreground">
-          Powered by <span className="font-semibold text-primary">Vortex</span>
-        </footer>
       </div>
+      <footer className="mt-6 text-center text-sm text-muted-foreground">
+        Powered by <span className="font-semibold text-primary">Vortex</span>
+      </footer>
     </div>
   );
 }
