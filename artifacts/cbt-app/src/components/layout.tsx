@@ -170,7 +170,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
           {children}
         </div>
         {/* Footer */}
-        <footer className="mt-8 pt-4 border-t border-border text-center text-sm text-muted-foreground">
+        <footer className="mt-2 pt-2 border-t border-border text-center text-sm text-muted-foreground">
           Powered by{' '}
           <a
             href="https://luma-website-six.vercel.app/"
