@@ -7,6 +7,9 @@ interface SubjectResult {
     midTermScore: number | null;
     classActivityScore: number | null;
     examScore: number | null;
+    midTermMax?: number;
+    classActivityMax?: number;
+    examMax?: number;
     totalScore: number | null;
     percentage: number | null;
     grade: string | null;
@@ -51,14 +54,10 @@ export function StudentResultsModal({
             );
             const data = await response.json();
 
-            // Process the data - only show percentage when all components are entered
             const processedSubjects = data.map((subject: any) => {
-                // Check if each component exists (not null and not undefined)
                 const hasMidTerm = subject.midTermScore !== null && subject.midTermScore !== undefined;
                 const hasActivity = subject.classActivityScore !== null && subject.classActivityScore !== undefined;
                 const hasExam = subject.examScore !== null && subject.examScore !== undefined;
-
-                // All three components must be entered for a complete result
                 const allComponentsEntered = hasMidTerm && hasActivity && hasExam;
 
                 let totalScore = null;
@@ -66,9 +65,8 @@ export function StudentResultsModal({
                 let grade = null;
 
                 if (allComponentsEntered) {
-                    // Sum all three components (each is already out of its respective max)
                     totalScore = (subject.midTermScore || 0) + (subject.classActivityScore || 0) + (subject.examScore || 0);
-                    percentage = totalScore; // Since total is out of 100
+                    percentage = totalScore;
 
                     if (percentage >= 70) grade = 'A';
                     else if (percentage >= 60) grade = 'B';
@@ -82,6 +80,9 @@ export function StudentResultsModal({
                     midTermScore: subject.midTermScore,
                     classActivityScore: subject.classActivityScore,
                     examScore: subject.examScore,
+                    midTermMax: 20,
+                    classActivityMax: 20,
+                    examMax: 60,
                     totalScore: totalScore,
                     percentage: percentage,
                     grade: grade,
@@ -90,7 +91,6 @@ export function StudentResultsModal({
 
             setSubjects(processedSubjects);
 
-            // Calculate overall average only from subjects with all components
             const completedSubjects = processedSubjects.filter((s: SubjectResult) => s.percentage !== null);
             setCompletedSubjectsCount(completedSubjects.length);
 
@@ -107,6 +107,14 @@ export function StudentResultsModal({
         }
     };
 
+    const getScoreDisplay = (score: number | null, max?: number) => {
+        if (score === null) return <span className="text-muted-foreground">—</span>;
+        if (max) {
+            return <span className="font-medium">{score}/{max}</span>;
+        }
+        return <span className="font-medium">{score}</span>;
+    };
+
     const getGradeColor = (grade?: string | null) => {
         if (!grade) return "bg-muted text-muted-foreground";
         switch (grade) {
@@ -116,11 +124,6 @@ export function StudentResultsModal({
             case 'D': return 'bg-orange-600 text-white';
             default: return 'bg-red-600 text-white';
         }
-    };
-
-    const getScoreDisplay = (score: number | null) => {
-        if (score === null) return <span className="text-muted-foreground">—</span>;
-        return <span className="font-medium">{score}</span>;
     };
 
     return (
@@ -161,10 +164,10 @@ export function StudentResultsModal({
                             <thead className="sticky top-0 bg-background">
                                 <tr className="border-b border-border">
                                     <th className="px-4 py-3 font-semibold">Subject</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Mid-Term (20%)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Class Activity (20%)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Exam (60%)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Total (100%)</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Mid-Term (20 marks)</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Class Activity (20 marks)</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Exam (60 marks)</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Total (100 marks)</th>
                                     <th className="px-4 py-3 font-semibold text-center">Grade</th>
                                     <th className="px-4 py-3 font-semibold text-center">Status</th>
                                 </tr>
@@ -179,9 +182,15 @@ export function StudentResultsModal({
                                     return (
                                         <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
                                             <td className="px-4 py-3 font-medium">{subject.subjectName}</td>
-                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.midTermScore)}</td>
-                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.classActivityScore)}</td>
-                                            <td className="px-4 py-3 text-center">{getScoreDisplay(subject.examScore)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                {getScoreDisplay(subject.midTermScore, subject.midTermMax)}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {getScoreDisplay(subject.classActivityScore, subject.classActivityMax)}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {getScoreDisplay(subject.examScore, subject.examMax)}
+                                            </td>
                                             <td className="px-4 py-3 text-center font-bold">
                                                 {isComplete ? `${subject.totalScore}/100` : "—"}
                                             </td>
@@ -210,8 +219,8 @@ export function StudentResultsModal({
                 )}
 
                 <div className="pt-4 text-xs text-muted-foreground text-center border-t border-border">
-                    Scores are calculated when all three components (Mid-Term, Class Activity, and Exam) are entered.
-                    {completedSubjectsCount === 0 && " No complete results yet."}
+                    Individual component scores are shown as points earned out of maximum marks.<br />
+                    Final percentage and grade appear only when all three components are entered.
                 </div>
             </div>
         </Modal>

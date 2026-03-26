@@ -345,10 +345,9 @@ export default function TeacherDashboard() {
                       </thead>
                       <tbody>
                         {classStudents.map((student: Student) => {
-                          // Get this student's subject scores
                           const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
 
-                          // Calculate completed subjects (all three components entered)
+                          // Only count subjects where all three components are entered
                           const completedSubjects = studentSubjectScores.filter((s: any) => {
                             return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
                           });
@@ -357,7 +356,6 @@ export default function TeacherDashboard() {
                           let overallAvg = 0;
                           if (completedSubjects.length > 0) {
                             const totalPercentages = completedSubjects.reduce((acc: number, s: any) => {
-                              // Calculate percentage from total score (which should be out of 100)
                               const totalScore = (s.midTermScore || 0) + (s.classActivityScore || 0) + (s.examScore || 0);
                               return acc + totalScore;
                             }, 0);
