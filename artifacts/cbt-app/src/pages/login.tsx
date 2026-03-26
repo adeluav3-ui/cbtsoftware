@@ -136,8 +136,16 @@ export default function Login() {
             </form>
           </Card>
         </motion.div>
-        <footer className="mt-6 text-center text-sm text-muted-foreground">
-          Powered by <span className="font-semibold text-primary">Vortex</span>
+        <footer className="mt-12 pt-6 border-t border-border text-center text-sm text-muted-foreground">
+          Powered by{' '}
+          <a
+            href="https://luma-website-six.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-primary hover:underline transition-colors"
+          >
+            Vortex
+          </a>
         </footer>
       </div>
     </div>
