@@ -151,6 +151,11 @@ export default function SchoolAdminDashboard() {
     examCbt: 30,
     examTheory: 30,
     classActivityTotal: 20,
+    gradeAMin: 70,
+    gradeBMin: 60,
+    gradeCMin: 50,
+    gradeDMin: 40,
+    gradeFMax: 39,
   });
   const [isLoadingScheme, setIsLoadingScheme] = useState(false);
   const [isSavingScheme, setIsSavingScheme] = useState(false);
@@ -565,11 +570,88 @@ export default function SchoolAdminDashboard() {
           <div className="mb-6">
             <h2 className="text-xl font-bold font-display">Grading Scheme Configuration</h2>
             <p className="text-muted-foreground text-sm mt-1">
-              Configure how exam scores are calculated. CBT scores are auto-graded, theory and class activity scores are entered by teachers.
+              Configure how exam scores are calculated and grade boundaries.
             </p>
           </div>
 
           <div className="space-y-8">
+            {/* Grade Ranges */}
+            <div className="border-b border-border pb-6">
+              <h3 className="text-lg font-semibold mb-4">Grade Boundaries</h3>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Grade A (min %)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingScheme.gradeAMin}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeAMin: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g., 70% and above</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Grade B (min %)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingScheme.gradeBMin}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeBMin: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g., 60-69%</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Grade C (min %)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingScheme.gradeCMin}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeCMin: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g., 50-59%</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Grade D (min %)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingScheme.gradeDMin}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeDMin: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g., 40-49%</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Grade F (max %)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={gradingScheme.gradeFMax}
+                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeFMax: parseInt(e.target.value) || 0 })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">e.g., below 40%</p>
+                </div>
+              </div>
+              <div className="mt-3 p-3 bg-muted/20 rounded-lg">
+                <p className="text-sm font-semibold">Current Grade Scale:</p>
+                <div className="flex gap-4 text-sm mt-1">
+                  <span>A: ≥{gradingScheme.gradeAMin}%</span>
+                  <span>B: {gradingScheme.gradeBMin}% - {gradingScheme.gradeAMin - 1}%</span>
+                  <span>C: {gradingScheme.gradeCMin}% - {gradingScheme.gradeBMin - 1}%</span>
+                  <span>D: {gradingScheme.gradeDMin}% - {gradingScheme.gradeCMin - 1}%</span>
+                  <span>F: ≤{gradingScheme.gradeFMax}%</span>
+                </div>
+              </div>
+            </div>
+
             {/* Mid-term Component */}
             <div className="border-b border-border pb-6">
               <h3 className="text-lg font-semibold mb-4">Mid-term Assessment</h3>

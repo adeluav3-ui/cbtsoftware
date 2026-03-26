@@ -310,6 +310,11 @@ router.get("/:studentId/subject-scores", async (req: Request<StudentParams>, res
       examCbt: 30,
       examTheory: 30,
       classActivityTotal: 20,
+      gradeAMin: 70,
+      gradeBMin: 60,
+      gradeCMin: 50,
+      gradeDMin: 40,
+      gradeFMax: 39,
     };
 
     const scheme = gradingScheme || defaultScheme;
@@ -343,8 +348,8 @@ router.get("/:studentId/subject-scores", async (req: Request<StudentParams>, res
       const midTermResult = examResults.find(r => r.subject === subject && r.assessmentType === 'mid_term');
       const examResult = examResults.find(r => r.subject === subject && r.assessmentType === 'exam');
 
-      let midTermCbt = null;
-      let examCbt = null;
+      let midTermCbt: number | null = null;
+      let examCbt: number | null = null;
 
       if (midTermResult && midTermResult.totalQuestions > 0) {
         const rawPercentage = (midTermResult.cbtScore / midTermResult.totalQuestions) * 100;
@@ -357,41 +362,59 @@ router.get("/:studentId/subject-scores", async (req: Request<StudentParams>, res
       }
 
       // Calculate total scores
-      const midTermTotal = (existing?.midTermScore !== null && existing?.midTermScore !== undefined)
-        ? (midTermCbt || 0) + (existing?.midTermScore || 0)
-        : null;
+      let midTermTotalScore: number | null = null;
+      let examTotalScore: number | null = null;
+      let classActivityTotalScore: number | null = null;
 
-      const examTotal = (existing?.examScore !== null && existing?.examScore !== undefined)
-        ? (examCbt || 0) + (existing?.examScore || 0)
-        : null;
+      if (existing?.midTermScore !== null && existing?.midTermScore !== undefined) {
+        midTermTotalScore = (midTermCbt || 0) + (existing.midTermScore || 0);
+      } else if (midTermCbt !== null) {
+        midTermTotalScore = midTermCbt;
+      }
 
-      const classActivityTotal = existing?.classActivityScore !== null && existing?.classActivityScore !== undefined
-        ? existing.classActivityScore
-        : null;
+      if (existing?.examScore !== null && existing?.examScore !== undefined) {
+        examTotalScore = (examCbt || 0) + (existing.examScore || 0);
+      } else if (examCbt !== null) {
+        examTotalScore = examCbt;
+      }
 
-      // Calculate overall percentage
-      let totalScore = null;
-      let percentage = null;
-      let grade = null;
+      if (existing?.classActivityScore !== null && existing?.classActivityScore !== undefined) {
+        classActivityTotalScore = existing.classActivityScore;
+      }
 
-      if (midTermTotal !== null && classActivityTotal !== null && examTotal !== null) {
-        totalScore = midTermTotal + classActivityTotal + examTotal;
-        percentage = Math.round((totalScore / 100) * 100);
+      // Calculate overall percentage and grade
+      let totalScore: number | null = null;
+      let percentage: number | null = null;
+      let grade: string | null = null;
 
-        if (percentage >= 70) grade = 'A';
-        else if (percentage >= 60) grade = 'B';
-        else if (percentage >= 50) grade = 'C';
-        else if (percentage >= 40) grade = 'D';
-        else grade = 'F';
+      // Check if all three components have scores (not null)
+      const hasMidTerm = midTermTotalScore !== null;
+      const hasClassActivity = classActivityTotalScore !== null;
+      const hasExam = examTotalScore !== null;
+
+      if (hasMidTerm && hasClassActivity && hasExam) {
+        totalScore = (midTermTotalScore || 0) + (classActivityTotalScore || 0) + (examTotalScore || 0);
+        percentage = totalScore; // Since total is out of 100
+
+        // Use dynamic grade ranges from grading scheme
+        if (percentage >= scheme.gradeAMin) {
+          grade = 'A';
+        } else if (percentage >= scheme.gradeBMin) {
+          grade = 'B';
+        } else if (percentage >= scheme.gradeCMin) {
+          grade = 'C';
+        } else if (percentage >= scheme.gradeDMin) {
+          grade = 'D';
+        } else {
+          grade = 'F';
+        }
       }
 
       subjectMap.set(subject, {
         subjectName: subject,
-        midTermScore: existing?.midTermScore !== undefined ? existing.midTermScore : null,
-        classActivityScore: existing?.classActivityScore !== undefined ? existing.classActivityScore : null,
-        examScore: existing?.examScore !== undefined ? existing.examScore : null,
-        midTermCbt: midTermCbt,
-        examCbt: examCbt,
+        midTermScore: midTermTotalScore,
+        classActivityScore: classActivityTotalScore,
+        examScore: examTotalScore,
         totalScore: totalScore,
         percentage: percentage,
         grade: grade,

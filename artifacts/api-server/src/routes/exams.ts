@@ -240,6 +240,7 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
 
           const allComponentsExist = hasMidTerm && hasActivity && hasExam;
 
+          // In the delete endpoint, replace the grade calculation section
           if (!allComponentsExist) {
             updateData.totalScore = null;
             updateData.percentage = null;
@@ -253,11 +254,24 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
             updateData.totalScore = total;
             updateData.percentage = total;
 
-            if (total >= 70) updateData.grade = 'A';
-            else if (total >= 60) updateData.grade = 'B';
-            else if (total >= 50) updateData.grade = 'C';
-            else if (total >= 40) updateData.grade = 'D';
-            else updateData.grade = 'F';
+            // Get grading scheme for dynamic grade calculation
+            const [gradingScheme] = await db
+              .select()
+              .from(gradingSchemesTable)
+              .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+              .limit(1);
+
+            const defaultScheme = { gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 };
+            const scheme = gradingScheme || defaultScheme;
+
+            let grade = 'F';
+            if (total >= scheme.gradeAMin) grade = 'A';
+            else if (total >= scheme.gradeBMin) grade = 'B';
+            else if (total >= scheme.gradeCMin) grade = 'C';
+            else if (total >= scheme.gradeDMin) grade = 'D';
+            else grade = 'F';
+
+            updateData.grade = grade;
           }
 
           await db
@@ -462,6 +476,7 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       return res.status(404).json({ error: "Exam not found" });
     }
 
+    // Get grading scheme
     const [gradingScheme] = await db
       .select()
       .from(gradingSchemesTable)
@@ -476,6 +491,11 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       examCbt: 30,
       examTheory: 30,
       classActivityTotal: 20,
+      gradeAMin: 70,
+      gradeBMin: 60,
+      gradeCMin: 50,
+      gradeDMin: 40,
+      gradeFMax: 39,
     };
 
     const scheme = gradingScheme || defaultScheme;
@@ -782,7 +802,6 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Teacher enters theory and class activity scores
-// Teacher enters theory and class activity scores
 router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, theoryScore, classActivityScore } = req.body;
@@ -821,6 +840,11 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       examCbt: 30,
       examTheory: 30,
       classActivityTotal: 20,
+      gradeAMin: 70,
+      gradeBMin: 60,
+      gradeCMin: 50,
+      gradeDMin: 40,
+      gradeFMax: 39,
     };
 
     const scheme = gradingScheme || defaultScheme;
@@ -856,13 +880,11 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       updateData.classActivityScore = classActivityScore || 0;
       totalScore = updateData.classActivityScore;
     } else if (exam.assessmentType === 'mid_term') {
-      // Get current CBT portion
       const cbtPortion = existing.midTermScore || 0;
       const theoryAdded = theoryScore || 0;
       totalScore = cbtPortion + theoryAdded;
       updateData.midTermScore = totalScore;
     } else if (exam.assessmentType === 'exam') {
-      // Get current CBT portion
       const cbtPortion = existing.examScore || 0;
       const theoryAdded = theoryScore || 0;
       totalScore = cbtPortion + theoryAdded;
@@ -873,12 +895,15 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
     updateData.totalScore = totalScore;
     updateData.percentage = Math.round(percentage);
 
-    // Calculate grade
-    if (percentage >= 70) updateData.grade = 'A';
-    else if (percentage >= 60) updateData.grade = 'B';
-    else if (percentage >= 50) updateData.grade = 'C';
-    else if (percentage >= 40) updateData.grade = 'D';
-    else updateData.grade = 'F';
+    // Calculate grade using dynamic ranges from grading scheme
+    let grade = 'F';
+    if (percentage >= scheme.gradeAMin) grade = 'A';
+    else if (percentage >= scheme.gradeBMin) grade = 'B';
+    else if (percentage >= scheme.gradeCMin) grade = 'C';
+    else if (percentage >= scheme.gradeDMin) grade = 'D';
+    else grade = 'F';
+
+    updateData.grade = grade;
 
     const [updated] = await db
       .update(subjectScoresTable)
