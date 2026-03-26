@@ -118,6 +118,15 @@ export default function SchoolAdminDashboard() {
     if (successCount > 0) {
       await fetchSubjects();
       setBulkSubjectSuccess(`Added ${successCount} subjects successfully. ${failCount > 0 ? `${failCount} failed.` : ""}`);
+
+      // Close modal if all subjects were added successfully
+      if (failCount === 0) {
+        setTimeout(() => {
+          setBulkSubjectModalOpen(false);
+          setBulkSubjectsText("");
+          setBulkSubjectSuccess("");
+        }, 1500); // Close after 1.5 seconds to show success message
+      }
     }
 
     if (failCount > 0 && successCount === 0) {
@@ -126,7 +135,7 @@ export default function SchoolAdminDashboard() {
 
     setIsBulkAdding(false);
 
-    // Clear after 3 seconds
+    // Clear success/error messages after 3 seconds
     setTimeout(() => {
       setBulkSubjectSuccess("");
       setBulkSubjectError("");
@@ -201,7 +210,6 @@ export default function SchoolAdminDashboard() {
     }
   };
 
-  // Add subject
   const handleAddSubject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubjectName.trim()) {
@@ -227,9 +235,10 @@ export default function SchoolAdminDashboard() {
       }
 
       await fetchSubjects();
-      setSubjectModalOpen(false);
+      setSubjectModalOpen(false); // Close modal
       setNewSubjectName("");
       setNewSubjectLevel("junior");
+      setSubjectError("");
     } catch (err) {
       setSubjectError("Network error. Please try again.");
     } finally {
