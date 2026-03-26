@@ -169,6 +169,10 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         <div className="p-8 md:p-12 max-w-7xl mx-auto">
           {children}
         </div>
+        {/* Footer */}
+        <footer className="mt-12 pt-6 border-t border-border text-center text-sm text-muted-foreground">
+          Powered by <span className="font-semibold text-primary">Vortex</span>
+        </footer>
       </main>
       <OfflineBanner />
     </div>
