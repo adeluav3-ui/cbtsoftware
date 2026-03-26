@@ -129,6 +129,19 @@ export default function TeacherDashboard() {
     }
   };
 
+  // Fetch subject scores
+  const fetchSubjectScores = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/subject-scores`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      setSubjectScores(data);
+    } catch (err) {
+      console.error("Failed to fetch subject scores", err);
+    }
+  };
+
   // Determine level based on selected class (JSS = junior, SSS = senior)
   useEffect(() => {
     if (eClass && schoolCode) {
@@ -544,6 +557,10 @@ export default function TeacherDashboard() {
         studentName={selectedStudentName}
         studentClass={selectedStudentClass}
         schoolCode={schoolCode}
+        onScoresUpdated={() => {
+          // Refresh the results tab data
+          fetchSubjectScores();
+        }}
       />
     </DashboardLayout>
   );

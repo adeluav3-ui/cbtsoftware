@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
-import { Modal, Badge } from "@/components/ui-elements";
-import { Loader2 } from "lucide-react";
+import { Modal, Badge, Button, Input } from "@/components/ui-elements";
+import { Loader2, Save } from "lucide-react";
 
 interface SubjectResult {
     subjectName: string;
     midTermScore: number | null;
     classActivityScore: number | null;
     examScore: number | null;
-    midTermMax?: number;
-    classActivityMax?: number;
-    examMax?: number;
     totalScore: number | null;
     percentage: number | null;
     grade: string | null;
@@ -22,6 +19,7 @@ interface StudentResultsModalProps {
     studentName: string;
     studentClass: string;
     schoolCode: string;
+    onScoresUpdated?: () => void;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
@@ -33,11 +31,14 @@ export function StudentResultsModal({
     studentName,
     studentClass,
     schoolCode,
+    onScoresUpdated,
 }: StudentResultsModalProps) {
     const [subjects, setSubjects] = useState<SubjectResult[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [overallAverage, setOverallAverage] = useState(0);
     const [completedSubjectsCount, setCompletedSubjectsCount] = useState(0);
+    const [editingScores, setEditingScores] = useState<{ [key: string]: { type: string; value: number } }>({});
+    const [saving, setSaving] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && studentId) {
@@ -80,9 +81,6 @@ export function StudentResultsModal({
                     midTermScore: subject.midTermScore,
                     classActivityScore: subject.classActivityScore,
                     examScore: subject.examScore,
-                    midTermMax: 20,
-                    classActivityMax: 20,
-                    examMax: 60,
                     totalScore: totalScore,
                     percentage: percentage,
                     grade: grade,
@@ -107,11 +105,41 @@ export function StudentResultsModal({
         }
     };
 
-    const getScoreDisplay = (score: number | null, max?: number) => {
-        if (score === null) return <span className="text-muted-foreground">—</span>;
-        if (max) {
-            return <span className="font-medium">{score}/{max}</span>;
+    const handleSaveScore = async (subjectName: string, component: string, score: number) => {
+        setSaving(`${subjectName}-${component}`);
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/subject-scores`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        subjectName,
+                        component,
+                        score,
+                    }),
+                    credentials: "include",
+                }
+            );
+
+            if (response.ok) {
+                await fetchResults();
+                onScoresUpdated?.();
+                setEditingScores(prev => {
+                    const newState = { ...prev };
+                    delete newState[`${subjectName}-${component}`];
+                    return newState;
+                });
+            }
+        } catch (err) {
+            console.error("Failed to save", err);
+        } finally {
+            setSaving(null);
         }
+    };
+
+    const getScoreDisplay = (score: number | null) => {
+        if (score === null) return <span className="text-muted-foreground">—</span>;
         return <span className="font-medium">{score}</span>;
     };
 
@@ -124,6 +152,70 @@ export function StudentResultsModal({
             case 'D': return 'bg-orange-600 text-white';
             default: return 'bg-red-600 text-white';
         }
+    };
+
+    const ScoreInput = ({
+        subjectName,
+        component,
+        currentScore,
+        maxScore,
+        label
+    }: {
+        subjectName: string;
+        component: string;
+        currentScore: number | null;
+        maxScore: number;
+        label: string;
+    }) => {
+        const isEditing = editingScores[`${subjectName}-${component}`];
+        const [tempValue, setTempValue] = useState(currentScore || 0);
+
+        if (currentScore !== null) {
+            return (
+                <div className="text-center">
+                    <span className="font-medium">{currentScore}/{maxScore}</span>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex flex-col gap-1">
+                {isEditing ? (
+                    <div className="flex gap-1">
+                        <Input
+                            type="number"
+                            min={0}
+                            max={maxScore}
+                            value={tempValue}
+                            onChange={(e) => setTempValue(parseInt(e.target.value) || 0)}
+                            className="w-16 text-center text-sm"
+                        />
+                        <Button
+                            size="sm"
+                            onClick={() => handleSaveScore(subjectName, component, tempValue)}
+                            isLoading={saving === `${subjectName}-${component}`}
+                            className="px-2"
+                        >
+                            <Save className="w-3 h-3" />
+                        </Button>
+                    </div>
+                ) : (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setEditingScores(prev => ({
+                                ...prev,
+                                [`${subjectName}-${component}`]: { type: component, value: 0 }
+                            }));
+                            setTempValue(0);
+                        }}
+                    >
+                        Enter {label}
+                    </Button>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -182,14 +274,44 @@ export function StudentResultsModal({
                                     return (
                                         <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
                                             <td className="px-4 py-3 font-medium">{subject.subjectName}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                {getScoreDisplay(subject.midTermScore, subject.midTermMax)}
+                                            <td className="px-4 py-3">
+                                                {hasMidTerm ? (
+                                                    <div className="text-center font-medium">{subject.midTermScore}/20</div>
+                                                ) : (
+                                                    <ScoreInput
+                                                        subjectName={subject.subjectName}
+                                                        component="midterm"
+                                                        currentScore={subject.midTermScore}
+                                                        maxScore={20}
+                                                        label="Mid-Term"
+                                                    />
+                                                )}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {getScoreDisplay(subject.classActivityScore, subject.classActivityMax)}
+                                            <td className="px-4 py-3">
+                                                {hasActivity ? (
+                                                    <div className="text-center font-medium">{subject.classActivityScore}/20</div>
+                                                ) : (
+                                                    <ScoreInput
+                                                        subjectName={subject.subjectName}
+                                                        component="activity"
+                                                        currentScore={subject.classActivityScore}
+                                                        maxScore={20}
+                                                        label="Activity"
+                                                    />
+                                                )}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {getScoreDisplay(subject.examScore, subject.examMax)}
+                                            <td className="px-4 py-3">
+                                                {hasExam ? (
+                                                    <div className="text-center font-medium">{subject.examScore}/60</div>
+                                                ) : (
+                                                    <ScoreInput
+                                                        subjectName={subject.subjectName}
+                                                        component="exam"
+                                                        currentScore={subject.examScore}
+                                                        maxScore={60}
+                                                        label="Exam"
+                                                    />
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center font-bold">
                                                 {isComplete ? `${subject.totalScore}/100` : "—"}
@@ -219,8 +341,7 @@ export function StudentResultsModal({
                 )}
 
                 <div className="pt-4 text-xs text-muted-foreground text-center border-t border-border">
-                    Individual component scores are shown as points earned out of maximum marks.<br />
-                    Final percentage and grade appear only when all three components are entered.
+                    Click "Enter" to add missing scores. Final percentage and grade appear when all three components are entered.
                 </div>
             </div>
         </Modal>
