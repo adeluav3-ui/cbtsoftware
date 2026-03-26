@@ -140,7 +140,7 @@ export default function Login() {
       <footer className="mt-12 pt-6 border-t border-border text-center text-sm text-muted-foreground">
         Powered by{' '}
         <a
-          href="https://luma-website-six.vercel.app/#contact"
+          href="https://luma-website-six.vercel.app/"
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold text-primary hover:underline transition-colors"
