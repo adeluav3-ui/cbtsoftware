@@ -275,9 +275,16 @@ export default function TakeExam() {
           ) : resultScore ? (
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
               <CheckCircle2 className="w-24 h-24 text-success mx-auto mb-6" />
-              <h2 className="text-4xl font-bold font-display mb-2">{resultScore.pct.toFixed(1)}%</h2>
-              <p className="text-xl text-muted-foreground mb-8">
-                You scored {resultScore.score} out of {questions.length}
+              <h2 className="text-3xl font-bold font-display mb-2">
+                {resultScore.score} / {questions.length}
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                You answered {resultScore.score} out of {questions.length} questions correctly
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                {exam.assessmentType === 'class_activity'
+                  ? "This is a class activity. Your teacher will enter the final score."
+                  : "Your CBT score has been recorded. Your teacher will enter the theory score later."}
               </p>
               <div className="flex flex-col gap-3">
                 <Button

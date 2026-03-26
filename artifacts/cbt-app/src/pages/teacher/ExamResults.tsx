@@ -3,7 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { Card, Button, Badge, Input } from "@/components/ui-elements";
-import { ArrowLeft, Download, Search } from "lucide-react";
+import { ArrowLeft, Download, Search, Save } from "lucide-react";
 
 interface StudentResult {
     studentId: number;
@@ -15,10 +15,8 @@ interface StudentResult {
     scaledCbtScore: number;
     theoryScore: number;
     classActivityScore: number;
-    totalScore: number;
+    componentScore: number;
     maxScore: number;
-    percentage: number;
-    grade: string;
     submittedAt: string;
 }
 
@@ -76,22 +74,26 @@ export default function ExamResults() {
 
         setSaving(studentId);
         try {
+            const body: any = { studentId };
+
+            if (data?.exam.assessmentType === 'class_activity') {
+                body.classActivityScore = scores.activity || 0;
+            } else {
+                body.theoryScore = scores.theory || 0;
+            }
+
             const response = await fetch(
                 `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${examId}/scores`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        studentId,
-                        theoryScore: scores.theory || 0,
-                        classActivityScore: scores.activity || 0,
-                    }),
+                    body: JSON.stringify(body),
                     credentials: "include",
                 }
             );
 
             if (response.ok) {
-                await fetchResults(); // Refresh data
+                await fetchResults();
                 setEditingScores(prev => {
                     const newState = { ...prev };
                     delete newState[studentId];
@@ -108,16 +110,6 @@ export default function ExamResults() {
     const filteredResults = data?.results.filter(r =>
         r.studentName.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];
-
-    const getGradeColor = (grade: string) => {
-        switch (grade) {
-            case 'A': return 'bg-green-600 text-white';
-            case 'B': return 'bg-blue-600 text-white';
-            case 'C': return 'bg-yellow-600 text-white';
-            case 'D': return 'bg-orange-600 text-white';
-            default: return 'bg-red-600 text-white';
-        }
-    };
 
     const getAssessmentTypeLabel = (type: string) => {
         switch (type) {
@@ -149,9 +141,12 @@ export default function ExamResults() {
     return (
         <DashboardLayout allowedRoles={["teacher", "school_admin"]}>
             <div className="mb-6">
-                <Link href="/teacher" className="inline-flex items-center text-sm text-primary hover:underline mb-4">
+                <button
+                    onClick={() => setLocation("/teacher")}
+                    className="inline-flex items-center text-sm text-primary hover:underline mb-4"
+                >
                     <ArrowLeft className="w-4 h-4 mr-1" /> Back to Exams
-                </Link>
+                </button>
                 <div className="flex justify-between items-start">
                     <div>
                         <h1 className="text-2xl font-bold font-display">{exam.title}</h1>
@@ -167,21 +162,16 @@ export default function ExamResults() {
 
             {/* Grading Scheme Info */}
             <Card className="p-4 mb-6 bg-muted/30">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                        <span className="text-muted-foreground">CBT Portion:</span>
-                        <span className="ml-2 font-semibold">{gradingScheme.componentCbt} marks</span>
-                    </div>
-                    {exam.assessmentType !== 'class_activity' && (
-                        <div>
-                            <span className="text-muted-foreground">Theory Portion:</span>
-                            <span className="ml-2 font-semibold">{gradingScheme.componentTheory} marks</span>
-                        </div>
+                <div className="text-sm">
+                    {exam.assessmentType === 'class_activity' ? (
+                        <p>Class Activity: Enter the score out of {gradingScheme.componentTotal} marks</p>
+                    ) : (
+                        <p>
+                            CBT Score: {gradingScheme.componentCbt} marks •
+                            Theory Score: {gradingScheme.componentTheory} marks •
+                            Total: {gradingScheme.componentTotal} marks
+                        </p>
                     )}
-                    <div>
-                        <span className="text-muted-foreground">Total:</span>
-                        <span className="ml-2 font-semibold">{gradingScheme.componentTotal} marks</span>
-                    </div>
                 </div>
             </Card>
 
@@ -210,22 +200,18 @@ export default function ExamResults() {
                                 <th className="px-4 py-3 font-semibold">Student</th>
                                 <th className="px-4 py-3 font-semibold text-center">CBT Score</th>
                                 {exam.assessmentType !== 'class_activity' && (
-                                    <th className="px-4 py-3 font-semibold text-center">Theory Score</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Theory Score (to enter)</th>
                                 )}
                                 {exam.assessmentType === 'class_activity' && (
-                                    <th className="px-4 py-3 font-semibold text-center">Activity Score</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Activity Score (to enter)</th>
                                 )}
-                                <th className="px-4 py-3 font-semibold text-center">Total</th>
-                                <th className="px-4 py-3 font-semibold text-center">%</th>
-                                <th className="px-4 py-3 font-semibold text-center">Grade</th>
+                                <th className="px-4 py-3 font-semibold text-center">Total (Current)</th>
                                 <th className="px-4 py-3 font-semibold">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredResults.map((result) => {
                                 const isEditing = editingScores[result.studentId];
-                                const currentTheory = isEditing?.theory ?? result.theoryScore;
-                                const currentActivity = isEditing?.activity ?? result.classActivityScore;
 
                                 return (
                                     <tr key={result.studentId} className="border-b border-border/50 hover:bg-muted/20">
@@ -235,7 +221,9 @@ export default function ExamResults() {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="font-semibold">{result.cbtRawScore}/{result.cbtTotal}</div>
-                                            <div className="text-xs text-muted-foreground">({result.cbtPercentage.toFixed(0)}% → {result.scaledCbtScore} pts)</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Scaled: {result.scaledCbtScore}/{gradingScheme.componentCbt}
+                                            </div>
                                         </td>
 
                                         {exam.assessmentType !== 'class_activity' && (
@@ -245,15 +233,17 @@ export default function ExamResults() {
                                                         type="number"
                                                         min={0}
                                                         max={gradingScheme.componentTheory}
-                                                        value={currentTheory}
+                                                        value={isEditing.theory || result.theoryScore}
                                                         onChange={(e) => setEditingScores(prev => ({
                                                             ...prev,
                                                             [result.studentId]: { ...prev[result.studentId], theory: parseInt(e.target.value) || 0 }
                                                         }))}
-                                                        className="w-20 text-center mx-auto"
+                                                        className="w-24 text-center mx-auto"
                                                     />
                                                 ) : (
-                                                    <span className="font-medium">{result.theoryScore}</span>
+                                                    <span className="font-medium">
+                                                        {result.theoryScore > 0 ? result.theoryScore : "Not entered"}
+                                                    </span>
                                                 )}
                                             </td>
                                         )}
@@ -265,30 +255,25 @@ export default function ExamResults() {
                                                         type="number"
                                                         min={0}
                                                         max={gradingScheme.componentTotal}
-                                                        value={currentActivity}
+                                                        value={isEditing.activity || result.classActivityScore}
                                                         onChange={(e) => setEditingScores(prev => ({
                                                             ...prev,
                                                             [result.studentId]: { ...prev[result.studentId], activity: parseInt(e.target.value) || 0 }
                                                         }))}
-                                                        className="w-20 text-center mx-auto"
+                                                        className="w-24 text-center mx-auto"
                                                     />
                                                 ) : (
-                                                    <span className="font-medium">{result.classActivityScore}</span>
+                                                    <span className="font-medium">
+                                                        {result.classActivityScore > 0 ? result.classActivityScore : "Not entered"}
+                                                    </span>
                                                 )}
                                             </td>
                                         )}
 
                                         <td className="px-4 py-3 text-center font-bold">
-                                            {result.totalScore}/{result.maxScore}
+                                            {result.componentScore}/{gradingScheme.componentTotal}
                                         </td>
-                                        <td className="px-4 py-3 text-center font-semibold">
-                                            {result.percentage}%
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <Badge className={getGradeColor(result.grade)}>
-                                                {result.grade}
-                                            </Badge>
-                                        </td>
+
                                         <td className="px-4 py-3">
                                             {isEditing ? (
                                                 <div className="flex gap-2">
@@ -297,7 +282,7 @@ export default function ExamResults() {
                                                         onClick={() => handleSaveScore(result.studentId)}
                                                         isLoading={saving === result.studentId}
                                                     >
-                                                        Save
+                                                        <Save className="w-3 h-3 mr-1" /> Save
                                                     </Button>
                                                     <Button
                                                         size="sm"
@@ -327,7 +312,7 @@ export default function ExamResults() {
                                                         }));
                                                     }}
                                                 >
-                                                    Enter Scores
+                                                    Enter {exam.assessmentType === 'class_activity' ? 'Activity' : 'Theory'} Score
                                                 </Button>
                                             )}
                                         </td>
@@ -336,7 +321,7 @@ export default function ExamResults() {
                             })}
                             {filteredResults.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                                    <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
                                         No students found.
                                     </td>
                                 </tr>
@@ -345,6 +330,12 @@ export default function ExamResults() {
                     </table>
                 </div>
             </Card>
+
+            <div className="mt-4 text-xs text-muted-foreground text-center">
+                {exam.assessmentType === 'class_activity'
+                    ? "Enter class activity scores above. Final percentage will appear in the student's overall results when all components are complete."
+                    : "CBT scores are auto-graded. Enter theory scores above. Final percentage will appear in the student's overall results when all components are complete."}
+            </div>
         </DashboardLayout>
     );
 }
