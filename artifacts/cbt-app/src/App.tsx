@@ -14,6 +14,7 @@ import StudentDashboard from "@/pages/student";
 import TakeExam from "@/pages/take-exam";
 import NotFound from "@/pages/not-found";
 import ExamResults from "@/pages/teacher/ExamResults";
+import ComprehensiveResults from "@/pages/student/ComprehensiveResults";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/student" component={StudentDashboard} />
       <Route path="/exam/:examId" component={TakeExam} />
       <Route path="/teacher/exams/:examId/results" component={ExamResults} />
+      <Route path="/comprehensive-results" component={ComprehensiveResults} />
 
       <Route path="/" component={RootRedirect} />
       <Route component={NotFound} />

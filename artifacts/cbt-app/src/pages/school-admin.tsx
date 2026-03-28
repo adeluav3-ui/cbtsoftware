@@ -5,11 +5,12 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { format } from "date-fns";
+import { supabase } from "@/lib/supabase";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -23,6 +24,8 @@ export default function SchoolAdminDashboard() {
   const { data: teachers = [] } = useListTeachers(schoolCode);
   const { data: students = [] } = useListStudents(schoolCode, classFilter);
   const { data: results = [] } = useListResults(schoolCode);
+  const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
   const [currentPasscode, setCurrentPasscode] = useState("");
@@ -66,81 +69,6 @@ export default function SchoolAdminDashboard() {
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [bulkSubjectError, setBulkSubjectError] = useState("");
   const [bulkSubjectSuccess, setBulkSubjectSuccess] = useState("");
-
-  // Bulk add subjects
-  const handleBulkAddSubjects = async () => {
-    if (!bulkSubjectsText.trim()) {
-      setBulkSubjectError("Please enter at least one subject");
-      return;
-    }
-
-    setIsBulkAdding(true);
-    setBulkSubjectError("");
-    setBulkSubjectSuccess("");
-
-    // Parse subjects - one per line
-    const subjectNames = bulkSubjectsText
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
-    if (subjectNames.length === 0) {
-      setBulkSubjectError("No valid subjects found");
-      setIsBulkAdding(false);
-      return;
-    }
-
-    let successCount = 0;
-    let failCount = 0;
-    const failedSubjects: string[] = [];
-
-    for (const subjectName of subjectNames) {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: subjectName, level: bulkSubjectsLevel }),
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          successCount++;
-        } else {
-          failCount++;
-          failedSubjects.push(subjectName);
-        }
-      } catch (err) {
-        failCount++;
-        failedSubjects.push(subjectName);
-      }
-    }
-
-    if (successCount > 0) {
-      await fetchSubjects();
-      setBulkSubjectSuccess(`Added ${successCount} subjects successfully. ${failCount > 0 ? `${failCount} failed.` : ""}`);
-
-      // Close modal if all subjects were added successfully
-      if (failCount === 0) {
-        setTimeout(() => {
-          setBulkSubjectModalOpen(false);
-          setBulkSubjectsText("");
-          setBulkSubjectSuccess("");
-        }, 1500); // Close after 1.5 seconds to show success message
-      }
-    }
-
-    if (failCount > 0 && successCount === 0) {
-      setBulkSubjectError(`Failed to add ${failCount} subjects. Check for duplicates or network issues.`);
-    }
-
-    setIsBulkAdding(false);
-
-    // Clear success/error messages after 3 seconds
-    setTimeout(() => {
-      setBulkSubjectSuccess("");
-      setBulkSubjectError("");
-    }, 3000);
-  };
 
   // Grading scheme state
   const [gradingScheme, setGradingScheme] = useState({
@@ -187,17 +115,30 @@ export default function SchoolAdminDashboard() {
   });
 
   const { mutate: deleteStudent } = useDeleteStudent({
-    mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, { class: classFilter }) }) }
+    mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) }) }
   });
 
   const { mutate: newSession, isPending: isNSPending } = useStartNewSession({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, { class: classFilter }) });
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         setSessionModalOpen(false);
       }
     }
   });
+
+  // Fetch school info
+  const fetchSchoolInfo = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      setSchoolLogo(data.logoUrl);
+    } catch (err) {
+      console.error("Failed to fetch school info", err);
+    }
+  };
 
   // Fetch subjects
   const fetchSubjects = async () => {
@@ -212,6 +153,54 @@ export default function SchoolAdminDashboard() {
       console.error("Failed to fetch subjects", err);
     } finally {
       setIsSubjectsLoading(false);
+    }
+  };
+
+  // Fetch grading scheme
+  const fetchGradingScheme = async () => {
+    setIsLoadingScheme(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setGradingScheme(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch grading scheme", err);
+    } finally {
+      setIsLoadingScheme(false);
+    }
+  };
+
+  // Update grading scheme
+  const updateGradingScheme = async () => {
+    setIsSavingScheme(true);
+    setSchemeError("");
+    setSchemeSuccess("");
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gradingScheme),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSchemeError(data.error || "Failed to update grading scheme");
+        return;
+      }
+
+      setSchemeSuccess("Grading scheme updated successfully!");
+      setTimeout(() => setSchemeSuccess(""), 3000);
+    } catch (err) {
+      setSchemeError("Network error. Please try again.");
+    } finally {
+      setIsSavingScheme(false);
     }
   };
 
@@ -240,7 +229,7 @@ export default function SchoolAdminDashboard() {
       }
 
       await fetchSubjects();
-      setSubjectModalOpen(false); // Close modal
+      setSubjectModalOpen(false);
       setNewSubjectName("");
       setNewSubjectLevel("junior");
       setSubjectError("");
@@ -271,12 +260,111 @@ export default function SchoolAdminDashboard() {
     }
   };
 
-  // Fetch subjects when component mounts
-  useEffect(() => {
-    if (schoolCode) {
-      fetchSubjects();
+  // Bulk add subjects
+  const handleBulkAddSubjects = async () => {
+    if (!bulkSubjectsText.trim()) {
+      setBulkSubjectError("Please enter at least one subject");
+      return;
     }
-  }, [schoolCode]);
+
+    setIsBulkAdding(true);
+    setBulkSubjectError("");
+    setBulkSubjectSuccess("");
+
+    const subjectNames = bulkSubjectsText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    if (subjectNames.length === 0) {
+      setBulkSubjectError("No valid subjects found");
+      setIsBulkAdding(false);
+      return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const subjectName of subjectNames) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: subjectName, level: bulkSubjectsLevel }),
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (err) {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      await fetchSubjects();
+      setBulkSubjectSuccess(`Added ${successCount} subjects successfully. ${failCount > 0 ? `${failCount} failed.` : ""}`);
+
+      if (failCount === 0) {
+        setTimeout(() => {
+          setBulkSubjectModalOpen(false);
+          setBulkSubjectsText("");
+          setBulkSubjectSuccess("");
+        }, 1500);
+      }
+    }
+
+    if (failCount > 0 && successCount === 0) {
+      setBulkSubjectError(`Failed to add ${failCount} subjects. Check for duplicates or network issues.`);
+    }
+
+    setIsBulkAdding(false);
+
+    setTimeout(() => {
+      setBulkSubjectSuccess("");
+      setBulkSubjectError("");
+    }, 3000);
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `school-logo-${Date.now()}.${fileExt}`;
+      const filePath = `school-logos/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('school-logos')
+        .upload(filePath, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('school-logos')
+        .getPublicUrl(filePath);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/logo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoUrl: publicUrl }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        setSchoolLogo(publicUrl);
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // Fetch current retake passcode
   const fetchCurrentPasscode = async () => {
@@ -331,74 +419,63 @@ export default function SchoolAdminDashboard() {
     }
   };
 
-  // Open modal and fetch current passcode
   const openPasscodeModal = () => {
     fetchCurrentPasscode();
     setPasscodeModalOpen(true);
   };
 
-  // Fetch grading scheme
-  const fetchGradingScheme = async () => {
-    setIsLoadingScheme(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setGradingScheme(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch grading scheme", err);
-    } finally {
-      setIsLoadingScheme(false);
-    }
-  };
-
-  // Update grading scheme
-  const updateGradingScheme = async () => {
-    setIsSavingScheme(true);
-    setSchemeError("");
-    setSchemeSuccess("");
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gradingScheme),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setSchemeError(data.error || "Failed to update grading scheme");
-        return;
-      }
-
-      setSchemeSuccess("Grading scheme updated successfully!");
-      setTimeout(() => setSchemeSuccess(""), 3000);
-    } catch (err) {
-      setSchemeError("Network error. Please try again.");
-    } finally {
-      setIsSavingScheme(false);
-    }
-  };
-
-  // Open modal and fetch scheme
   const openGradingModal = () => {
     fetchGradingScheme();
     setGradingModalOpen(true);
   };
 
+  useEffect(() => {
+    if (schoolCode) {
+      fetchSchoolInfo();
+      fetchSubjects();
+      fetchGradingScheme();
+    }
+  }, [schoolCode]);
+
   return (
     <DashboardLayout allowedRoles={["school_admin"]}>
+      {/* School Logo Section */}
+      <div className="flex items-center gap-4 mb-6 p-4 bg-muted/20 rounded-xl">
+        <div className="relative">
+          {schoolLogo ? (
+            <img src={schoolLogo} alt="School Logo" className="w-16 h-16 object-contain rounded-lg" />
+          ) : (
+            <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
+              <School className="w-8 h-8 text-muted-foreground" />
+            </div>
+          )}
+          <label className="absolute -bottom-2 -right-2 cursor-pointer bg-primary rounded-full p-1 shadow-lg hover:bg-primary/80 transition-colors">
+            <Upload className="w-3 h-3 text-white" />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleLogoUpload}
+              disabled={uploadingLogo}
+              className="hidden"
+            />
+          </label>
+        </div>
+        <div>
+          <p className="text-sm font-semibold">School Logo</p>
+          <p className="text-xs text-muted-foreground">Upload your school's logo. It will appear on student results.</p>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold">School Administration</h1>
           <p className="text-muted-foreground mt-1">Manage personnel, students, and academic records.</p>
         </div>
         <div className="flex gap-3">
+          <Button variant="outline" onClick={openGradingModal}>
+            <RotateCw className="w-4 h-4 mr-2" />
+            Grading Scheme
+          </Button>
           <Button variant="outline" onClick={openPasscodeModal}>
             <RotateCw className="w-4 h-4 mr-2" />
             Retake Passcode
@@ -411,9 +488,10 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Grading", "Subjects"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
+      {/* Teachers Tab - same as before */}
       {activeTab === "Teachers" && (
         <Card className="p-0 overflow-hidden">
           <div className="p-6 border-b border-border/50 flex justify-between items-center bg-muted/20">
@@ -462,6 +540,7 @@ export default function SchoolAdminDashboard() {
         </Card>
       )}
 
+      {/* Students Tab */}
       {activeTab === "Students" && (
         <Card className="p-0 overflow-hidden">
           <div className="p-6 border-b border-border/50 flex flex-col sm:flex-row justify-between items-center bg-muted/20 gap-4">
@@ -515,6 +594,7 @@ export default function SchoolAdminDashboard() {
         </Card>
       )}
 
+      {/* Results Tab */}
       {activeTab === "Results" && (
         <Card className="p-0 overflow-hidden">
           <div className="p-4 border-b border-border/50 bg-muted/20">
@@ -565,198 +645,7 @@ export default function SchoolAdminDashboard() {
         </Card>
       )}
 
-      {activeTab === "Grading" && (
-        <Card className="p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold font-display">Grading Scheme Configuration</h2>
-            <p className="text-muted-foreground text-sm mt-1">
-              Configure how exam scores are calculated and grade boundaries.
-            </p>
-          </div>
-
-          <div className="space-y-8">
-            {/* Grade Ranges */}
-            <div className="border-b border-border pb-6">
-              <h3 className="text-lg font-semibold mb-4">Grade Boundaries</h3>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade A (min %)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={gradingScheme.gradeAMin}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeAMin: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">e.g., 70% and above</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade B (min %)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={gradingScheme.gradeBMin}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeBMin: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">e.g., 60-69%</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade C (min %)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={gradingScheme.gradeCMin}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeCMin: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">e.g., 50-59%</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade D (min %)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={gradingScheme.gradeDMin}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeDMin: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">e.g., 40-49%</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Grade F (max %)</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={gradingScheme.gradeFMax}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, gradeFMax: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">e.g., below 40%</p>
-                </div>
-              </div>
-              <div className="mt-3 p-3 bg-muted/20 rounded-lg">
-                <p className="text-sm font-semibold">Current Grade Scale:</p>
-                <div className="flex gap-4 text-sm mt-1">
-                  <span>A: ≥{gradingScheme.gradeAMin}%</span>
-                  <span>B: {gradingScheme.gradeBMin}% - {gradingScheme.gradeAMin - 1}%</span>
-                  <span>C: {gradingScheme.gradeCMin}% - {gradingScheme.gradeBMin - 1}%</span>
-                  <span>D: {gradingScheme.gradeDMin}% - {gradingScheme.gradeCMin - 1}%</span>
-                  <span>F: ≤{gradingScheme.gradeFMax}%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mid-term Component */}
-            <div className="border-b border-border pb-6">
-              <h3 className="text-lg font-semibold mb-4">Mid-term Assessment</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Total Points</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.midTermTotal}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTotal: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">CBT Portion</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.midTermCbt}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermCbt: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Theory Portion</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.midTermTheory}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTheory: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Exam Component */}
-            <div className="border-b border-border pb-6">
-              <h3 className="text-lg font-semibold mb-4">Final Exam</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Total Points</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.examTotal}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, examTotal: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">CBT Portion</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.examCbt}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, examCbt: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Theory Portion</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.examTheory}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, examTheory: parseInt(e.target.value) || 0 })}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Class Activity */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Class Activity</h3>
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Total Points</label>
-                  <Input
-                    type="number"
-                    value={gradingScheme.classActivityTotal}
-                    onChange={(e) => setGradingScheme({ ...gradingScheme, classActivityTotal: parseInt(e.target.value) || 0 })}
-                    className="w-full max-w-md"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {schemeError && (
-              <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
-                {schemeError}
-              </div>
-            )}
-
-            {schemeSuccess && (
-              <div className="bg-success/10 text-success p-3 rounded-lg text-sm">
-                {schemeSuccess}
-              </div>
-            )}
-
-            <div className="flex justify-end pt-4">
-              <Button onClick={updateGradingScheme} isLoading={isSavingScheme}>
-                Save Grading Scheme
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
+      {/* Subjects Tab */}
       {activeTab === "Subjects" && (
         <Card className="p-6">
           <div className="flex justify-between items-center mb-6">
@@ -786,57 +675,46 @@ export default function SchoolAdminDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Junior Secondary Subjects */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Junior Secondary (JSS1-3)</h3>
                   <Badge variant="default">{subjects.filter(s => s.level === 'junior').length}</Badge>
                 </div>
                 <div className="space-y-2">
-                  {subjects.filter(s => s.level === 'junior').length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No junior subjects added</p>
-                  ) : (
-                    subjects.filter(s => s.level === 'junior').map(subject => (
-                      <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
-                        <span className="font-medium">{subject.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteSubject(subject.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+                  {subjects.filter(s => s.level === 'junior').map(subject => (
+                    <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
+                      <span className="font-medium">{subject.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSubject(subject.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              {/* Senior Secondary Subjects */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Senior Secondary (SSS1-3)</h3>
                   <Badge variant="default">{subjects.filter(s => s.level === 'senior').length}</Badge>
                 </div>
                 <div className="space-y-2">
-                  {subjects.filter(s => s.level === 'senior').length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No senior subjects added</p>
-                  ) : (
-                    subjects.filter(s => s.level === 'senior').map(subject => (
-                      <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
-                        <span className="font-medium">{subject.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteSubject(subject.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
+                  {subjects.filter(s => s.level === 'senior').map(subject => (
+                    <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
+                      <span className="font-medium">{subject.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSubject(subject.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -876,6 +754,7 @@ export default function SchoolAdminDashboard() {
               </div>
             </form>
           </Modal>
+
           {/* Bulk Upload Modal */}
           <Modal isOpen={bulkSubjectModalOpen} onClose={() => setBulkSubjectModalOpen(false)} title="Bulk Upload Subjects" size="lg">
             <div className="space-y-4">
@@ -886,7 +765,6 @@ export default function SchoolAdminDashboard() {
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
                 </Select>
               </div>
-
               <div>
                 <Label>Subjects (one per line)</Label>
                 <textarea
@@ -895,76 +773,40 @@ export default function SchoolAdminDashboard() {
                   placeholder="Mathematics&#10;English Language&#10;Basic Science&#10;Social Studies&#10;..."
                   className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-50 font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Enter one subject per line. Duplicate subjects will be ignored.
-                </p>
+                <p className="text-xs text-muted-foreground mt-2">Enter one subject per line. Duplicate subjects will be ignored.</p>
               </div>
-
               {bulkSubjectError && (
-                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
-                  {bulkSubjectError}
-                </div>
+                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{bulkSubjectError}</div>
               )}
-
               {bulkSubjectSuccess && (
-                <div className="bg-success/10 text-success p-3 rounded-lg text-sm">
-                  {bulkSubjectSuccess}
-                </div>
+                <div className="bg-success/10 text-success p-3 rounded-lg text-sm">{bulkSubjectSuccess}</div>
               )}
-
               <div className="bg-muted/20 p-3 rounded-lg">
                 <p className="text-sm font-semibold mb-2">Common Subjects:</p>
                 <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
                   {bulkSubjectsLevel === "junior" ? (
                     <>
-                      <span>• Mathematics</span>
-                      <span>• English Language</span>
-                      <span>• Basic Science</span>
-                      <span>• Basic Technology</span>
-                      <span>• Social Studies</span>
-                      <span>• Civic Education</span>
-                      <span>• Christian Religious Studies</span>
-                      <span>• Islamic Religious Studies</span>
-                      <span>• Business Studies</span>
-                      <span>• Computer Studies</span>
-                      <span>• French</span>
-                      <span>• Home Economics</span>
-                      <span>• Agricultural Science</span>
-                      <span>• Cultural & Creative Arts</span>
+                      <span>• Mathematics</span> <span>• English Language</span> <span>• Basic Science</span>
+                      <span>• Basic Technology</span> <span>• Social Studies</span> <span>• Civic Education</span>
+                      <span>• Christian Religious Studies</span> <span>• Islamic Religious Studies</span>
+                      <span>• Business Studies</span> <span>• Computer Studies</span> <span>• French</span>
+                      <span>• Home Economics</span> <span>• Agricultural Science</span> <span>• Cultural & Creative Arts</span>
                     </>
                   ) : (
                     <>
-                      <span>• Mathematics</span>
-                      <span>• English Language</span>
-                      <span>• Physics</span>
-                      <span>• Chemistry</span>
-                      <span>• Biology</span>
-                      <span>• Economics</span>
-                      <span>• Government</span>
-                      <span>• Literature in English</span>
-                      <span>• Christian Religious Studies</span>
-                      <span>• Islamic Religious Studies</span>
-                      <span>• Geography</span>
-                      <span>• Commerce</span>
-                      <span>• Accounting</span>
-                      <span>• Further Mathematics</span>
-                      <span>• Civic Education</span>
+                      <span>• Mathematics</span> <span>• English Language</span> <span>• Physics</span>
+                      <span>• Chemistry</span> <span>• Biology</span> <span>• Economics</span>
+                      <span>• Government</span> <span>• Literature in English</span> <span>• Christian Religious Studies</span>
+                      <span>• Islamic Religious Studies</span> <span>• Geography</span> <span>• Commerce</span>
+                      <span>• Accounting</span> <span>• Further Mathematics</span> <span>• Civic Education</span>
                       <span>• Computer Science</span>
                     </>
                   )}
                 </div>
               </div>
-
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => setBulkSubjectModalOpen(false)} className="flex-1">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBulkAddSubjects}
-                  isLoading={isBulkAdding}
-                  disabled={!bulkSubjectsText.trim()}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={() => setBulkSubjectModalOpen(false)} className="flex-1">Cancel</Button>
+                <Button onClick={handleBulkAddSubjects} isLoading={isBulkAdding} disabled={!bulkSubjectsText.trim()} className="flex-1">
                   Upload Subjects
                 </Button>
               </div>
@@ -973,6 +815,96 @@ export default function SchoolAdminDashboard() {
         </Card>
       )}
 
+      {/* Grading Scheme Modal */}
+      <Modal isOpen={gradingModalOpen} onClose={() => setGradingModalOpen(false)} title="Grading Scheme Configuration" size="lg">
+        <div className="space-y-6">
+          {/* Grade Ranges */}
+          <div className="border-b border-border pb-4">
+            <h3 className="text-lg font-semibold mb-4">Grade Boundaries</h3>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Grade A (min %)</label>
+                <Input type="number" min={0} max={100} value={gradingScheme.gradeAMin}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, gradeAMin: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Grade B (min %)</label>
+                <Input type="number" min={0} max={100} value={gradingScheme.gradeBMin}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, gradeBMin: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Grade C (min %)</label>
+                <Input type="number" min={0} max={100} value={gradingScheme.gradeCMin}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, gradeCMin: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Grade D (min %)</label>
+                <Input type="number" min={0} max={100} value={gradingScheme.gradeDMin}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, gradeDMin: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Grade F (max %)</label>
+                <Input type="number" min={0} max={100} value={gradingScheme.gradeFMax}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, gradeFMax: parseInt(e.target.value) || 0 })} />
+              </div>
+            </div>
+          </div>
+
+          {/* Mid-term Component */}
+          <div className="border-b border-border pb-4">
+            <h3 className="text-lg font-semibold mb-4">Mid-term Assessment</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div><label className="block text-sm font-medium mb-2">Total Points</label>
+                <Input type="number" value={gradingScheme.midTermTotal}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTotal: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div><label className="block text-sm font-medium mb-2">CBT Portion</label>
+                <Input type="number" value={gradingScheme.midTermCbt}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, midTermCbt: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div><label className="block text-sm font-medium mb-2">Theory Portion</label>
+                <Input type="number" value={gradingScheme.midTermTheory}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, midTermTheory: parseInt(e.target.value) || 0 })} />
+              </div>
+            </div>
+          </div>
+
+          {/* Exam Component */}
+          <div className="border-b border-border pb-4">
+            <h3 className="text-lg font-semibold mb-4">Final Exam</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div><label className="block text-sm font-medium mb-2">Total Points</label>
+                <Input type="number" value={gradingScheme.examTotal}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, examTotal: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div><label className="block text-sm font-medium mb-2">CBT Portion</label>
+                <Input type="number" value={gradingScheme.examCbt}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, examCbt: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div><label className="block text-sm font-medium mb-2">Theory Portion</label>
+                <Input type="number" value={gradingScheme.examTheory}
+                  onChange={(e) => setGradingScheme({ ...gradingScheme, examTheory: parseInt(e.target.value) || 0 })} />
+              </div>
+            </div>
+          </div>
+
+          {/* Class Activity */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Class Activity</h3>
+            <div><label className="block text-sm font-medium mb-2">Total Points</label>
+              <Input type="number" value={gradingScheme.classActivityTotal}
+                onChange={(e) => setGradingScheme({ ...gradingScheme, classActivityTotal: parseInt(e.target.value) || 0 })} className="w-full max-w-md" />
+            </div>
+          </div>
+
+          {schemeError && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{schemeError}</div>}
+          {schemeSuccess && <div className="bg-success/10 text-success p-3 rounded-lg text-sm">{schemeSuccess}</div>}
+
+          <div className="flex justify-end pt-4">
+            <Button onClick={updateGradingScheme} isLoading={isSavingScheme}>Save Grading Scheme</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">
@@ -990,11 +922,9 @@ export default function SchoolAdminDashboard() {
           <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} required /></div>
           <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
-          <div>
-            <Label>Class</Label>
-            <Select value={sClass} onChange={e => setSClass(e.target.value)}>
-              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-            </Select>
+          <div><Label>Class</Label><Select value={sClass} onChange={e => setSClass(e.target.value)}>
+            {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+          </Select>
           </div>
           <Button type="submit" className="w-full mt-2" isLoading={isCSPending}>Create Student</Button>
         </form>
@@ -1012,33 +942,8 @@ export default function SchoolAdminDashboard() {
         </div>
       </Modal>
 
-      {/* Detail modals */}
-      <TeacherDetailModal
-        teacherId={selectedTeacherId}
-        teacherName={selectedTeacherName}
-        schoolCode={schoolCode}
-        onClose={() => setSelectedTeacherId(null)}
-      />
-
-      <StudentDetailModal
-        studentId={selectedStudentId}
-        studentName={selectedStudentName}
-        schoolCode={schoolCode}
-        onClose={() => setSelectedStudentId(null)}
-      />
-
-      <ResultDetailModal
-        resultId={selectedResultId}
-        schoolCode={schoolCode}
-        onClose={() => setSelectedResultId(null)}
-      />
-
       {/* Retake Passcode Modal */}
-      <Modal
-        isOpen={passcodeModalOpen}
-        onClose={() => setPasscodeModalOpen(false)}
-        title="Retake Exam Passcode"
-      >
+      <Modal isOpen={passcodeModalOpen} onClose={() => setPasscodeModalOpen(false)} title="Retake Exam Passcode">
         <div className="space-y-4">
           <div className="bg-muted/30 p-4 rounded-lg">
             <label className="text-sm font-medium text-muted-foreground">Current Passcode</label>
@@ -1046,47 +951,25 @@ export default function SchoolAdminDashboard() {
               {isLoadingPasscode ? "Loading..." : currentPasscode || "1234"}
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium mb-2">New Passcode (4 digits)</label>
-            <Input
-              type="password"
-              maxLength={4}
-              placeholder="Enter new 4-digit passcode"
-              value={newPasscode}
-              onChange={(e) => {
-                setNewPasscode(e.target.value.replace(/[^0-9]/g, '').slice(0, 4));
-                setPasscodeError("");
-              }}
-              className="text-center text-2xl tracking-widest"
-            />
+            <Input type="password" maxLength={4} placeholder="Enter new 4-digit passcode" value={newPasscode}
+              onChange={(e) => { setNewPasscode(e.target.value.replace(/[^0-9]/g, '').slice(0, 4)); setPasscodeError(""); }}
+              className="text-center text-2xl tracking-widest" />
           </div>
-
-          {passcodeError && (
-            <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
-              {passcodeError}
-            </div>
-          )}
-
-          <p className="text-xs text-muted-foreground">
-            Students will need this 4-digit code to retake exams. Keep it secure.
-          </p>
-
+          {passcodeError && <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{passcodeError}</div>}
+          <p className="text-xs text-muted-foreground">Students will need this 4-digit code to retake exams. Keep it secure.</p>
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={() => setPasscodeModalOpen(false)} className="flex-1">
-              Cancel
-            </Button>
-            <Button
-              onClick={updatePasscode}
-              isLoading={isUpdatingPasscode}
-              disabled={!newPasscode}
-              className="flex-1"
-            >
-              Update Passcode
-            </Button>
+            <Button variant="outline" onClick={() => setPasscodeModalOpen(false)} className="flex-1">Cancel</Button>
+            <Button onClick={updatePasscode} isLoading={isUpdatingPasscode} disabled={!newPasscode} className="flex-1">Update Passcode</Button>
           </div>
         </div>
       </Modal>
+
+      {/* Detail modals */}
+      <TeacherDetailModal teacherId={selectedTeacherId} teacherName={selectedTeacherName} schoolCode={schoolCode} onClose={() => setSelectedTeacherId(null)} />
+      <StudentDetailModal studentId={selectedStudentId} studentName={selectedStudentName} schoolCode={schoolCode} onClose={() => setSelectedStudentId(null)} />
+      <ResultDetailModal resultId={selectedResultId} schoolCode={schoolCode} onClose={() => setSelectedResultId(null)} />
     </DashboardLayout>
   );
 }

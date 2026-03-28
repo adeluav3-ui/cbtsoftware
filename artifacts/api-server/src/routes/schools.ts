@@ -651,4 +651,107 @@ router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) =
   }
 });
 
+// Update school logo
+router.post("/:schoolCode/logo", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { logoUrl } = req.body;
+
+  if (!logoUrl) {
+    return res.status(400).json({ error: "Logo URL required" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ logoUrl })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update teacher commentary for a student's subject
+// Update teacher commentary endpoint
+router.post("/:schoolCode/students/:studentId/subject-comment", async (req: Request, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const studentIdNum = Number(String(studentId)); // Convert safely
+  const { subjectName, comment } = req.body;
+
+  if (!subjectName) {
+    return res.status(400).json({ error: "Subject name required" });
+  }
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.studentId, studentIdNum),
+          eq(subjectScoresTable.subjectName, subjectName),
+          eq(subjectScoresTable.schoolCode, schoolCodeStr)
+        )
+      )
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ error: "Subject record not found" });
+    }
+
+    const [updated] = await db
+      .update(subjectScoresTable)
+      .set({ teacherComment: comment || null, updatedAt: new Date() })
+      .where(eq(subjectScoresTable.id, existing.id))
+      .returning();
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get school info
+router.get("/:schoolCode", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+
+  try {
+    const [school] = await db
+      .select({
+        name: schoolsTable.name,
+        logoUrl: schoolsTable.logoUrl,
+        code: schoolsTable.code,
+      })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+
+    if (!school) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json(school);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;

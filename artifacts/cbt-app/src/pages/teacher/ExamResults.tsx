@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { Card, Button, Badge, Input } from "@/components/ui-elements";
@@ -212,6 +212,8 @@ export default function ExamResults() {
                         <tbody>
                             {filteredResults.map((result) => {
                                 const isEditing = editingScores[result.studentId];
+                                const isTheoryLocked = result.theoryScore > 0 && result.theoryScore !== null;
+                                const isActivityLocked = result.classActivityScore > 0 && result.classActivityScore !== null;
 
                                 return (
                                     <tr key={result.studentId} className="border-b border-border/50 hover:bg-muted/20">
@@ -228,7 +230,9 @@ export default function ExamResults() {
 
                                         {exam.assessmentType !== 'class_activity' && (
                                             <td className="px-4 py-3 text-center">
-                                                {isEditing ? (
+                                                {isTheoryLocked ? (
+                                                    <span className="text-green-600 font-medium">✓ {result.theoryScore} entered</span>
+                                                ) : isEditing ? (
                                                     <Input
                                                         type="number"
                                                         min={0}
@@ -241,8 +245,8 @@ export default function ExamResults() {
                                                         className="w-24 text-center mx-auto"
                                                     />
                                                 ) : (
-                                                    <span className="font-medium">
-                                                        {result.theoryScore > 0 ? result.theoryScore : "Not entered"}
+                                                    <span className="font-medium text-muted-foreground">
+                                                        Not entered
                                                     </span>
                                                 )}
                                             </td>
@@ -250,7 +254,9 @@ export default function ExamResults() {
 
                                         {exam.assessmentType === 'class_activity' && (
                                             <td className="px-4 py-3 text-center">
-                                                {isEditing ? (
+                                                {isActivityLocked ? (
+                                                    <span className="text-green-600 font-medium">✓ {result.classActivityScore} entered</span>
+                                                ) : isEditing ? (
                                                     <Input
                                                         type="number"
                                                         min={0}
@@ -263,8 +269,8 @@ export default function ExamResults() {
                                                         className="w-24 text-center mx-auto"
                                                     />
                                                 ) : (
-                                                    <span className="font-medium">
-                                                        {result.classActivityScore > 0 ? result.classActivityScore : "Not entered"}
+                                                    <span className="font-medium text-muted-foreground">
+                                                        Not entered
                                                     </span>
                                                 )}
                                             </td>
@@ -311,8 +317,11 @@ export default function ExamResults() {
                                                             }
                                                         }));
                                                     }}
+                                                    disabled={exam.assessmentType !== 'class_activity' ? isTheoryLocked : isActivityLocked}
                                                 >
-                                                    Enter {exam.assessmentType === 'class_activity' ? 'Activity' : 'Theory'} Score
+                                                    {exam.assessmentType !== 'class_activity'
+                                                        ? (isTheoryLocked ? "Score Locked" : "Enter Theory Score")
+                                                        : (isActivityLocked ? "Score Locked" : "Enter Activity Score")}
                                                 </Button>
                                             )}
                                         </td>
@@ -335,6 +344,7 @@ export default function ExamResults() {
                 {exam.assessmentType === 'class_activity'
                     ? "Enter class activity scores above. Final percentage will appear in the student's overall results when all components are complete."
                     : "CBT scores are auto-graded. Enter theory scores above. Final percentage will appear in the student's overall results when all components are complete."}
+                <p className="mt-1 text-yellow-600">✓ Scores that have been entered cannot be changed. Contact admin if correction is needed.</p>
             </div>
         </DashboardLayout>
     );

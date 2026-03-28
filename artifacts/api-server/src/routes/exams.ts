@@ -802,6 +802,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Teacher enters theory and class activity scores
+// Teacher enters theory and class activity scores
 router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const { studentId, theoryScore, classActivityScore } = req.body;
@@ -873,6 +874,26 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       return res.status(404).json({ error: "Student score record not found" });
     }
 
+    // Check if the score is already locked (already entered)
+    if (exam.assessmentType === 'class_activity' && existing.classActivityScore !== null && existing.classActivityScore !== 0) {
+      return res.status(403).json({ error: "Class activity score already entered and cannot be changed. Contact admin if correction needed." });
+    }
+
+    if (exam.assessmentType === 'mid_term' && existing.midTermScore !== null && existing.midTermScore !== 0) {
+      // Check if the current score includes theory already (if midTermScore > cbtPortion)
+      const cbtPortion = existing.midTermScore || 0;
+      if (cbtPortion > 0) {
+        return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
+      }
+    }
+
+    if (exam.assessmentType === 'exam' && existing.examScore !== null && existing.examScore !== 0) {
+      const cbtPortion = existing.examScore || 0;
+      if (cbtPortion > 0) {
+        return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
+      }
+    }
+
     const updateData: any = { updatedAt: new Date() };
     let totalScore = 0;
 
@@ -895,7 +916,6 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
     updateData.totalScore = totalScore;
     updateData.percentage = Math.round(percentage);
 
-    // Calculate grade using dynamic ranges from grading scheme
     let grade = 'F';
     if (percentage >= scheme.gradeAMin) grade = 'A';
     else if (percentage >= scheme.gradeBMin) grade = 'B';

@@ -17,6 +17,7 @@ export const subjectScoresTable = pgTable("subject_scores", {
     totalScore: integer("total_score"),
     percentage: integer("percentage"),
     grade: text("grade"),
+    teacherComment: text("teacher_comment"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

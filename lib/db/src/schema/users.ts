@@ -10,6 +10,7 @@ export const usersTable = pgTable("users", {
   fullName: text("full_name").notNull(),
   schoolCode: text("school_code"), // null for super_admin
   class: text("class"), // only for students
+  profilePicture: text("profile_picture"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

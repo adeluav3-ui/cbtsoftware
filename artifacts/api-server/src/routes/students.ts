@@ -190,6 +190,7 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
         fullName: usersTable.fullName,
         class: usersTable.class,
         schoolCode: usersTable.schoolCode,
+        profilePicture: usersTable.profilePicture,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
@@ -517,6 +518,45 @@ router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) 
       .where(eq(subjectScoresTable.schoolCode, schoolCode));
 
     res.json(scores);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update student profile picture
+router.post("/:studentId/profile-picture", async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { profilePictureUrl } = req.body;
+
+  if (!profilePictureUrl) {
+    return res.status(400).json({ error: "Profile picture URL required" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ profilePicture: profilePictureUrl })
+      .where(
+        and(
+          eq(usersTable.id, parseInt(studentId)),
+          eq(usersTable.schoolCode, schoolCode),
+          eq(usersTable.role, "student")
+        )
+      )
+      .returning({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        profilePicture: usersTable.profilePicture,
+      });
+
+    if (!updated) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    res.json(updated);
     return;
   } catch (err) {
     console.error(err);

@@ -176,253 +176,213 @@ export default function TeacherDashboard() {
           <h1 className="text-3xl font-display font-bold">Teacher Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage your exams, students, and results.</p>
         </div>
-        {activeTab === "My Exams" && (
-          <Button onClick={() => setExamModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Create Exam
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setLocation("/comprehensive-results")}>
+            <ClipboardList className="w-4 h-4 mr-2" /> Comprehensive Results
           </Button>
-        )}
-        {activeTab === "Students" && (
-          <Button onClick={() => setStudentModalOpen(true)}>
-            <UserPlus className="w-4 h-4 mr-2" /> Add Student
-          </Button>
-        )}
-      </div>
-
-      <div className="mb-6">
-        <CustomTabs tabs={["My Exams", "Students", "Results"]} activeTab={activeTab} onChange={setActiveTab} />
-      </div>
-
-      {/* ── My Exams Tab ──────────────────────────────── */}
-      {activeTab === "My Exams" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exams.map(exam => (
-            <Card key={exam.id} className="flex flex-col group hover:border-primary/30">
-              <div className="flex justify-between items-start mb-4">
-                <Badge variant={exam.isActive ? "success" : "default"}>
-                  {exam.isActive ? "Active" : "Draft"}
-                </Badge>
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => toggleStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    title="Toggle Status"
-                  >
-                    {exam.isActive ? <PowerOff size={16} /> : <Power size={16} />}
-                  </button>
-                  <button
-                    onClick={() => deleteExam({ schoolCode, examId: exam.id })}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              <h3 className="text-xl font-bold font-display mb-1">{exam.title}</h3>
-              <p className="text-primary font-semibold text-sm mb-4">{exam.subject} • {exam.class}</p>
-              <div className="flex justify-between text-sm text-muted-foreground mt-auto pt-4 border-t border-border/50">
-                <span>{exam.durationMinutes} mins</span>
-                <span>{exam.questionCount || 0} Questions</span>
-              </div>
-              <Button
-                variant="secondary"
-                className="w-full mt-2"
-                onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
-              >
-                <Settings className="w-4 h-4 mr-2" /> Manage Questions
-              </Button>
-              <Button
-                variant="secondary"
-                className="w-full mt-2"
-                onClick={() => setLocation(`/teacher/exams/${exam.id}/results`)}
-              >
-                <ClipboardList className="w-4 h-4 mr-2" /> View Results
-              </Button>
-            </Card>
-          ))}
-          {exams.length === 0 && !isLoading && (
-            <div className="col-span-full py-16 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border">
-              <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p className="font-semibold text-lg">No exams created yet.</p>
-              <p className="text-sm mt-1">Click "Create Exam" to get started.</p>
-            </div>
+          {activeTab === "My Exams" && (
+            <Button onClick={() => setExamModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Create Exam
+            </Button>
+          )}
+          {activeTab === "Students" && (
+            <Button onClick={() => setStudentModalOpen(true)}>
+              <UserPlus className="w-4 h-4 mr-2" /> Add Student
+            </Button>
           )}
         </div>
-      )}
 
-      {/* ── Students Tab ──────────────────────────────── */}
-      {activeTab === "Students" && (
-        <Card className="p-0 overflow-hidden">
-          <div className="p-5 border-b border-border/50 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-muted-foreground">Class:</span>
-                <CustomTabs tabs={CLASSES} activeTab={classFilter} onChange={val => setClassFilter(val)} />
+        <div className="mb-6">
+          <CustomTabs tabs={["My Exams", "Students", "Results"]} activeTab={activeTab} onChange={setActiveTab} />
+        </div>
+
+        {/* ── My Exams Tab ──────────────────────────────── */}
+        {activeTab === "My Exams" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {exams.map(exam => (
+              <Card key={exam.id} className="flex flex-col group hover:border-primary/30">
+                <div className="flex justify-between items-start mb-4">
+                  <Badge variant={exam.isActive ? "success" : "default"}>
+                    {exam.isActive ? "Active" : "Draft"}
+                  </Badge>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={() => toggleStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      title="Toggle Status"
+                    >
+                      {exam.isActive ? <PowerOff size={16} /> : <Power size={16} />}
+                    </button>
+                    <button
+                      onClick={() => deleteExam({ schoolCode, examId: exam.id })}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold font-display mb-1">{exam.title}</h3>
+                <p className="text-primary font-semibold text-sm mb-4">{exam.subject} • {exam.class}</p>
+                <div className="flex justify-between text-sm text-muted-foreground mt-auto pt-4 border-t border-border/50">
+                  <span>{exam.durationMinutes} mins</span>
+                  <span>{exam.questionCount || 0} Questions</span>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="w-full mt-2"
+                  onClick={() => setLocation(`/teacher/exams/${exam.id}`)}
+                >
+                  <Settings className="w-4 h-4 mr-2" /> Manage Questions
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full mt-2"
+                  onClick={() => setLocation(`/teacher/exams/${exam.id}/results`)}
+                >
+                  <ClipboardList className="w-4 h-4 mr-2" /> View Results
+                </Button>
+              </Card>
+            ))}
+            {exams.length === 0 && !isLoading && (
+              <div className="col-span-full py-16 text-center text-muted-foreground bg-muted/20 rounded-2xl border-2 border-dashed border-border">
+                <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                <p className="font-semibold text-lg">No exams created yet.</p>
+                <p className="text-sm mt-1">Click "Create Exam" to get started.</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {studentsLoading ? "Loading…" : `${students.length} student${students.length !== 1 ? "s" : ""} in ${classFilter}`}
-              </p>
-            </div>
+            )}
           </div>
+        )}
 
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                <th className="px-6 py-4 font-semibold">Full Name</th>
-                <th className="px-6 py-4 font-semibold">Username</th>
-                <th className="px-6 py-4 font-semibold">Class</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {studentsLoading ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading students…</td>
+        {/* ── Students Tab ──────────────────────────────── */}
+        {activeTab === "Students" && (
+          <Card className="p-0 overflow-hidden">
+            <div className="p-5 border-b border-border/50 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-muted-foreground">Class:</span>
+                  <CustomTabs tabs={CLASSES} activeTab={classFilter} onChange={val => setClassFilter(val)} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {studentsLoading ? "Loading…" : `${students.length} student${students.length !== 1 ? "s" : ""} in ${classFilter}`}
+                </p>
+              </div>
+            </div>
+
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                  <th className="px-6 py-4 font-semibold">Full Name</th>
+                  <th className="px-6 py-4 font-semibold">Username</th>
+                  <th className="px-6 py-4 font-semibold">Class</th>
+                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
-              ) : students.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center">
-                    <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                    <p className="text-muted-foreground font-semibold">No students in {classFilter} yet.</p>
-                    <p className="text-sm text-muted-foreground mt-1">Click "Add Student" to enrol one.</p>
-                  </td>
-                </tr>
-              ) : (
-                students.map((s: Student) => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedStudentId(s.id);
-                      setSelectedStudentName(s.fullName || s.username);
-                      setSelectedStudentClass(s.class);
-                      setStudentResultsModalOpen(true);
-                    }}
-                  >
-                    <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
-                    <td className="px-6 py-4 text-muted-foreground font-mono text-sm">{s.username}</td>
-                    <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteStudent({ schoolCode, studentId: s.id });
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+              </thead>
+              <tbody>
+                {studentsLoading ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading students…</td>
+                  </tr>
+                ) : students.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-16 text-center">
+                      <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                      <p className="text-muted-foreground font-semibold">No students in {classFilter} yet.</p>
+                      <p className="text-sm text-muted-foreground mt-1">Click "Add Student" to enrol one.</p>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </Card>
-      )}
+                ) : (
+                  students.map((s: Student) => (
+                    <tr
+                      key={s.id}
+                      className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedStudentId(s.id);
+                        setSelectedStudentName(s.fullName || s.username);
+                        setSelectedStudentClass(s.class);
+                        setStudentResultsModalOpen(true);
+                      }}
+                    >
+                      <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
+                      <td className="px-6 py-4 text-muted-foreground font-mono text-sm">{s.username}</td>
+                      <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteStudent({ schoolCode, studentId: s.id });
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </Card>
+        )}
 
-      {/* ── Results Tab ───────────────────────────────── */}
-      {activeTab === "Results" && (
-        <Card className="p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2">Student Results by Class</h3>
-            <p className="text-sm text-muted-foreground">Click on any student to view their complete results</p>
-          </div>
+        {/* ── Results Tab ───────────────────────────────── */}
+        {activeTab === "Results" && (
+          <Card className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-2">Student Results by Class</h3>
+              <p className="text-sm text-muted-foreground">Click on any student to view their complete results</p>
+            </div>
 
-          <div className="space-y-8">
-            {CLASSES.map(className => {
-              const classStudents = students.filter((s: Student) => s.class === className);
+            <div className="space-y-8">
+              {CLASSES.map(className => {
+                const classStudents = students.filter((s: Student) => s.class === className);
 
-              if (classStudents.length === 0) return null;
+                if (classStudents.length === 0) return null;
 
-              return (
-                <div key={className}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <h4 className="text-xl font-bold font-display text-primary">{className}</h4>
-                    <Badge variant="default">{classStudents.length} students</Badge>
-                  </div>
+                return (
+                  <div key={className}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <h4 className="text-xl font-bold font-display text-primary">{className}</h4>
+                      <Badge variant="default">{classStudents.length} students</Badge>
+                    </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                          <th className="px-4 py-3 font-semibold">Student Name</th>
-                          <th className="px-4 py-3 font-semibold">Username</th>
-                          <th className="px-4 py-3 font-semibold text-center">Subjects</th>
-                          <th className="px-4 py-3 font-semibold text-center">Completed</th>
-                          <th className="px-4 py-3 font-semibold text-center">Overall %</th>
-                          <th className="px-4 py-3 font-semibold text-center">Status</th>
-                          <th className="px-4 py-3 font-semibold text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {classStudents.map((student: Student) => {
-                          const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                            <th className="px-4 py-3 font-semibold">Student Name</th>
+                            <th className="px-4 py-3 font-semibold">Username</th>
+                            <th className="px-4 py-3 font-semibold text-center">Subjects</th>
+                            <th className="px-4 py-3 font-semibold text-center">Completed</th>
+                            <th className="px-4 py-3 font-semibold text-center">Overall %</th>
+                            <th className="px-4 py-3 font-semibold text-center">Status</th>
+                            <th className="px-4 py-3 font-semibold text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classStudents.map((student: Student) => {
+                            const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
 
-                          // Only count subjects where all three components are entered
-                          const completedSubjects = studentSubjectScores.filter((s: any) => {
-                            return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
-                          });
+                            // Only count subjects where all three components are entered
+                            const completedSubjects = studentSubjectScores.filter((s: any) => {
+                              return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+                            });
 
-                          // Calculate overall average from completed subjects
-                          let overallAvg = 0;
-                          if (completedSubjects.length > 0) {
-                            const totalPercentages = completedSubjects.reduce((acc: number, s: any) => {
-                              const totalScore = (s.midTermScore || 0) + (s.classActivityScore || 0) + (s.examScore || 0);
-                              return acc + totalScore;
-                            }, 0);
-                            overallAvg = totalPercentages / completedSubjects.length;
-                          }
+                            // Calculate overall average from completed subjects
+                            let overallAvg = 0;
+                            if (completedSubjects.length > 0) {
+                              const totalPercentages = completedSubjects.reduce((acc: number, s: any) => {
+                                const totalScore = (s.midTermScore || 0) + (s.classActivityScore || 0) + (s.examScore || 0);
+                                return acc + totalScore;
+                              }, 0);
+                              overallAvg = totalPercentages / completedSubjects.length;
+                            }
 
-                          return (
-                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer">
-                              <td
-                                className="px-4 py-3 font-semibold text-primary"
-                                onClick={() => {
-                                  setSelectedStudentId(student.id);
-                                  setSelectedStudentName(student.fullName || student.username);
-                                  setSelectedStudentClass(student.class);
-                                  setStudentResultsModalOpen(true);
-                                }}
-                              >
-                                {student.fullName}
-                              </td>
-                              <td
-                                className="px-4 py-3 text-muted-foreground text-sm"
-                                onClick={() => {
-                                  setSelectedStudentId(student.id);
-                                  setSelectedStudentName(student.fullName || student.username);
-                                  setSelectedStudentClass(student.class);
-                                  setStudentResultsModalOpen(true);
-                                }}
-                              >
-                                {student.username}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {studentSubjectScores.length}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                {completedSubjects.length}
-                              </td>
-                              <td className="px-4 py-3 text-center font-bold">
-                                {completedSubjects.length > 0 ? (
-                                  <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>
-                                    {overallAvg.toFixed(1)}%
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <Badge variant={overallAvg >= 70 ? "success" : completedSubjects.length > 0 ? "warning" : "default"}>
-                                  {overallAvg >= 70 ? "Passing" : completedSubjects.length > 0 ? "Needs Improvement" : "No Results"}
-                                </Badge>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
+                            return (
+                              <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer">
+                                <td
+                                  className="px-4 py-3 font-semibold text-primary"
                                   onClick={() => {
                                     setSelectedStudentId(student.id);
                                     setSelectedStudentName(student.fullName || student.username);
@@ -430,138 +390,183 @@ export default function TeacherDashboard() {
                                     setStudentResultsModalOpen(true);
                                   }}
                                 >
-                                  <ClipboardList className="w-4 h-4 mr-1" /> View Results
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                  {student.fullName}
+                                </td>
+                                <td
+                                  className="px-4 py-3 text-muted-foreground text-sm"
+                                  onClick={() => {
+                                    setSelectedStudentId(student.id);
+                                    setSelectedStudentName(student.fullName || student.username);
+                                    setSelectedStudentClass(student.class);
+                                    setStudentResultsModalOpen(true);
+                                  }}
+                                >
+                                  {student.username}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {studentSubjectScores.length}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  {completedSubjects.length}
+                                </td>
+                                <td className="px-4 py-3 text-center font-bold">
+                                  {completedSubjects.length > 0 ? (
+                                    <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>
+                                      {overallAvg.toFixed(1)}%
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <Badge variant={overallAvg >= 70 ? "success" : completedSubjects.length > 0 ? "warning" : "default"}>
+                                    {overallAvg >= 70 ? "Passing" : completedSubjects.length > 0 ? "Needs Improvement" : "No Results"}
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedStudentId(student.id);
+                                      setSelectedStudentName(student.fullName || student.username);
+                                      setSelectedStudentClass(student.class);
+                                      setStudentResultsModalOpen(true);
+                                    }}
+                                  >
+                                    <ClipboardList className="w-4 h-4 mr-1" /> View Results
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+                );
+              })}
+
+              {students.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  No students enrolled yet. Add students in the Students tab.
                 </div>
-              );
-            })}
+              )}
+            </div>
+          </Card>
+        )}
 
-            {students.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                No students enrolled yet. Add students in the Students tab.
+        {/* ── Create Exam Modal ────────────────────────── */}
+        <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div><Label>Exam Title</Label><Input value={eTitle} onChange={e => setETitle(e.target.value)} placeholder="e.g. Mid-Term Test" required /></div>
+            <div>
+              <Label>Subject</Label>
+              <Select value={eSubject} onChange={e => setESubject(e.target.value)} required>
+                <option value="">Select a subject</option>
+                {subjects.map(subject => (
+                  <option key={subject.id} value={subject.name}>{subject.name}</option>
+                ))}
+              </Select>
+              {subjects.length === 0 && eClass && (
+                <p className="text-xs text-warning mt-1">
+                  No subjects added for this class level. Ask the school admin to add subjects.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Class</Label>
+                <Select value={eClass} onChange={e => setEClass(e.target.value)}>
+                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </Select>
               </div>
-            )}
-          </div>
-        </Card>
-      )}
+              <div>
+                <Label>Duration (Minutes)</Label>
+                <Input type="number" min="1" value={eDuration} onChange={e => setEDuration(e.target.value)} required />
+              </div>
+              <div>
+                <Label>Assessment Type</Label>
+                <Select value={eAssessmentType} onChange={e => setEAssessmentType(e.target.value)}>
+                  <option value="mid_term">Mid-Term Test</option>
+                  <option value="exam">Final Exam</option>
+                  <option value="class_activity">Class Activity</option>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {eAssessmentType === "mid_term" && "CBT + Theory scores (teacher enters theory)"}
+                  {eAssessmentType === "exam" && "CBT + Theory scores (teacher enters theory)"}
+                  {eAssessmentType === "class_activity" && "Only class activity score (teacher enters manually)"}
+                </p>
+              </div>
+            </div>
+            <Button type="submit" className="w-full mt-4" isLoading={isCEPending}>Create Exam</Button>
+          </form>
+        </Modal>
 
-      {/* ── Create Exam Modal ────────────────────────── */}
-      <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div><Label>Exam Title</Label><Input value={eTitle} onChange={e => setETitle(e.target.value)} placeholder="e.g. Mid-Term Test" required /></div>
-          <div>
-            <Label>Subject</Label>
-            <Select value={eSubject} onChange={e => setESubject(e.target.value)} required>
-              <option value="">Select a subject</option>
-              {subjects.map(subject => (
-                <option key={subject.id} value={subject.name}>{subject.name}</option>
-              ))}
-            </Select>
-            {subjects.length === 0 && eClass && (
-              <p className="text-xs text-warning mt-1">
-                No subjects added for this class level. Ask the school admin to add subjects.
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+        {/* ── Add Student Modal ────────────────────────── */}
+        <Modal isOpen={isStudentModalOpen} onClose={() => setStudentModalOpen(false)} title="Enrol New Student">
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass } });
+            }}
+            className="space-y-4"
+          >
+            <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} placeholder="e.g. Amara Osei" required /></div>
+            <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} placeholder="e.g. amara.osei" required /></div>
+            <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} placeholder="Set a password" required /></div>
             <div>
               <Label>Class</Label>
-              <Select value={eClass} onChange={e => setEClass(e.target.value)}>
+              <Select value={sClass} onChange={e => setSClass(e.target.value)}>
                 {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
-            <div>
-              <Label>Duration (Minutes)</Label>
-              <Input type="number" min="1" value={eDuration} onChange={e => setEDuration(e.target.value)} required />
-            </div>
-            <div>
-              <Label>Assessment Type</Label>
-              <Select value={eAssessmentType} onChange={e => setEAssessmentType(e.target.value)}>
-                <option value="mid_term">Mid-Term Test</option>
-                <option value="exam">Final Exam</option>
-                <option value="class_activity">Class Activity</option>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {eAssessmentType === "mid_term" && "CBT + Theory scores (teacher enters theory)"}
-                {eAssessmentType === "exam" && "CBT + Theory scores (teacher enters theory)"}
-                {eAssessmentType === "class_activity" && "Only class activity score (teacher enters manually)"}
-              </p>
-            </div>
-          </div>
-          <Button type="submit" className="w-full mt-4" isLoading={isCEPending}>Create Exam</Button>
-        </form>
-      </Modal>
+            <Button type="submit" className="w-full mt-2" isLoading={isCSPending}>Enrol Student</Button>
+          </form>
+        </Modal>
 
-      {/* ── Add Student Modal ────────────────────────── */}
-      <Modal isOpen={isStudentModalOpen} onClose={() => setStudentModalOpen(false)} title="Enrol New Student">
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass } });
-          }}
-          className="space-y-4"
-        >
-          <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} placeholder="e.g. Amara Osei" required /></div>
-          <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} placeholder="e.g. amara.osei" required /></div>
-          <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} placeholder="Set a password" required /></div>
-          <div>
-            <Label>Class</Label>
-            <Select value={sClass} onChange={e => setSClass(e.target.value)}>
-              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-            </Select>
-          </div>
-          <Button type="submit" className="w-full mt-2" isLoading={isCSPending}>Enrol Student</Button>
-        </form>
-      </Modal>
-
-      <ResultDetailModal
-        resultId={selectedResultId}
-        schoolCode={schoolCode}
-        onClose={() => setSelectedResultId(null)}
-      />
-
-      {/* Enter Scores Modal */}
-      {selectedStudentForScores && (
-        <EnterScoresModal
-          isOpen={scoresModalOpen}
-          onClose={() => {
-            setScoresModalOpen(false);
-            setSelectedStudentForScores(null);
-          }}
-          examId={selectedStudentForScores.examId}
-          examTitle={selectedStudentForScores.examTitle}
-          assessmentType={selectedStudentForScores.assessmentType}
-          studentId={selectedStudentForScores.studentId}
-          studentName={selectedStudentForScores.studentName}
+        <ResultDetailModal
+          resultId={selectedResultId}
           schoolCode={schoolCode}
-          existingTheoryScore={selectedStudentForScores.theoryScore}
-          existingActivityScore={selectedStudentForScores.activityScore}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["results", schoolCode] });
+          onClose={() => setSelectedResultId(null)}
+        />
+
+        {/* Enter Scores Modal */}
+        {selectedStudentForScores && (
+          <EnterScoresModal
+            isOpen={scoresModalOpen}
+            onClose={() => {
+              setScoresModalOpen(false);
+              setSelectedStudentForScores(null);
+            }}
+            examId={selectedStudentForScores.examId}
+            examTitle={selectedStudentForScores.examTitle}
+            assessmentType={selectedStudentForScores.assessmentType}
+            studentId={selectedStudentForScores.studentId}
+            studentName={selectedStudentForScores.studentName}
+            schoolCode={schoolCode}
+            existingTheoryScore={selectedStudentForScores.theoryScore}
+            existingActivityScore={selectedStudentForScores.activityScore}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["results", schoolCode] });
+            }}
+          />
+        )}
+
+        {/* Student Results Modal */}
+        <StudentResultsModal
+          isOpen={studentResultsModalOpen}
+          onClose={() => setStudentResultsModalOpen(false)}
+          studentId={selectedStudentId !== null ? selectedStudentId : 0}
+          studentName={selectedStudentName}
+          studentClass={selectedStudentClass}
+          schoolCode={schoolCode}
+          onScoresUpdated={() => {
+            // Refresh the results tab data
+            fetchSubjectScores();
           }}
         />
-      )}
-
-      {/* Student Results Modal */}
-      <StudentResultsModal
-        isOpen={studentResultsModalOpen}
-        onClose={() => setStudentResultsModalOpen(false)}
-        studentId={selectedStudentId !== null ? selectedStudentId : 0}
-        studentName={selectedStudentName}
-        studentClass={selectedStudentClass}
-        schoolCode={schoolCode}
-        onScoresUpdated={() => {
-          // Refresh the results tab data
-          fetchSubjectScores();
-        }}
-      />
+      </div>
     </DashboardLayout>
   );
 }
