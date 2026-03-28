@@ -133,11 +133,14 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `student-profiles/${fileName}`;
+      const filePath = `${studentId}/${fileName}`; // Use student ID as folder name
 
       const { data, error } = await supabase.storage
         .from('student-images')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (error) throw error;
 
@@ -160,6 +163,7 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
       }
     } catch (err) {
       console.error("Upload failed", err);
+      alert("Failed to upload image. Please make sure the storage bucket is set up correctly.");
     } finally {
       setUploadingImage(false);
     }
