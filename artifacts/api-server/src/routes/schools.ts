@@ -754,4 +754,104 @@ router.get("/:schoolCode", async (req: Request, res: Response) => {
   }
 });
 
+// In schools.ts - add endpoint to update term and session
+router.post("/:schoolCode/update-term", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { term } = req.body;
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ currentTerm: term })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update the new session endpoint to also advance academic session
+router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const classOrder = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+
+  try {
+    // Get current session to advance it
+    const [school] = await db
+      .select()
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+
+    // Advance academic session (e.g., 2025/2026 -> 2026/2027)
+    let newSession = "2026/2027";
+    if (school?.currentAcademicSession) {
+      const [startYear] = school.currentAcademicSession.split('/');
+      const nextYear = parseInt(startYear) + 1;
+      newSession = `${nextYear}/${nextYear + 1}`;
+    }
+
+    // Reset to First Term for new session
+    await db
+      .update(schoolsTable)
+      .set({
+        currentAcademicSession: newSession,
+        currentTerm: "First Term"
+      })
+      .where(eq(schoolsTable.code, schoolCodeStr));
+
+    // Get all students in this school
+    const students = await db
+      .select()
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.schoolCode, schoolCodeStr),
+          eq(usersTable.role, "student")
+        )
+      );
+
+    let promoted = 0;
+    let archived = 0;
+
+    for (const student of students) {
+      const currentClassIndex = classOrder.indexOf(student.class ?? "");
+      if (currentClassIndex === -1) continue;
+
+      if (currentClassIndex === classOrder.length - 1) {
+        await db.delete(usersTable).where(eq(usersTable.id, student.id));
+        archived++;
+      } else {
+        const nextClass = classOrder[currentClassIndex + 1];
+        await db
+          .update(usersTable)
+          .set({ class: nextClass })
+          .where(eq(usersTable.id, student.id));
+        promoted++;
+      }
+    }
+
+    res.json({
+      message: `New session started. ${promoted} students promoted, ${archived} students graduated and archived. New session: ${newSession}`,
+      academicSession: newSession,
+    });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;

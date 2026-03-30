@@ -12,6 +12,7 @@ export const examsTable = pgTable("exams", {
   schoolCode: text("school_code").notNull(),
   teacherId: integer("teacher_id").notNull(),
   assessmentType: text("assessment_type").default("exam"),
+  term: text("term").default("First Term"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

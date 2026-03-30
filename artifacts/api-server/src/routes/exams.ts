@@ -62,6 +62,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
         schoolCode: examsTable.schoolCode,
         teacherId: examsTable.teacherId,
         assessmentType: examsTable.assessmentType,
+        term: examsTable.term,
         createdAt: examsTable.createdAt,
         questionCount: sql<number>`(SELECT COUNT(*) FROM questions WHERE questions.exam_id = exams.id)`.as("question_count"),
       })
@@ -82,7 +83,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 router.post("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const session = req.session;
-  const { title, subject, class: examClass, durationMinutes, assessmentType } = req.body;
+  const { title, subject, class: examClass, durationMinutes, assessmentType, term } = req.body;
 
   if (!title || !subject || !examClass || !durationMinutes) {
     return res.status(400).json({ error: "Title, subject, class and duration required" });
@@ -107,6 +108,7 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
         teacherId: Number(teacherId),
         isActive: false,
         assessmentType: assessmentType || "exam",
+        term: term || "First Term", // Add this
       })
       .returning();
 

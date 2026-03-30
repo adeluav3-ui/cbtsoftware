@@ -7,6 +7,8 @@ export const subjectScoresTable = pgTable("subject_scores", {
     subjectName: text("subject_name").notNull(),
     className: text("class_name").notNull(),
     schoolCode: text("school_code").notNull(),
+    term: text("term").default("First Term"), // Add this
+    academicSession: text("academic_session").default("2025/2026"),
 
     // Three components (null means not yet entered)
     midTermScore: integer("mid_term_score"),

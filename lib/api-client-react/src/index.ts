@@ -41,6 +41,7 @@ export interface Exam {
     class: string;
     durationMinutes: number;
     assessmentType?: string;
+    term?: string;
     isActive: boolean;
     schoolCode: string;
     teacherId: number;
@@ -72,6 +73,7 @@ export interface Result {
     percentage: number;
     schoolCode: string;
     assessmentType?: string;
+    term?: string;
     submittedAt: string;
     examTitle?: string;
     subject?: string;
@@ -245,7 +247,10 @@ export const api = {
             return response.json();
         },
 
-        create: async (schoolCode: string, data: { title: string; subject: string; class: string; durationMinutes: number }) => {
+        create: async (schoolCode: string, data: {
+            title: string; subject: string; class: string; durationMinutes: number; assessmentType?: string;
+            term?: string;
+        }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -538,7 +543,7 @@ export function useExam(schoolCode: string, examId: number) {
 export function useCreateExam(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { title: string; subject: string; class: string; durationMinutes: number; assessmentType?: string; } }) =>
+        mutationFn: ({ schoolCode, data }: { schoolCode: string; data: { title: string; subject: string; class: string; durationMinutes: number; assessmentType?: string; term?: string; } }) =>
             api.exams.create(schoolCode, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ['exams', variables.schoolCode] });

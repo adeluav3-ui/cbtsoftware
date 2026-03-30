@@ -8,6 +8,9 @@ export const schoolsTable = pgTable("schools", {
   name: text("name"),
   logoUrl: text("logo_url"),
   retakePasscode: text("retake_passcode").default("1234"),
+  currentAcademicSession: text("current_academic_session").default("2025/2026"),
+  currentTerm: text("current_term").default("First Term"),
+  availableTerms: text("available_terms").array().default(["First Term", "Second Term", "Third Term"]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

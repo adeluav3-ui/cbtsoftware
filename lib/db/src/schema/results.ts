@@ -12,6 +12,7 @@ export const resultsTable = pgTable("results", {
   totalQuestions: integer("total_questions").notNull(),
   percentage: real("percentage").notNull(),
   schoolCode: text("school_code").notNull(),
+  term: text("term").default("First Term"),
   submittedAt: timestamp("submitted_at").notNull().defaultNow(),
 });
 

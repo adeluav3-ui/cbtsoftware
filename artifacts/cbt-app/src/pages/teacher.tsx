@@ -60,6 +60,7 @@ export default function TeacherDashboard() {
   const [studentResultsModalOpen, setStudentResultsModalOpen] = useState(false);
   const [subjectScores, setSubjectScores] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<{ id: number; name: string; level: string }[]>([]);
+  const [currentTerm, setCurrentTerm] = useState("First Term");
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -81,7 +82,12 @@ export default function TeacherDashboard() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createExam({ schoolCode, data: { title: eTitle, subject: eSubject, class: eClass, durationMinutes: parseInt(eDuration), assessmentType: eAssessmentType } });
+    createExam({
+      schoolCode, data: {
+        title: eTitle, subject: eSubject, class: eClass, durationMinutes: parseInt(eDuration), assessmentType: eAssessmentType,
+        term: currentTerm
+      }
+    });
   };
 
   // ── Students ─────────────────────────────────────
@@ -128,6 +134,23 @@ export default function TeacherDashboard() {
       console.error("Failed to fetch subjects", err);
     }
   };
+
+
+  // Fetch school info to get current term
+  useEffect(() => {
+    const fetchSchoolInfo = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}`, {
+          credentials: "include",
+        });
+        const data = await response.json();
+        setCurrentTerm(data.currentTerm || "First Term");
+      } catch (err) {
+        console.error("Failed to fetch school info", err);
+      }
+    };
+    if (schoolCode) fetchSchoolInfo();
+  }, [schoolCode]);
 
   // Fetch subject scores
   const fetchSubjectScores = async () => {
