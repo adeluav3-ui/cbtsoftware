@@ -42,6 +42,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
         fullName: usersTable.fullName,
         class: usersTable.class,
         schoolCode: usersTable.schoolCode,
+        profilePicture: usersTable.profilePicture,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
