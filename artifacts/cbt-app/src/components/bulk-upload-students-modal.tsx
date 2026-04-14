@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal, Button, Label, Select, Textarea, Input } from "@/components/ui-elements";
-import { Upload, FileText, Download } from "lucide-react";
+import { Upload, FileText, Download, UserPlus } from "lucide-react";
 
 interface BulkUploadStudentsModalProps {
     isOpen: boolean;
@@ -21,7 +21,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
     const [createdStudents, setCreatedStudents] = useState<any[]>([]);
     const [showResults, setShowResults] = useState(false);
 
-    // Generate username from full name
+    // Generate username from full name (lowercase, no spaces)
     const generateUsername = (fullName: string) => {
         return fullName.toLowerCase().replace(/\s+/g, '');
     };
@@ -42,7 +42,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
         setSuccess("");
         setCreatedStudents([]);
 
-        // Parse student data
+        // Parse student data - one per line
         const lines = studentData.trim().split('\n');
         const students = [];
         const errors = [];
@@ -51,14 +51,19 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
             const line = lines[i].trim();
             if (!line) continue;
 
-            // Format: "Full Name" or "Full Name,OptionalExtra"
+            // Format: "Full Name" or "Full Name,Class" (class optional, will use default if not specified)
             let fullName = line;
-            let extra = "";
+            let studentClass = selectedClass;
 
             if (line.includes(',')) {
                 const parts = line.split(',');
                 fullName = parts[0].trim();
-                extra = parts.slice(1).join(',').trim();
+                if (parts[1] && parts[1].trim()) {
+                    const customClass = parts[1].trim().toUpperCase();
+                    if (CLASSES.includes(customClass)) {
+                        studentClass = customClass;
+                    }
+                }
             }
 
             if (!fullName) {
@@ -73,8 +78,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                 fullName,
                 username,
                 password,
-                class: selectedClass,
-                originalLine: line,
+                class: studentClass,
             });
         }
 
@@ -84,7 +88,13 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
             return;
         }
 
-        // Create students via API
+        if (students.length === 0) {
+            setError("No valid student names found");
+            setIsUploading(false);
+            return;
+        }
+
+        // Create students one by one via API
         const created = [];
         const failed = [];
 
@@ -92,7 +102,9 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
                     body: JSON.stringify({
                         username: student.username,
                         password: student.password,
@@ -110,9 +122,11 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                     });
                 } else {
                     const errorData = await response.json();
-                    failed.push({ ...student, error: errorData.error });
+                    console.error("Failed to create student:", errorData);
+                    failed.push({ ...student, error: errorData.error || "Unknown error" });
                 }
             } catch (err) {
+                console.error("Network error:", err);
                 failed.push({ ...student, error: "Network error" });
             }
         }
@@ -133,11 +147,11 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
     };
 
     const downloadCSVTemplate = () => {
-        const headers = ["Full Name"];
+        const headers = ["Full Name", "Class (Optional)"];
         const rows = [
-            ["John Doe"],
-            ["Jane Smith"],
-            ["Michael Johnson"],
+            ["John Doe", "JSS1"],
+            ["Jane Smith", ""],
+            ["Michael Johnson", "SSS2"],
         ];
 
         const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -191,7 +205,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                         {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                        All students will be added to this class. You can change individual classes later.
+                        Students will be added to this class. You can also specify class per student using "Name, Class" format.
                     </p>
                 </div>
 
@@ -202,11 +216,11 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                         <Textarea
                             value={studentData}
                             onChange={(e) => setStudentData(e.target.value)}
-                            placeholder="John Doe&#10;Jane Smith&#10;Michael Johnson"
+                            placeholder="John Doe&#10;Jane Smith&#10;Michael Johnson, SSS1"
                             className="min-h-[200px] font-mono text-sm"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                            Enter one student name per line. Format: First Name Last Name
+                            Format: Full Name (or "Full Name, Class" to override default class)
                         </p>
                     </div>
                 ) : (
@@ -232,7 +246,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                             <label htmlFor="csv-upload" className="cursor-pointer">
                                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                                 <p className="text-sm">Click to upload CSV file</p>
-                                <p className="text-xs text-muted-foreground mt-1">CSV should have a "Full Name" column</p>
+                                <p className="text-xs text-muted-foreground mt-1">CSV should have "Full Name" column (optional "Class" column)</p>
                             </label>
                         </div>
                         <Button variant="outline" size="sm" onClick={downloadCSVTemplate} className="mt-2">
@@ -292,7 +306,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                         Cancel
                     </Button>
                     <Button onClick={processBulkUpload} isLoading={isUploading} className="flex-1">
-                        Upload Students
+                        <UserPlus className="w-4 h-4 mr-1" /> Upload Students
                     </Button>
                 </div>
             </div>
