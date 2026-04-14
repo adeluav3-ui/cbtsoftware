@@ -50,7 +50,7 @@ export default function TeacherExamDetails() {
         groups.push({ groupId: item.groupId, groupImageUrl: item.groupImageUrl || null });
       }
     }
-    console.log("Available groups:", groups); // Debug log
+    console.log("getAvailableGroups called, found:", groups.length, "groups");
     return groups;
   };
 
@@ -165,7 +165,28 @@ export default function TeacherExamDetails() {
       const data = await response.json();
       console.log("Group created successfully:", data);
 
-      // Refresh exam data to get the new group structure
+      // Manually add the new group to the exam data
+      if (exam && exam.questions) {
+        // Create a new group object
+        const newGroup = {
+          isGroup: true,
+          groupId: data.groupId,
+          groupOrder: data.groupOrder,
+          groupImageUrl: data.groupImageUrl,
+          questions: [],
+        };
+
+        // Add the new group to the questions array
+        const updatedQuestions = [...exam.questions, newGroup];
+
+        // Update the exam data manually
+        const updatedExam = { ...exam, questions: updatedQuestions };
+
+        // Force a re-render by updating the state through the query cache
+        queryClient.setQueryData(getGetExamQueryKey(schoolCode, examId), updatedExam);
+      }
+
+      // Also refetch to ensure consistency
       await refetch();
 
       // Clear form and close modal
