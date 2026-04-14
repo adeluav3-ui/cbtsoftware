@@ -121,6 +121,75 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
   }
 });
 
+router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { groupImageUrl } = req.body;
+
+  try {
+    // Get the next group ID
+    const [maxGroup] = await db
+      .select({ maxId: sql<number>`COALESCE(MAX(group_id), 0)` })
+      .from(questionsTable)
+      .where(eq(questionsTable.examId, parseInt(examId)));
+
+    const newGroupId = (maxGroup?.maxId || 0) + 1;
+
+    // Create a placeholder question to represent the group?
+    // Actually, groups don't need a separate record - just return the new group ID
+    // The group will be created when questions are added with this groupId
+
+    console.log(`Created new group ${newGroupId} for exam ${examId}`);
+
+    res.json({
+      success: true,
+      groupId: newGroupId,
+      groupOrder: 0,
+      groupImageUrl: groupImageUrl || null
+    });
+    return;
+  } catch (err) {
+    console.error("Error creating group:", err);
+    res.status(500).json({ error: "Server error", details: err });
+    return;
+  }
+});
+
+// Add question to a specific group
+router.post("/:examId/questions/group", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
+
+  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+    return res.status(400).json({ error: "All question fields are required" });
+  }
+
+  try {
+    const [question] = await db
+      .insert(questionsTable)
+      .values({
+        examId: parseInt(examId),
+        text,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        schoolCode,
+        imageUrl: imageUrl || null,
+        groupId: groupId || null,
+        groupOrder: groupOrder || 0,
+      })
+      .returning();
+
+    res.status(201).json(question);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Get exam with questions (grouped)
 router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
@@ -191,64 +260,6 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
     }
 
     res.json({ ...exam, questions: groupedResult });
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-// Create a new group for an exam
-router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) => {
-  const { schoolCode, examId } = req.params;
-  const { groupOrder, groupImageUrl } = req.body;
-
-  try {
-    // Get the next group ID
-    const [maxGroup] = await db
-      .select({ maxId: sql<number>`COALESCE(MAX(group_id), 0)` })
-      .from(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)));
-
-    const newGroupId = (maxGroup?.maxId || 0) + 1;
-
-    res.json({ groupId: newGroupId, groupOrder: groupOrder || 0, groupImageUrl });
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
-// Add question to a specific group
-router.post("/:examId/questions/group", async (req: Request<ExamParams>, res: Response) => {
-  const { schoolCode, examId } = req.params;
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
-
-  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
-    return res.status(400).json({ error: "All question fields are required" });
-  }
-
-  try {
-    const [question] = await db
-      .insert(questionsTable)
-      .values({
-        examId: parseInt(examId),
-        text,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
-        correctOption,
-        schoolCode,
-        imageUrl: imageUrl || null,
-        groupId: groupId || null,
-        groupOrder: groupOrder || 0,
-      })
-      .returning();
-
-    res.status(201).json(question);
     return;
   } catch (err) {
     console.error(err);

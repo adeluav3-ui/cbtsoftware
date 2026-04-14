@@ -141,6 +141,8 @@ export default function TeacherExamDetails() {
   const createGroup = async () => {
     setCreatingGroup(true);
     try {
+      console.log("Creating group with image:", groupImageUrl);
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${examId}/groups`,
         {
@@ -150,18 +152,32 @@ export default function TeacherExamDetails() {
           credentials: "include",
         }
       );
-      if (response.ok) {
-        await refetch(); // Refresh exam data to get the new group
-        setGroupModalOpen(false);
-        setGroupImageUrl("");
-      } else {
+
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {
         const errorData = await response.json();
-        console.error("Failed to create group:", errorData);
-        alert("Failed to create group. Please try again.");
+        console.error("Server error response:", errorData);
+        alert(`Failed to create group: ${errorData.error || "Unknown error"}`);
+        return;
       }
+
+      const data = await response.json();
+      console.log("Group created successfully:", data);
+
+      // Refresh exam data to get the new group structure
+      await refetch();
+
+      // Clear form and close modal
+      setGroupModalOpen(false);
+      setGroupImageUrl("");
+
+      // Show success message
+      alert(`Group ${data.groupId} created successfully! You can now add questions to this group.`);
+
     } catch (err) {
-      console.error("Failed to create group", err);
-      alert("Network error. Please try again.");
+      console.error("Failed to create group:", err);
+      alert("Network error. Please check your connection and try again.");
     } finally {
       setCreatingGroup(false);
     }
