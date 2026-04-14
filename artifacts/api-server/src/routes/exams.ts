@@ -121,7 +121,7 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
   }
 });
 
-// Get exam with questions
+// Get exam with questions (grouped)
 router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
 
@@ -144,9 +144,111 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
     const questions = await db
       .select()
       .from(questionsTable)
+      .where(eq(questionsTable.examId, parseInt(examId)))
+      .orderBy(questionsTable.groupId, questionsTable.groupOrder, questionsTable.id);
+
+    // Group questions by groupId
+    const groupedResult: any[] = [];
+    let currentGroup: any = null;
+    let currentGroupId: number | null = null;
+
+    for (const q of questions) {
+      if (q.groupId !== null && q.groupId !== currentGroupId) {
+        // New group found - push previous group if exists
+        if (currentGroup) {
+          groupedResult.push(currentGroup);
+        }
+        // Start new group
+        currentGroup = {
+          isGroup: true,
+          groupId: q.groupId,
+          groupOrder: q.groupOrder || 0,
+          groupImageUrl: q.groupImageUrl,
+          questions: [q],
+        };
+        currentGroupId = q.groupId;
+      } else if (q.groupId !== null && q.groupId === currentGroupId) {
+        // Add to existing group
+        currentGroup.questions.push(q);
+      } else {
+        // No group - push previous group if exists, then add individual question
+        if (currentGroup) {
+          groupedResult.push(currentGroup);
+          currentGroup = null;
+          currentGroupId = null;
+        }
+        // Add as individual question
+        groupedResult.push({
+          isGroup: false,
+          question: q,
+        });
+      }
+    }
+
+    // Push the last group if exists
+    if (currentGroup) {
+      groupedResult.push(currentGroup);
+    }
+
+    res.json({ ...exam, questions: groupedResult });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+// Create a new group for an exam
+router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { groupOrder, groupImageUrl } = req.body;
+
+  try {
+    // Get the next group ID
+    const [maxGroup] = await db
+      .select({ maxId: sql<number>`COALESCE(MAX(group_id), 0)` })
+      .from(questionsTable)
       .where(eq(questionsTable.examId, parseInt(examId)));
 
-    res.json({ ...exam, questions });
+    const newGroupId = (maxGroup?.maxId || 0) + 1;
+
+    res.json({ groupId: newGroupId, groupOrder: groupOrder || 0, groupImageUrl });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Add question to a specific group
+router.post("/:examId/questions/group", async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
+
+  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+    return res.status(400).json({ error: "All question fields are required" });
+  }
+
+  try {
+    const [question] = await db
+      .insert(questionsTable)
+      .values({
+        examId: parseInt(examId),
+        text,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        schoolCode,
+        imageUrl: imageUrl || null,
+        groupId: groupId || null,
+        groupOrder: groupOrder || 0,
+      })
+      .returning();
+
+    res.status(201).json(question);
     return;
   } catch (err) {
     console.error(err);

@@ -9,11 +9,12 @@ import {
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus } from "lucide-react";
+import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
 import { StudentResultsModal } from "@/components/student-results-modal";
+import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
 
 interface Student {
   id: number;
@@ -40,6 +41,7 @@ export default function TeacherDashboard() {
   const [eClass, setEClass] = useState("JSS1");
   const [eDuration, setEDuration] = useState("45");
   const [eAssessmentType, setEAssessmentType] = useState("exam");
+  const [bulkStudentModalOpen, setBulkStudentModalOpen] = useState(false);
 
   // Scores modal state
   const [scoresModalOpen, setScoresModalOpen] = useState(false);
@@ -134,7 +136,6 @@ export default function TeacherDashboard() {
       console.error("Failed to fetch subjects", err);
     }
   };
-
 
   // Fetch school info to get current term
   useEffect(() => {
@@ -278,6 +279,14 @@ export default function TeacherDashboard() {
               <p className="text-xs text-muted-foreground mt-1">
                 {studentsLoading ? "Loading…" : `${students.length} student${students.length !== 1 ? "s" : ""} in ${classFilter}`}
               </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkStudentModalOpen(true)}>
+                <Upload className="w-4 h-4 mr-1" /> Bulk Upload
+              </Button>
+              <Button size="sm" onClick={() => setStudentModalOpen(true)}>
+                <UserPlus className="w-4 h-4 mr-2" /> Add Student
+              </Button>
             </div>
           </div>
 
@@ -565,6 +574,15 @@ export default function TeacherDashboard() {
           }}
         />
       )}
+
+      <BulkUploadStudentsModal
+        isOpen={bulkStudentModalOpen}
+        onClose={() => setBulkStudentModalOpen(false)}
+        schoolCode={schoolCode}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
+        }}
+      />
 
       {/* Student Results Modal */}
       <StudentResultsModal

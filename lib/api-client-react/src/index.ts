@@ -47,6 +47,7 @@ export interface Exam {
     teacherId: number;
     createdAt: string;
     questionCount: number;
+    questions?: GroupedQuestion[]; // Change this from Question[] to GroupedQuestion[]
 }
 
 export interface Question {
@@ -60,7 +61,20 @@ export interface Question {
     correctOption: string;
     schoolCode: string;
     imageUrl?: string | null;
+    groupId?: number | null;
+    groupOrder?: number | null;
+    groupImageUrl?: string | null;
 }
+
+export interface GroupedQuestion {
+    isGroup: boolean;
+    groupId?: number;
+    groupOrder?: number;
+    groupImageUrl?: string | null;
+    questions?: Question[];
+    question?: Question;
+}
+
 
 export interface Result {
     id: number;
@@ -240,7 +254,7 @@ export const api = {
             return response.json();
         },
 
-        get: async (schoolCode: string, examId: number): Promise<Exam & { questions: Question[] }> => {
+        get: async (schoolCode: string, examId: number): Promise<Exam & { questions: GroupedQuestion[] }> => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}`, {
                 credentials: 'include',
             });

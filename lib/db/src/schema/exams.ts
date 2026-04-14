@@ -26,7 +26,10 @@ export const questionsTable = pgTable("questions", {
   optionD: text("option_d").notNull(),
   correctOption: text("correct_option").notNull(), // A, B, C, D
   schoolCode: text("school_code").notNull(),
-  imageUrl: text("image_url"), // NEW - nullable, stores Supabase Storage URL
+  imageUrl: text("image_url"),
+  groupId: integer("group_id"), // Add this
+  groupOrder: integer("group_order").default(0), // Add this
+  groupImageUrl: text("group_image_url"), // Add this
 });
 
 export const insertExamSchema = createInsertSchema(examsTable).omit({ id: true, createdAt: true });

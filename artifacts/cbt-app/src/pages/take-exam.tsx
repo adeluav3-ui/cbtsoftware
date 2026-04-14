@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useSubmitExam, Question } from "@workspace/api-client-react";
+import { useGetExam, useSubmitExam, Question, type GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal } from "@/components/ui-elements";
-import { Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Clock, AlertCircle, CheckCircle2, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 
@@ -18,7 +18,6 @@ export default function TakeExam() {
 
   const { data: examData, isLoading } = useGetExam(schoolCode, examId);
 
-  // Fall back to cached exam if offline
   const exam = examData || (() => {
     const cached = localStorage.getItem(`exam_${examId}`);
     return cached ? JSON.parse(cached) : null;
@@ -32,10 +31,49 @@ export default function TakeExam() {
   const [isFinished, setIsFinished] = useState(false);
   const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
 
-  const questions = useMemo(() => {
+  // Flatten questions for easy navigation
+  const flattenedQuestions = useMemo(() => {
     if (!exam?.questions) return [];
-    return exam.questions; // Keep original order
+    const flat: any[] = [];
+    for (const item of exam.questions) {
+      if (item.isGroup) {
+        flat.push(...item.questions);
+      } else if (item.question) {
+        flat.push(item.question);
+      }
+    }
+    return flat;
   }, [exam?.questions]);
+
+  // Get current question/group context
+  const getCurrentContext = () => {
+    if (!exam?.questions) return { question: null, groupImage: null, isGroupStart: false };
+
+    let flatIndex = 0;
+    for (const item of exam.questions) {
+      if (item.isGroup) {
+        if (currentIdx >= flatIndex && currentIdx < flatIndex + item.questions.length) {
+          const questionIndex = currentIdx - flatIndex;
+          return {
+            question: item.questions[questionIndex],
+            groupImage: item.groupImageUrl,
+            isGroupStart: questionIndex === 0,
+            groupId: item.groupId
+          };
+        }
+        flatIndex += item.questions.length;
+      } else if (item.question) {
+        if (currentIdx === flatIndex) {
+          return { question: item.question, groupImage: null, isGroupStart: false, groupId: null };
+        }
+        flatIndex++;
+      }
+    }
+    return { question: null, groupImage: null, isGroupStart: false, groupId: null };
+  };
+
+  const currentContext = getCurrentContext();
+  const q = currentContext.question;
 
   useEffect(() => {
     if (hasStarted && timeLeft > 0 && !isFinished) {
@@ -59,7 +97,6 @@ export default function TakeExam() {
 
   const startExam = async () => {
     if (exam) {
-      // Pre-cache exam data in localStorage as offline backup
       localStorage.setItem(`exam_${examId}`, JSON.stringify(exam));
       setTimeLeft(exam.durationMinutes * 60);
       setHasStarted(true);
@@ -71,7 +108,7 @@ export default function TakeExam() {
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = ""; // required for Chrome
+      e.returnValue = "";
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -81,13 +118,10 @@ export default function TakeExam() {
   useEffect(() => {
     if (!hasStarted || isFinished) return;
 
-    // Push a fake history entry to catch back button
     window.history.pushState(null, "", window.location.href);
-
     const handlePopState = () => {
       window.history.pushState(null, "", window.location.href);
     };
-
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [hasStarted, isFinished]);
@@ -144,13 +178,10 @@ export default function TakeExam() {
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-  const isLowTime = timeLeft < 300; // less than 5 mins
-
-  const q = questions[currentIdx];
+  const isLowTime = timeLeft < 300;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="bg-card border-b border-border p-4 shadow-sm sticky top-0 z-20 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold font-display">{exam.title}</h1>
@@ -162,9 +193,7 @@ export default function TakeExam() {
         </div>
       </header>
 
-      {/* Main Layout */}
       <main className="flex-1 max-w-6xl mx-auto w-full p-4 md:p-8 flex flex-col md:flex-row gap-8">
-
         {/* Question Area */}
         <div className="flex-1">
           {q ? (
@@ -175,11 +204,31 @@ export default function TakeExam() {
               className="bg-card rounded-3xl p-8 shadow-xl border border-border/50"
             >
               <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-6">
-                Question {currentIdx + 1} of {questions.length}
+                Question {currentIdx + 1} of {flattenedQuestions.length}
               </div>
+
+              {/* Group Image Display */}
+              {currentContext.groupImage && currentContext.isGroupStart && (
+                <div className="mb-6 p-4 bg-muted/20 rounded-xl border border-primary/20">
+                  <div className="flex items-center gap-2 mb-3 text-primary">
+                    <Layers className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Group {currentContext.groupId}</span>
+                  </div>
+                  <img
+                    src={currentContext.groupImage}
+                    alt="Group illustration"
+                    className="max-w-full max-h-64 object-contain rounded-lg mx-auto"
+                  />
+                  <p className="text-center text-sm text-muted-foreground mt-3">
+                    Answer the following questions based on the image above
+                  </p>
+                </div>
+              )}
+
+              {/* Question Content */}
               <div className="mb-8">
                 <h2 className="text-2xl font-semibold text-foreground leading-relaxed">{q.text}</h2>
-                {q.imageUrl && (
+                {q.imageUrl && !currentContext.groupImage && (
                   <div className="mt-4">
                     <img
                       src={q.imageUrl}
@@ -191,6 +240,7 @@ export default function TakeExam() {
                 )}
               </div>
 
+              {/* Options */}
               <div className="space-y-4">
                 {['A', 'B', 'C', 'D'].map(optKey => {
                   const val = q[`option${optKey}` as keyof Question];
@@ -214,6 +264,7 @@ export default function TakeExam() {
                 })}
               </div>
 
+              {/* Navigation Buttons */}
               <div className="flex justify-between mt-10 pt-6 border-t border-border/50">
                 <Button
                   variant="outline"
@@ -222,7 +273,7 @@ export default function TakeExam() {
                 >
                   Previous
                 </Button>
-                {currentIdx === questions.length - 1 ? (
+                {currentIdx === flattenedQuestions.length - 1 ? (
                   <Button variant="primary" onClick={handleFinalSubmit}>Submit Exam</Button>
                 ) : (
                   <Button onClick={() => setCurrentIdx(p => p + 1)}>Next Question</Button>
@@ -234,12 +285,12 @@ export default function TakeExam() {
           )}
         </div>
 
-        {/* Sidebar Nav */}
+        {/* Sidebar Navigation */}
         <div className="w-full md:w-80 shrink-0">
           <Card className="p-6 sticky top-24">
             <h3 className="font-bold mb-4 font-display">Navigation</h3>
             <div className="grid grid-cols-5 gap-2">
-              {questions.map((sq, idx) => {
+              {flattenedQuestions.map((sq, idx) => {
                 const isAns = !!answers[sq.id.toString()];
                 const isCurr = idx === currentIdx;
                 return (
@@ -276,10 +327,10 @@ export default function TakeExam() {
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
               <CheckCircle2 className="w-24 h-24 text-success mx-auto mb-6" />
               <h2 className="text-3xl font-bold font-display mb-2">
-                {resultScore.score} / {questions.length}
+                {resultScore.score} / {flattenedQuestions.length}
               </h2>
               <p className="text-lg text-muted-foreground mb-8">
-                You answered {resultScore.score} out of {questions.length} questions correctly
+                You answered {resultScore.score} out of {flattenedQuestions.length} questions correctly
               </p>
               <p className="text-sm text-muted-foreground mb-6">
                 {exam.assessmentType === 'class_activity'
@@ -287,11 +338,7 @@ export default function TakeExam() {
                   : "Your CBT score has been recorded. Your teacher will enter the theory score later."}
               </p>
               <div className="flex flex-col gap-3">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => setShowReview(true)}
-                >
+                <Button size="lg" variant="outline" onClick={() => setShowReview(true)}>
                   Review My Answers
                 </Button>
                 <Button size="lg" onClick={() => setLocation("/student")}>
@@ -304,6 +351,7 @@ export default function TakeExam() {
           )}
         </div>
       </Modal>
+
       <ResultDetailModal
         resultId={showReview ? submittedResultId : null}
         schoolCode={schoolCode}
