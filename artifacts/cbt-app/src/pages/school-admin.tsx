@@ -644,43 +644,45 @@ export default function SchoolAdminDashboard() {
                 <UserPlus className="w-4 h-4 mr-2" /> Add Student
               </Button>
             </div>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                  <th className="px-6 py-4 font-semibold">Name</th>
-                  <th className="px-6 py-4 font-semibold">Username</th>
-                  <th className="px-6 py-4 font-semibold">Class</th>
-                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map(s => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                    onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
-                  >
-                    <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
-                    <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
-                    <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </td>
-                  </tr>
-                ))}
-                {students.length === 0 && (
-                  <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
-                )}
-              </tbody>
-            </table>
           </div>
+
+          {/* Table starts here - outside the header div */}
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                <th className="px-6 py-4 font-semibold">Name</th>
+                <th className="px-6 py-4 font-semibold">Username</th>
+                <th className="px-6 py-4 font-semibold">Class</th>
+                <th className="px-6 py-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map(s => (
+                <tr
+                  key={s.id}
+                  className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
+                >
+                  <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
+                  <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
+                  <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </td>
+                </tr>
+              ))}
+              {students.length === 0 && (
+                <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
+              )}
+            </tbody>
+          </table>
         </Card>
       )}
 
