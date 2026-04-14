@@ -54,6 +54,10 @@ export default function SchoolAdminDashboard() {
 
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
+  const [academicSessionModalOpen, setAcademicSessionModalOpen] = useState(false);
+  const [newAcademicSession, setNewAcademicSession] = useState("2025/2026");
+  const [isUpdatingSession, setIsUpdatingSession] = useState(false);
+  const [sessionError, setSessionError] = useState("");
 
   // Subjects state
   const [subjects, setSubjects] = useState<{ id: number; name: string; level: string }[]>([]);
@@ -136,6 +140,34 @@ export default function SchoolAdminDashboard() {
       }
     }
   });
+
+  // Update academic session
+  const updateAcademicSession = async () => {
+    setIsUpdatingSession(true);
+    setSessionError("");
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/update-academic-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ academicSession: newAcademicSession }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setSessionError(data.error || "Failed to update academic session");
+        return;
+      }
+
+      setAcademicSession(newAcademicSession);
+      setAcademicSessionModalOpen(false);
+    } catch (err) {
+      setSessionError("Network error. Please try again.");
+    } finally {
+      setIsUpdatingSession(false);
+    }
+  };
 
   // Fetch school info including term and session
   const fetchSchoolInfo = async () => {
@@ -511,22 +543,29 @@ export default function SchoolAdminDashboard() {
           <h1 className="text-3xl font-display font-bold">School Administration</h1>
           <p className="text-muted-foreground mt-1">Manage personnel, students, and academic records.</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setTermModalOpen(true)}>
-            <RotateCw className="w-4 h-4 mr-2" />
-            {currentTerm} • {academicSession}
+        <div className="flex gap-2 flex-wrap justify-end">
+          <Button variant="outline" size="sm" onClick={() => setTermModalOpen(true)}>
+            <RotateCw className="w-3 h-3 mr-1" />
+            Term: {currentTerm}
           </Button>
-          <Button variant="outline" onClick={openGradingModal}>
-            <RotateCw className="w-4 h-4 mr-2" />
-            Grading Scheme
+          <Button variant="outline" size="sm" onClick={() => {
+            setNewAcademicSession(academicSession);
+            setAcademicSessionModalOpen(true);
+          }}>
+            <RotateCw className="w-3 h-3 mr-1" />
+            Session: {academicSession}
           </Button>
-          <Button variant="outline" onClick={openPasscodeModal}>
-            <RotateCw className="w-4 h-4 mr-2" />
-            Retake Passcode
+          <Button variant="outline" size="sm" onClick={openGradingModal}>
+            <RotateCw className="w-3 h-3 mr-1" />
+            Grading
           </Button>
-          <Button variant="outline" onClick={() => setSessionModalOpen(true)}>
-            <RotateCw className="w-4 h-4 mr-2 text-primary" />
-            Start New Session
+          <Button variant="outline" size="sm" onClick={openPasscodeModal}>
+            <RotateCw className="w-3 h-3 mr-1" />
+            Passcode
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSessionModalOpen(true)}>
+            <RotateCw className="w-3 h-3 mr-1" />
+            New Session
           </Button>
         </div>
       </div>
@@ -949,6 +988,39 @@ export default function SchoolAdminDashboard() {
             </Button>
             <Button onClick={updateTerm} isLoading={isUpdatingTerm} className="flex-1">
               Update Term
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Academic Session Modal */}
+      <Modal isOpen={academicSessionModalOpen} onClose={() => setAcademicSessionModalOpen(false)} title="Academic Session Settings">
+        <div className="space-y-4">
+          <div>
+            <Label>Academic Session</Label>
+            <Input
+              type="text"
+              value={newAcademicSession}
+              onChange={(e) => setNewAcademicSession(e.target.value)}
+              placeholder="e.g., 2025/2026"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Format: YYYY/YYYY (e.g., 2025/2026)
+            </p>
+          </div>
+
+          {sessionError && (
+            <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
+              {sessionError}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setAcademicSessionModalOpen(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button onClick={updateAcademicSession} isLoading={isUpdatingSession} className="flex-1">
+              Update Session
             </Button>
           </div>
         </div>

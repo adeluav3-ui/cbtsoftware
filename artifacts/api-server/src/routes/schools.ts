@@ -726,6 +726,7 @@ router.post("/:schoolCode/students/:studentId/subject-comment", async (req: Requ
 });
 
 // Get school info
+// Get school info (already exists, but verify it includes term and session)
 router.get("/:schoolCode", async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
@@ -736,6 +737,9 @@ router.get("/:schoolCode", async (req: Request, res: Response) => {
         name: schoolsTable.name,
         logoUrl: schoolsTable.logoUrl,
         code: schoolsTable.code,
+        currentTerm: schoolsTable.currentTerm,
+        currentAcademicSession: schoolsTable.currentAcademicSession,
+        availableTerms: schoolsTable.availableTerms,
       })
       .from(schoolsTable)
       .where(eq(schoolsTable.code, schoolCodeStr))
@@ -755,10 +759,15 @@ router.get("/:schoolCode", async (req: Request, res: Response) => {
 });
 
 // In schools.ts - add endpoint to update term and session
+// Update school term and academic session
 router.post("/:schoolCode/update-term", async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { term } = req.body;
+
+  if (!term) {
+    return res.status(400).json({ error: "Term is required" });
+  }
 
   try {
     const [updated] = await db
@@ -771,7 +780,37 @@ router.post("/:schoolCode/update-term", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "School not found" });
     }
 
-    res.json(updated);
+    res.json({ success: true, currentTerm: updated.currentTerm });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update academic session
+router.post("/:schoolCode/update-academic-session", async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { academicSession } = req.body;
+
+  if (!academicSession) {
+    return res.status(400).json({ error: "Academic session is required" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ currentAcademicSession: academicSession })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({ success: true, currentAcademicSession: updated.currentAcademicSession });
     return;
   } catch (err) {
     console.error(err);

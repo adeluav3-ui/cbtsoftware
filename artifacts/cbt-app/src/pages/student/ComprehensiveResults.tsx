@@ -28,8 +28,9 @@ interface Student {
 interface SchoolInfo {
     name: string;
     logoUrl: string | null;
+    currentTerm: string;
+    academicSession: string;
 }
-
 export default function ComprehensiveResults() {
     const { user } = useAuth();
     const schoolCode = user?.schoolCode || "";
@@ -39,7 +40,12 @@ export default function ComprehensiveResults() {
     const [isLoading, setIsLoading] = useState(false);
     const [comment, setComment] = useState("");
     const [isSavingComment, setIsSavingComment] = useState(false);
-    const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({ name: "", logoUrl: null });
+    const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
+        name: "",
+        logoUrl: null,
+        currentTerm: "First Term",
+        academicSession: "2025/2026"
+    });
     const [selectedClass, setSelectedClass] = useState<string>("JSS1");
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -63,11 +69,17 @@ export default function ComprehensiveResults() {
                 credentials: "include",
             });
             const data = await response.json();
-            setSchoolInfo({ name: data.name || "School", logoUrl: data.logoUrl });
+            setSchoolInfo({
+                name: data.name || "School",
+                logoUrl: data.logoUrl,
+                currentTerm: data.currentTerm || "First Term",
+                academicSession: data.currentAcademicSession || "2025/2026"
+            });
         } catch (err) {
             console.error("Failed to fetch school info", err);
         }
     };
+
 
     const fetchStudents = async () => {
         setIsLoadingStudents(true);
@@ -179,8 +191,8 @@ export default function ComprehensiveResults() {
                                     key={className}
                                     onClick={() => setSelectedClass(className)}
                                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedClass === className
-                                            ? "bg-primary text-primary-foreground"
-                                            : "hover:bg-muted"
+                                        ? "bg-primary text-primary-foreground"
+                                        : "hover:bg-muted"
                                         }`}
                                 >
                                     {className}
@@ -200,8 +212,8 @@ export default function ComprehensiveResults() {
                                         key={student.id}
                                         onClick={() => setSelectedStudent(student)}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${selectedStudent?.id === student.id
-                                                ? "bg-primary/10 border border-primary/30"
-                                                : "hover:bg-muted"
+                                            ? "bg-primary/10 border border-primary/30"
+                                            : "hover:bg-muted"
                                             }`}
                                     >
                                         {student.profilePicture ? (
@@ -222,6 +234,7 @@ export default function ComprehensiveResults() {
                     {selectedStudent ? (
                         <Card className="p-6 print:shadow-none">
                             {/* Header with School Logo and Student Info */}
+                            {/* Header with School Logo and Student Info */}
                             <div className="flex justify-between items-start mb-6 pb-4 border-b border-border print:border-black">
                                 <div className="flex items-center gap-3">
                                     {schoolInfo.logoUrl ? (
@@ -231,12 +244,18 @@ export default function ComprehensiveResults() {
                                     )}
                                     <div>
                                         <h2 className="text-xl font-bold">{schoolInfo.name}</h2>
-                                        <p className="text-xs text-muted-foreground">Academic Session 2024/2025</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {schoolInfo.currentTerm} • {schoolInfo.academicSession}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     {selectedStudent.profilePicture ? (
-                                        <img src={selectedStudent.profilePicture} alt={selectedStudent.fullName} className="w-16 h-16 rounded-full object-cover mx-auto" />
+                                        <img
+                                            src={selectedStudent.profilePicture}
+                                            alt={selectedStudent.fullName}
+                                            className="w-16 h-16 rounded-full object-cover mx-auto border-2 border-primary"
+                                        />
                                     ) : (
                                         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
                                             <User className="w-8 h-8 text-muted-foreground" />
