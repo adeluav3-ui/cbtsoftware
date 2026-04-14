@@ -1,23 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions } from "@workspace/api-client-react";
+import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions, type GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
 import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload, Layers } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
 import { supabase } from "@/lib/supabase";
-
-interface GroupedQuestion {
-  isGroup: boolean;
-  groupId?: number;
-  groupOrder?: number;
-  groupImageUrl?: string | null;
-  questions?: any[];
-  question?: any;
-}
 
 export default function TeacherExamDetails() {
   const { examId: rawExamId } = useParams();
@@ -26,7 +17,7 @@ export default function TeacherExamDetails() {
   const schoolCode = user?.schoolCode || "";
   const queryClient = useQueryClient();
 
-  const { data: exam, isLoading } = useGetExam(schoolCode, examId);
+  const { data: exam, isLoading, refetch } = useGetExam(schoolCode, examId);
 
   // Single question modal state
   const [isModalOpen, setModalOpen] = useState(false);
@@ -45,20 +36,21 @@ export default function TeacherExamDetails() {
   const [groupImageUrl, setGroupImageUrl] = useState("");
   const [isUploadingGroupImage, setIsUploadingGroupImage] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
-  const [bulkGroupId, setBulkGroupId] = useState<number | null>(null);
 
   // Bulk upload modal state
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkGroupId, setBulkGroupId] = useState<number | null>(null);
 
   // Get available groups from the grouped questions
   const getAvailableGroups = () => {
     if (!exam?.questions) return [];
     const groups: { groupId: number; groupImageUrl: string | null }[] = [];
-    for (const item of exam.questions as GroupedQuestion[]) {
+    for (const item of exam.questions) {
       if (item.isGroup && item.groupId) {
         groups.push({ groupId: item.groupId, groupImageUrl: item.groupImageUrl || null });
       }
     }
+    console.log("Available groups:", groups); // Debug log
     return groups;
   };
 
@@ -68,7 +60,7 @@ export default function TeacherExamDetails() {
   const flattenQuestions = () => {
     if (!exam?.questions) return [];
     const flat: any[] = [];
-    for (const item of exam.questions as GroupedQuestion[]) {
+    for (const item of exam.questions) {
       if (item.isGroup && item.questions) {
         flat.push(...item.questions);
       } else if (!item.isGroup && item.question) {
@@ -79,6 +71,14 @@ export default function TeacherExamDetails() {
   };
 
   const flatQuestions = flattenQuestions();
+
+  // Debug log to see exam data
+  useEffect(() => {
+    if (exam) {
+      console.log("Exam data:", exam);
+      console.log("Questions structure:", exam.questions);
+    }
+  }, [exam]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,14 +150,18 @@ export default function TeacherExamDetails() {
           credentials: "include",
         }
       );
-      const data = await response.json();
       if (response.ok) {
-        await queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
+        await refetch(); // Refresh exam data to get the new group
         setGroupModalOpen(false);
         setGroupImageUrl("");
+      } else {
+        const errorData = await response.json();
+        console.error("Failed to create group:", errorData);
+        alert("Failed to create group. Please try again.");
       }
     } catch (err) {
       console.error("Failed to create group", err);
+      alert("Network error. Please try again.");
     } finally {
       setCreatingGroup(false);
     }
@@ -168,6 +172,7 @@ export default function TeacherExamDetails() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
         setBulkModalOpen(false);
+        setBulkGroupId(null);
       }
     }
   });
@@ -203,6 +208,7 @@ export default function TeacherExamDetails() {
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Adding question with groupId:", selectedGroupId);
     addQuestion({
       schoolCode, examId,
       data: {
@@ -280,7 +286,7 @@ export default function TeacherExamDetails() {
 
       {/* Questions list with groups */}
       <div className="space-y-6">
-        {(exam.questions as GroupedQuestion[]).map((item, idx) => {
+        {(exam.questions as GroupedQuestion[])?.map((item, idx) => {
           if (item.isGroup && item.questions) {
             // Render a group
             return (
@@ -293,7 +299,7 @@ export default function TeacherExamDetails() {
                   )}
                 </div>
                 <div className="space-y-4">
-                  {item.questions.map((q: any, qIdx: number) => (
+                  {item.questions.map((q, qIdx) => (
                     <div key={q.id} className="relative group bg-background rounded-xl p-4 border border-border">
                       <button
                         onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
@@ -313,7 +319,7 @@ export default function TeacherExamDetails() {
                           <div className="grid grid-cols-2 gap-2 mt-3">
                             {['A', 'B', 'C', 'D'].map(opt => (
                               <div key={opt} className={`text-sm p-2 rounded border ${q.correctOption === opt ? 'bg-green-100 border-green-400' : 'bg-muted/20'}`}>
-                                <span className="font-bold">{opt}.</span> {q[`option${opt}`]}
+                                <span className="font-bold">{opt}.</span> {q[`option${opt}` as keyof typeof q] as string}
                               </div>
                             ))}
                           </div>
@@ -351,11 +357,11 @@ export default function TeacherExamDetails() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-12">
                   {['A', 'B', 'C', 'D'].map(optKey => {
-                    const optVal = q[`option${optKey}`];
+                    const optVal = q[`option${optKey}` as keyof typeof q];
                     const isCorrect = q.correctOption === optKey;
                     return (
                       <div key={optKey} className={`p-3 rounded-xl border ${isCorrect ? 'bg-success/10 border-success/30 text-success-foreground font-semibold' : 'bg-muted/30 border-border/50 text-muted-foreground'}`}>
-                        <span className="font-bold mr-2">{optKey}.</span> {optVal}
+                        <span className="font-bold mr-2">{optKey}.</span> {optVal as string}
                       </div>
                     );
                   })}
@@ -402,18 +408,33 @@ export default function TeacherExamDetails() {
               )}
             </div>
           </div>
-          {availableGroups.length > 0 && (
+
+          {/* Group Selection Dropdown - Always show if there are groups */}
+          <div>
+            <Label>Add to Group (Optional)</Label>
             <Select
-              value={bulkGroupId?.toString() || ""}
-              onChange={e => setBulkGroupId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-40"
+              value={selectedGroupId?.toString() || ""}
+              onChange={e => setSelectedGroupId(e.target.value ? parseInt(e.target.value) : null)}
             >
-              <option value="">No Group</option>
+              <option value="">No Group (Individual Question)</option>
               {availableGroups.map((g) => (
-                <option key={g.groupId} value={g.groupId}>Group {g.groupId}</option>
+                <option key={g.groupId} value={g.groupId}>
+                  Group {g.groupId} {g.groupImageUrl && "📷"}
+                </option>
               ))}
             </Select>
-          )}
+            {availableGroups.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                No groups created yet. Click "Create Group" to make one.
+              </p>
+            )}
+            {selectedGroupId && (
+              <p className="text-xs text-green-600 mt-1">
+                This question will be added to Group {selectedGroupId} and stay with other questions in that group.
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
             <div><Label>Option B</Label><Input value={optB} onChange={e => setOptB(e.target.value)} required /></div>
