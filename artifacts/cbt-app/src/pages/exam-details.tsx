@@ -50,7 +50,6 @@ export default function TeacherExamDetails() {
         groups.push({ groupId: item.groupId, groupImageUrl: item.groupImageUrl || null });
       }
     }
-    console.log("getAvailableGroups called, found:", groups.length, "groups");
     return groups;
   };
 
@@ -141,8 +140,6 @@ export default function TeacherExamDetails() {
   const createGroup = async () => {
     setCreatingGroup(true);
     try {
-      console.log("Creating group with image:", groupImageUrl);
-
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${examId}/groups`,
         {
@@ -153,21 +150,16 @@ export default function TeacherExamDetails() {
         }
       );
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Server error response:", errorData);
         alert(`Failed to create group: ${errorData.error || "Unknown error"}`);
         return;
       }
 
       const data = await response.json();
-      console.log("Group created successfully:", data);
 
-      // Manually add the new group to the exam data
-      if (exam && exam.questions) {
-        // Create a new group object
+      // Manually add the new group to the local exam data without refetching
+      if (exam) {
         const newGroup = {
           isGroup: true,
           groupId: data.groupId,
@@ -176,29 +168,20 @@ export default function TeacherExamDetails() {
           questions: [],
         };
 
-        // Add the new group to the questions array
-        const updatedQuestions = [...exam.questions, newGroup];
-
-        // Update the exam data manually
+        const updatedQuestions = [...(exam.questions || []), newGroup];
         const updatedExam = { ...exam, questions: updatedQuestions };
 
-        // Force a re-render by updating the state through the query cache
+        // Update the cached data
         queryClient.setQueryData(getGetExamQueryKey(schoolCode, examId), updatedExam);
       }
 
-      // Also refetch to ensure consistency
-      await refetch();
-
-      // Clear form and close modal
       setGroupModalOpen(false);
       setGroupImageUrl("");
-
-      // Show success message
-      alert(`Group ${data.groupId} created successfully! You can now add questions to this group.`);
+      alert(`Group ${data.groupId} created! Now add questions to this group.`);
 
     } catch (err) {
       console.error("Failed to create group:", err);
-      alert("Network error. Please check your connection and try again.");
+      alert("Network error. Please try again.");
     } finally {
       setCreatingGroup(false);
     }
