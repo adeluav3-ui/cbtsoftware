@@ -21,9 +21,20 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
     const [createdStudents, setCreatedStudents] = useState<any[]>([]);
     const [showResults, setShowResults] = useState(false);
 
-    // Generate username from full name (lowercase, no spaces)
-    const generateUsername = (fullName: string) => {
-        return fullName.toLowerCase().replace(/\s+/g, '');
+    // Generate username from full name with uniqueness handling
+    const generateUsername = (fullName: string, index: number, existingUsernames: Set<string>) => {
+        let baseUsername = fullName.toLowerCase().replace(/\s+/g, '');
+        let username = baseUsername;
+        let counter = 1;
+
+        // If username already exists, append a number
+        while (existingUsernames.has(username)) {
+            username = `${baseUsername}${counter}`;
+            counter++;
+        }
+
+        existingUsernames.add(username);
+        return username;
     };
 
     // Generate random 6-digit PIN
@@ -51,7 +62,7 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
             const line = lines[i].trim();
             if (!line) continue;
 
-            // Format: "Full Name" or "Full Name,Class" (class optional, will use default if not specified)
+            // Format: "Full Name" or "Full Name,Class"
             let fullName = line;
             let studentClass = selectedClass;
 
@@ -71,14 +82,10 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                 continue;
             }
 
-            const username = generateUsername(fullName);
-            const password = generatePin();
-
             students.push({
                 fullName,
-                username,
-                password,
                 class: studentClass,
+                originalIndex: i,
             });
         }
 
@@ -97,8 +104,13 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
         // Create students one by one via API
         const created = [];
         const failed = [];
+        const processedUsernames = new Set<string>();
 
-        for (const student of students) {
+        for (let idx = 0; idx < students.length; idx++) {
+            const student = students[idx];
+            const username = generateUsername(student.fullName, idx, processedUsernames);
+            const password = generatePin();
+
             try {
                 const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students`, {
                     method: "POST",
@@ -106,41 +118,53 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        username: student.username,
-                        password: student.password,
+                        username: username,
+                        password: password,
                         fullName: student.fullName,
                         class: student.class,
                     }),
                     credentials: "include",
                 });
 
+                const data = await response.json();
+
                 if (response.ok) {
-                    const data = await response.json();
                     created.push({
-                        ...student,
+                        fullName: student.fullName,
+                        username: username,
+                        password: password,
+                        class: student.class,
                         id: data.id,
                     });
                 } else {
-                    const errorData = await response.json();
-                    console.error("Failed to create student:", errorData);
-                    failed.push({ ...student, error: errorData.error || "Unknown error" });
+                    console.error("Failed to create student:", data);
+                    failed.push({
+                        fullName: student.fullName,
+                        error: data.error || "Unknown error",
+                        class: student.class
+                    });
                 }
             } catch (err) {
                 console.error("Network error:", err);
-                failed.push({ ...student, error: "Network error" });
+                failed.push({
+                    fullName: student.fullName,
+                    error: "Network error",
+                    class: student.class
+                });
             }
         }
 
         setCreatedStudents(created);
 
         if (created.length > 0) {
-            setSuccess(`Successfully created ${created.length} students. ${failed.length} failed.`);
+            setSuccess(`✅ Successfully created ${created.length} students.`);
+            if (failed.length > 0) {
+                setError(`❌ ${failed.length} students failed: ${failed.map(f => `${f.fullName} (${f.error})`).join(', ')}`);
+            }
             setShowResults(true);
             onSuccess();
-        }
-
-        if (failed.length > 0) {
-            setError(`${failed.length} students failed: ${failed.map(f => f.fullName).join(', ')}`);
+        } else if (failed.length > 0) {
+            setError(`Failed to create ${failed.length} students: ${failed.map(f => `${f.fullName} (${f.error})`).join(', ')}`);
         }
 
         setIsUploading(false);
