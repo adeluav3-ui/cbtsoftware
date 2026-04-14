@@ -451,9 +451,10 @@ router.post("/:examId/toggle", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Bulk add questions
+// Bulk add questions (with optional group)
 router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
-  const { questions } = req.body;
+  const { questions, groupId } = req.body;
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
     return res.status(400).json({ error: "Questions array is required" });
@@ -472,10 +473,25 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
   }
 
   try {
+    // If groupId is provided, get the starting groupOrder
+    let startOrder = 0;
+    if (groupId) {
+      const existingInGroup = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(questionsTable)
+        .where(
+          and(
+            eq(questionsTable.examId, parseInt(examId)),
+            eq(questionsTable.groupId, groupId)
+          )
+        );
+      startOrder = existingInGroup[0]?.count || 0;
+    }
+
     const inserted = await db
       .insert(questionsTable)
       .values(
-        questions.map((q: any) => ({
+        questions.map((q: any, idx: number) => ({
           examId: parseInt(examId),
           text: String(q.text),
           optionA: String(q.optionA),
@@ -485,6 +501,8 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
           correctOption: String(q.correctOption),
           schoolCode,
           imageUrl: q.imageUrl || null,
+          groupId: groupId || null,
+          groupOrder: groupId ? startOrder + idx : 0,
         }))
       )
       .returning();
@@ -499,15 +517,31 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
 });
 
 // Add question to exam
+// Add question to exam (with optional group)
 router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl } = req.body;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
 
   if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
     return res.status(400).json({ error: "All question fields are required" });
   }
 
   try {
+    // If groupId is provided, get the next groupOrder for that group
+    let finalGroupOrder = groupOrder || 0;
+    if (groupId) {
+      const existingInGroup = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(questionsTable)
+        .where(
+          and(
+            eq(questionsTable.examId, parseInt(examId)),
+            eq(questionsTable.groupId, groupId)
+          )
+        );
+      finalGroupOrder = existingInGroup[0]?.count || 0;
+    }
+
     const [question] = await db
       .insert(questionsTable)
       .values({
@@ -520,6 +554,8 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
         correctOption,
         schoolCode,
         imageUrl: imageUrl || null,
+        groupId: groupId || null,
+        groupOrder: finalGroupOrder,
       })
       .returning();
 

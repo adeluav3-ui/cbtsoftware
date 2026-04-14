@@ -244,11 +244,11 @@ export const api = {
 
         bulkAddQuestions: async (schoolCode: string, examId: number, questions: Array<{
             text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
-        }>) => {
+        }>, groupId?: number | null) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questions }),
+                body: JSON.stringify({ questions, groupId }),
                 credentials: 'include',
             });
             return response.json();
@@ -293,7 +293,7 @@ export const api = {
         },
 
         addQuestion: async (schoolCode: string, examId: number, data: {
-            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null;
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null;
         }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions`, {
                 method: 'POST',
@@ -530,14 +530,15 @@ export function useListExams(schoolCode: string, filters?: { class?: string; act
 export function useBulkAddQuestions(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, examId, questions }: {
+        mutationFn: ({ schoolCode, examId, questions, groupId }: {
             schoolCode: string;
             examId: number;
             questions: Array<{
                 text: string; optionA: string; optionB: string;
                 optionC: string; optionD: string; correctOption: string;
-            }>
-        }) => api.exams.bulkAddQuestions(schoolCode, examId, questions),
+            }>;
+            groupId?: number | null;
+        }) => api.exams.bulkAddQuestions(schoolCode, examId, questions, groupId),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
             options?.mutation?.onSuccess?.();
@@ -599,7 +600,7 @@ export function useAddQuestion(options?: MutationOptions) {
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
             schoolCode: string; examId: number; data: {
-                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null;
+                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null;
             }
         }) => api.exams.addQuestion(schoolCode, examId, data),
         onSuccess: (_, variables) => {

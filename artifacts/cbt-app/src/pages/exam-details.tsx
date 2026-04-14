@@ -45,6 +45,7 @@ export default function TeacherExamDetails() {
   const [groupImageUrl, setGroupImageUrl] = useState("");
   const [isUploadingGroupImage, setIsUploadingGroupImage] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [bulkGroupId, setBulkGroupId] = useState<number | null>(null);
 
   // Bulk upload modal state
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
@@ -211,7 +212,8 @@ export default function TeacherExamDetails() {
         optionC: optC,
         optionD: optD,
         correctOption: correctOpt,
-        imageUrl: imageUrl || null
+        imageUrl: imageUrl || null,
+        groupId: selectedGroupId,
       }
     });
   };
@@ -401,16 +403,16 @@ export default function TeacherExamDetails() {
             </div>
           </div>
           {availableGroups.length > 0 && (
-            <div>
-              <Label>Add to Group (Optional)</Label>
-              <Select value={selectedGroupId?.toString() || ""} onChange={e => setSelectedGroupId(e.target.value ? parseInt(e.target.value) : null)}>
-                <option value="">No Group (Individual Question)</option>
-                {availableGroups.map((g) => (
-                  <option key={g.groupId} value={g.groupId}>Group {g.groupId}</option>
-                ))}
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">Group questions share an illustration and stay together.</p>
-            </div>
+            <Select
+              value={bulkGroupId?.toString() || ""}
+              onChange={e => setBulkGroupId(e.target.value ? parseInt(e.target.value) : null)}
+              className="w-40"
+            >
+              <option value="">No Group</option>
+              {availableGroups.map((g) => (
+                <option key={g.groupId} value={g.groupId}>Group {g.groupId}</option>
+              ))}
+            </Select>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
@@ -464,7 +466,7 @@ export default function TeacherExamDetails() {
       <BulkUploadModal
         isOpen={isBulkModalOpen}
         onClose={() => setBulkModalOpen(false)}
-        onUpload={(questions) => bulkAddQuestions({ schoolCode, examId, questions })}
+        onUpload={(questions) => bulkAddQuestions({ schoolCode, examId, questions, groupId: bulkGroupId })}
         isPending={isBulkPending}
       />
     </DashboardLayout>
