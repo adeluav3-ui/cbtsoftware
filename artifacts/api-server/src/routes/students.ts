@@ -179,7 +179,8 @@ router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) 
     return;
   }
 });
-// Get a student's full profile: all results with answer breakdown
+
+// Get a student's full profile (include password for admin view)
 router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
@@ -188,6 +189,7 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
       .select({
         id: usersTable.id,
         username: usersTable.username,
+        password: usersTable.password, // Add password field
         fullName: usersTable.fullName,
         class: usersTable.class,
         schoolCode: usersTable.schoolCode,
@@ -258,6 +260,45 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
     );
 
     res.json({ ...student, results: resultsWithAnswers });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Reset student password
+router.post("/:studentId/reset-password", async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: "New password must be at least 4 characters" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ password: newPassword })
+      .where(
+        and(
+          eq(usersTable.id, parseInt(studentId)),
+          eq(usersTable.schoolCode, schoolCode),
+          eq(usersTable.role, "student")
+        )
+      )
+      .returning({
+        id: usersTable.id,
+        username: usersTable.username,
+        fullName: usersTable.fullName,
+      });
+
+    if (!updated) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    res.json({ message: "Password reset successfully", student: updated });
     return;
   } catch (err) {
     console.error(err);
