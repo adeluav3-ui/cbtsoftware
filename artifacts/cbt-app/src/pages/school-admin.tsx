@@ -11,6 +11,7 @@ import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export default function SchoolAdminDashboard() {
   const { data: results = [] } = useListResults(schoolCode);
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [bulkStudentModalOpen, setBulkStudentModalOpen] = useState(false);
 
   const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
   const [currentPasscode, setCurrentPasscode] = useState("");
@@ -634,46 +636,51 @@ export default function SchoolAdminDashboard() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">Click a student row to view their full exam history</p>
             </div>
-            <Button size="sm" onClick={() => setStudentModalOpen(true)}>
-              <UserPlus className="w-4 h-4 mr-2" /> Add Student
-            </Button>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                <th className="px-6 py-4 font-semibold">Name</th>
-                <th className="px-6 py-4 font-semibold">Username</th>
-                <th className="px-6 py-4 font-semibold">Class</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(s => (
-                <tr
-                  key={s.id}
-                  className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                  onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
-                >
-                  <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
-                  <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
-                  <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </td>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkStudentModalOpen(true)}>
+                <Upload className="w-4 h-4 mr-1" /> Bulk Upload
+              </Button>
+              <Button size="sm" onClick={() => setStudentModalOpen(true)}>
+                <UserPlus className="w-4 h-4 mr-2" /> Add Student
+              </Button>
+            </div>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
+                  <th className="px-6 py-4 font-semibold">Name</th>
+                  <th className="px-6 py-4 font-semibold">Username</th>
+                  <th className="px-6 py-4 font-semibold">Class</th>
+                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
-              ))}
-              {students.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {students.map(s => (
+                  <tr
+                    key={s.id}
+                    className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
+                  >
+                    <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
+                    <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
+                    <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
+                    <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </td>
+                  </tr>
+                ))}
+                {students.length === 0 && (
+                  <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
@@ -1135,6 +1142,17 @@ export default function SchoolAdminDashboard() {
           </div>
         </div>
       </Modal>
+
+      {/* Bulk Upload Students Modal */}
+      <BulkUploadStudentsModal
+        isOpen={bulkStudentModalOpen}
+        onClose={() => setBulkStudentModalOpen(false)}
+        schoolCode={schoolCode}
+        onSuccess={() => {
+          // Refresh students list after bulk upload
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
+        }}
+      />
 
       {/* Detail modals */}
       <TeacherDetailModal teacherId={selectedTeacherId} teacherName={selectedTeacherName} schoolCode={schoolCode} onClose={() => setSelectedTeacherId(null)} />
