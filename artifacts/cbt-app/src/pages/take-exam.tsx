@@ -31,27 +31,65 @@ export default function TakeExam() {
   const [isFinished, setIsFinished] = useState(false);
   const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
 
-  // Flatten questions for easy navigation
-  const flattenedQuestions = useMemo(() => {
+  // Shuffle groups and individual questions while preserving group order
+  const shuffledExamItems = useMemo(() => {
     if (!exam?.questions) return [];
-    const flat: any[] = [];
+
+    // Separate groups and individual questions
+    const groups: any[] = [];
+    const individuals: any[] = [];
+
     for (const item of exam.questions) {
       if (item.isGroup) {
+        groups.push(item);
+      } else if (item.question) {
+        individuals.push(item);
+      }
+    }
+
+    // Shuffle groups
+    for (let i = groups.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [groups[i], groups[j]] = [groups[j], groups[i]];
+    }
+
+    // Shuffle individual questions
+    for (let i = individuals.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [individuals[i], individuals[j]] = [individuals[j], individuals[i]];
+    }
+
+    // Option 2: Shuffle everything together (groups + individuals)
+    const allItems = [...groups, ...individuals];
+    for (let i = allItems.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+    }
+
+    return allItems;
+  }, [exam?.questions]);
+
+  // Flatten questions for easy navigation (preserving order within groups)
+  const flattenedQuestions = useMemo(() => {
+    const flat: any[] = [];
+    for (const item of shuffledExamItems) {
+      if (item.isGroup && item.questions) {
+        // Questions within a group stay in original order (not shuffled)
         flat.push(...item.questions);
       } else if (item.question) {
         flat.push(item.question);
       }
     }
     return flat;
-  }, [exam?.questions]);
+  }, [shuffledExamItems]);
 
   // Get current question/group context
   const getCurrentContext = () => {
-    if (!exam?.questions) return { question: null, groupImage: null, isGroupStart: false };
+    if (!shuffledExamItems.length) return { question: null, groupImage: null, isGroupStart: false, groupId: null };
 
     let flatIndex = 0;
-    for (const item of exam.questions) {
-      if (item.isGroup) {
+    for (const item of shuffledExamItems) {
+      if (item.isGroup && item.questions) {
         if (currentIdx >= flatIndex && currentIdx < flatIndex + item.questions.length) {
           const questionIndex = currentIdx - flatIndex;
           return {
