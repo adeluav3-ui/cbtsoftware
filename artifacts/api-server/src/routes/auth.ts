@@ -83,6 +83,7 @@ router.post("/login", async (req: Request, res: Response) => {
       schoolName,
       fullName: user.fullName,
       class: user.class,
+      profilePicture: user.profilePicture,
     });
     return;
   } catch (err) {
@@ -113,7 +114,15 @@ router.get("/me", async (req: Request, res: Response) => {
 
   try {
     const [user] = await db
-      .select()
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        role: usersTable.role,
+        schoolCode: usersTable.schoolCode,
+        fullName: usersTable.fullName,
+        class: usersTable.class,
+        profilePicture: usersTable.profilePicture, // Add this line
+      })
       .from(usersTable)
       .where(eq(usersTable.id, userId))
       .limit(1);
@@ -140,6 +149,7 @@ router.get("/me", async (req: Request, res: Response) => {
       schoolName,
       fullName: user.fullName,
       class: user.class,
+      profilePicture: user.profilePicture, // Add this line
     });
     return;
   } catch (err) {
