@@ -250,8 +250,10 @@ router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Respon
 
 // Update teacher profile picture
 router.post("/profile-picture", async (req: Request, res: Response) => {
+  // Get user from session (custom auth)
   const session = (req as any).session;
   const userId = session?.userId;
+
   const { profilePictureUrl } = req.body;
 
   if (!userId) {

@@ -97,7 +97,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         .from('profile-pictures')
         .getPublicUrl(fileName);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/teachers/profile-picture`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${user?.schoolCode}/teachers/profile-picture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profilePictureUrl: publicUrl }),
