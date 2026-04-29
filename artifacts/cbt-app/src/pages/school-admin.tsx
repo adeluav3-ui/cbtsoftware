@@ -751,19 +751,19 @@ export default function SchoolAdminDashboard() {
 
       {/* Subjects Tab */}
       {activeTab === "Subjects" && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-6">
+        <Card className="p-4 md:p-6">
+          {/* Header - Stacked on mobile, side by side on desktop */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
             <div>
-              <h2 className="text-xl font-bold font-display">Subject Management</h2>
-              <p className="text-muted-foreground text-sm mt-1">
-                Add subjects for Junior Secondary (JSS1-3) and Senior Secondary (SSS1-3)
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setBulkSubjectModalOpen(true)}>
+              <h2 className="text-lg md:text-xl font-bold font-display">Subject Management</h2>
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                Add subjects for Primary (Pry 1-5), Junior Secondary (JSS1-3) and Senior Secondary (SSS1-3)
+              </p>      </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkSubjectModalOpen(true)} className="w-full sm:w-auto">
                 <Upload className="w-4 h-4 mr-2" /> Bulk Upload
               </Button>
-              <Button onClick={() => setSubjectModalOpen(true)}>
+              <Button size="sm" onClick={() => setSubjectModalOpen(true)} className="w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" /> Add Subject
               </Button>
             </div>
