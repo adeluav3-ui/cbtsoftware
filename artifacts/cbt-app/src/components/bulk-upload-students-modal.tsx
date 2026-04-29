@@ -9,12 +9,12 @@ interface BulkUploadStudentsModalProps {
     onSuccess: () => void;
 }
 
-const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+const CLASSES = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
 export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess }: BulkUploadStudentsModalProps) {
     const [uploadMethod, setUploadMethod] = useState<"paste" | "csv">("paste");
     const [studentData, setStudentData] = useState("");
-    const [selectedClass, setSelectedClass] = useState("JSS1");
+    const [selectedClass, setSelectedClass] = useState("Pry 1");
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");

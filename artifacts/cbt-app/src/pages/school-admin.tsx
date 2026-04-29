@@ -20,7 +20,7 @@ export default function SchoolAdminDashboard() {
   const queryClient = useQueryClient();
 
   const [classFilter, setClassFilter] = useState("JSS1");
-  const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const CLASSES = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
@@ -66,7 +66,7 @@ export default function SchoolAdminDashboard() {
   const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
-  const [newSubjectLevel, setNewSubjectLevel] = useState<"junior" | "senior">("junior");
+  const [newSubjectLevel, setNewSubjectLevel] = useState<"primary" | "junior" | "senior">("primary");
   const [subjectError, setSubjectError] = useState("");
   const [isAddingSubject, setIsAddingSubject] = useState(false);
 
@@ -81,7 +81,7 @@ export default function SchoolAdminDashboard() {
   // Bulk subject upload state
   const [bulkSubjectModalOpen, setBulkSubjectModalOpen] = useState(false);
   const [bulkSubjectsText, setBulkSubjectsText] = useState("");
-  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"junior" | "senior">("junior");
+  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"primary" | "junior" | "senior">("primary");
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [bulkSubjectError, setBulkSubjectError] = useState("");
   const [bulkSubjectSuccess, setBulkSubjectSuccess] = useState("");
@@ -838,23 +838,18 @@ export default function SchoolAdminDashboard() {
               </div>
               <div>
                 <Label>Level</Label>
-                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "junior" | "senior")}>
+                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "primary" | "junior" | "senior")}>
+                  <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
                 </Select>
               </div>
               {subjectError && (
-                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">
-                  {subjectError}
-                </div>
+                <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{subjectError}</div>
               )}
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => setSubjectModalOpen(false)} className="flex-1">
-                  Cancel
-                </Button>
-                <Button type="submit" isLoading={isAddingSubject} className="flex-1">
-                  Add Subject
-                </Button>
+                <Button variant="outline" onClick={() => setSubjectModalOpen(false)} className="flex-1">Cancel</Button>
+                <Button type="submit" isLoading={isAddingSubject} className="flex-1">Add Subject</Button>
               </div>
             </form>
           </Modal>
@@ -864,7 +859,8 @@ export default function SchoolAdminDashboard() {
             <div className="space-y-4">
               <div>
                 <Label>Level</Label>
-                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "junior" | "senior")}>
+                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "primary" | "junior" | "senior")}>
+                  <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
                 </Select>
@@ -888,7 +884,16 @@ export default function SchoolAdminDashboard() {
               <div className="bg-muted/20 p-3 rounded-lg">
                 <p className="text-sm font-semibold mb-2">Common Subjects:</p>
                 <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                  {bulkSubjectsLevel === "junior" ? (
+                  {bulkSubjectsLevel === "primary" ? (
+                    <>
+                      <span>• Mathematics</span> <span>• English Language</span> <span>• Basic Science</span>
+                      <span>• Social Studies</span> <span>• Civic Education</span> <span>• Christian Religious Studies</span>
+                      <span>• Islamic Religious Studies</span> <span>• Computer Studies</span> <span>• French</span>
+                      <span>• Home Economics</span> <span>• Agricultural Science</span> <span>• Cultural & Creative Arts</span>
+                      <span>• Handwriting</span> <span>• Phonics</span> <span>• Verbal Reasoning</span>
+                      <span>• Quantitative Reasoning</span> <span>• Vocational Aptitude</span> <span>• Physical & Health Education</span>
+                    </>
+                  ) : bulkSubjectsLevel === "junior" ? (
                     <>
                       <span>• Mathematics</span> <span>• English Language</span> <span>• Basic Science</span>
                       <span>• Basic Technology</span> <span>• Social Studies</span> <span>• Civic Education</span>

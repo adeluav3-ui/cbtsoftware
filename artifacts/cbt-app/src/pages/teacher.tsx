@@ -30,7 +30,7 @@ export default function TeacherDashboard() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("My Exams");
-  const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const CLASSES = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   // ── Exams ────────────────────────────────────────
   const { data: exams = [], isLoading } = useListExams(schoolCode);
@@ -166,10 +166,12 @@ export default function TeacherDashboard() {
     }
   };
 
-  // Determine level based on selected class (JSS = junior, SSS = senior)
+  // Determine level based on selected class
   useEffect(() => {
     if (eClass && schoolCode) {
-      const level = eClass.startsWith('JSS') ? 'junior' : 'senior';
+      let level = 'primary';
+      if (eClass.startsWith('JSS')) level = 'junior';
+      else if (eClass.startsWith('SSS')) level = 'senior';
       fetchSubjects(level);
     }
   }, [eClass, schoolCode]);

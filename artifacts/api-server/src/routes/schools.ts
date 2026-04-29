@@ -118,7 +118,7 @@ router.post("/", async (req: Request, res: Response) => {
 // Start new session (promote students)
 router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
-  const classOrder = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const classOrder = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   try {
     // Get all students in this school
@@ -823,7 +823,7 @@ router.post("/:schoolCode/update-academic-session", async (req: Request, res: Re
 router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
-  const classOrder = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const classOrder = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   try {
     // Get current session to advance it
