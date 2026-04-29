@@ -85,7 +85,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     setUploadingPicture(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `profile-pictures/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from('profile-pictures')
@@ -97,7 +97,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         .from('profile-pictures')
         .getPublicUrl(fileName);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/profile-picture`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/teachers/profile-picture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profilePictureUrl: publicUrl }),
@@ -107,7 +107,6 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
       if (response.ok) {
         const updatedUser = await response.json();
         setProfilePicture(updatedUser.profilePicture);
-        // Update the user in auth context
         if (user) {
           setUser({ ...user, profilePicture: updatedUser.profilePicture });
         }
