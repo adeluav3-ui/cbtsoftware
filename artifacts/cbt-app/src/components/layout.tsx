@@ -2,8 +2,9 @@ import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation, Link } from "wouter";
 import { useLogout } from "@workspace/api-client-react";
-import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Upload, Camera } from "lucide-react";
 import { cn } from "./ui-elements";
+import { supabase } from "@/lib/supabase";
 
 function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -33,6 +34,8 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
   const [, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
 
   const { mutate: logout } = useLogout({
     mutation: {
@@ -43,6 +46,13 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
       }
     }
   });
+
+  // Update profile picture when user changes
+  useEffect(() => {
+    if (user?.profilePicture) {
+      setProfilePicture(user.profilePicture);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -67,6 +77,49 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [mobileMenuOpen]);
+
+  const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPicture(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `profile-pictures/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('profile-pictures')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-pictures')
+        .getPublicUrl(fileName);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/profile-picture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profilePictureUrl: publicUrl }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        setProfilePicture(updatedUser.profilePicture);
+        // Update the user in auth context
+        if (user) {
+          setUser({ ...user, profilePicture: updatedUser.profilePicture });
+        }
+        await refetch();
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Failed to upload profile picture. Please try again.");
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
 
   if (isLoading || !user) {
     return (
@@ -132,17 +185,64 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         </nav>
       </div>
 
-      {/* Bottom user section */}
+      {/* Bottom user section with profile picture */}
       <div className={cn("p-3 border-t border-border/50 bg-muted/20", collapsed && "px-2")}>
         {!collapsed && (
           <div className="flex items-center mb-3">
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-secondary/20 flex items-center justify-center mr-2 md:mr-3 shrink-0">
-              <UserCircle className="w-4 h-4 md:w-5 md:h-5 text-secondary" />
+            {/* Profile Picture */}
+            <div className="relative group shrink-0 mr-2 md:mr-3">
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt={user.fullName || user.username}
+                  className="w-8 h-8 md:w-9 md:h-9 rounded-full object-cover border-2 border-primary/20"
+                />
+              ) : (
+                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-secondary/20 flex items-center justify-center">
+                  <UserCircle className="w-4 h-4 md:w-5 md:h-5 text-secondary" />
+                </div>
+              )}
+              {/* Upload button overlay on hover */}
+              <label className="absolute -bottom-1 -right-1 cursor-pointer bg-primary rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="w-3 h-3 text-white" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePictureUpload}
+                  disabled={uploadingPicture}
+                  className="hidden"
+                />
+              </label>
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="font-bold text-xs md:text-sm truncate">{user.fullName || user.username}</p>
               <p className="text-[10px] md:text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</p>
             </div>
+          </div>
+        )}
+        {collapsed && (
+          <div className="relative group flex justify-center mb-3">
+            {profilePicture ? (
+              <img
+                src={profilePicture}
+                alt={user.fullName || user.username}
+                className="w-8 h-8 rounded-full object-cover border-2 border-primary/20"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
+                <UserCircle className="w-4 h-4 text-secondary" />
+              </div>
+            )}
+            <label className="absolute -bottom-1 -right-1 cursor-pointer bg-primary rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+              <Camera className="w-2.5 h-2.5 text-white" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureUpload}
+                disabled={uploadingPicture}
+                className="hidden"
+              />
+            </label>
           </div>
         )}
         <button
@@ -209,7 +309,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative z-10 transition-all duration-300">
-        <div className="absolute top-0 left-0 right-0 h-32 md:h-48 bg-linear-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
+        <div className="absolute top-0 left-0 right-0 h-32 md:h-48 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none -z-10" />
         <div className="p-3 pt-14 md:p-6 md:pt-6 lg:p-8 max-w-7xl mx-auto">
           {children}
         </div>

@@ -25,6 +25,7 @@ export interface User {
     schoolName: string | null;
     fullName: string | null;
     class: string | null;
+    profilePicture?: string | null;
 }
 
 export interface School {

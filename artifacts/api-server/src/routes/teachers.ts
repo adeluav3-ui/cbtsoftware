@@ -248,4 +248,42 @@ router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Respon
   }
 });
 
+// Update teacher profile picture
+router.post("/profile-picture", async (req: Request, res: Response) => {
+  const session = (req as any).session;
+  const userId = session?.userId;
+  const { profilePictureUrl } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  if (!profilePictureUrl) {
+    return res.status(400).json({ error: "Profile picture URL required" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ profilePicture: profilePictureUrl })
+      .where(eq(usersTable.id, userId))
+      .returning({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        profilePicture: usersTable.profilePicture,
+      });
+
+    if (!updated) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;
