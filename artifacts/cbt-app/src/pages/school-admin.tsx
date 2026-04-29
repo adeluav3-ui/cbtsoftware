@@ -23,7 +23,7 @@ export default function SchoolAdminDashboard() {
   const CLASSES = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
-  const { data: students = [] } = useListStudents(schoolCode, classFilter);
+  const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
   const { data: results = [] } = useListResults(schoolCode);
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -540,39 +540,25 @@ export default function SchoolAdminDashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-display font-bold">School Administration</h1>
-          <p className="text-muted-foreground mt-1">Manage personnel, students, and academic records.</p>
+          <h1 className="text-2xl md:text-3xl font-display font-bold">School Administration</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage personnel, students, and academic records.</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
+        <div className="flex flex-wrap gap-2 justify-end">
           <Button variant="outline" size="sm" onClick={() => setTermModalOpen(true)}>
-            <RotateCw className="w-3 h-3 mr-1" />
-            Term: {currentTerm}
+            <RotateCw className="w-3 h-3 mr-1" /> {currentTerm}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => {
-            setNewAcademicSession(academicSession);
-            setAcademicSessionModalOpen(true);
-          }}>
-            <RotateCw className="w-3 h-3 mr-1" />
-            Session: {academicSession}
+          <Button variant="outline" size="sm" onClick={() => { setNewAcademicSession(academicSession); setAcademicSessionModalOpen(true); }}>
+            <RotateCw className="w-3 h-3 mr-1" /> {academicSession}
           </Button>
-          <Button variant="outline" size="sm" onClick={openGradingModal}>
-            <RotateCw className="w-3 h-3 mr-1" />
-            Grading
-          </Button>
-          <Button variant="outline" size="sm" onClick={openPasscodeModal}>
-            <RotateCw className="w-3 h-3 mr-1" />
-            Passcode
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setSessionModalOpen(true)}>
-            <RotateCw className="w-3 h-3 mr-1" />
-            New Session
-          </Button>
+          <Button variant="outline" size="sm" onClick={openGradingModal}>Grading</Button>
+          <Button variant="outline" size="sm" onClick={openPasscodeModal}>Passcode</Button>
+          <Button variant="outline" size="sm" onClick={() => setSessionModalOpen(true)}>New Session</Button>
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 overflow-x-auto pb-2">
         <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
@@ -628,61 +614,87 @@ export default function SchoolAdminDashboard() {
       {/* Students Tab */}
       {activeTab === "Students" && (
         <Card className="p-0 overflow-hidden">
-          <div className="p-6 border-b border-border/50 flex flex-col sm:flex-row justify-between items-center bg-muted/20 gap-4">
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-semibold text-muted-foreground mr-2">Filter Class:</span>
-                <CustomTabs tabs={CLASSES} activeTab={classFilter} onChange={setClassFilter} />
+          <div className="p-4 border-b border-border/50 bg-muted/20">
+            {/* Class Filter - Horizontal scroll on mobile */}
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-muted-foreground mb-2">Filter by Class:</p>
+              <div className="overflow-x-auto pb-2 -mx-1 px-1">
+                <div className="flex gap-1.5 min-w-max">
+                  {CLASSES.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setClassFilter(c)}
+                      className={`px-3 py-1.5 text-xs rounded-full whitespace-nowrap transition-colors ${classFilter === c
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Click a student row to view their full exam history</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {students.length === 0 ? 'No students' : `${students.length} student${students.length !== 1 ? 's' : ''} in ${classFilter}`}
+              </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setBulkStudentModalOpen(true)}>
+
+            {/* Action Buttons - Stack on mobile, side by side on tablet+ */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkStudentModalOpen(true)} className="w-full sm:w-auto">
                 <Upload className="w-4 h-4 mr-1" /> Bulk Upload
               </Button>
-              <Button size="sm" onClick={() => setStudentModalOpen(true)}>
+              <Button size="sm" onClick={() => setStudentModalOpen(true)} className="w-full sm:w-auto">
                 <UserPlus className="w-4 h-4 mr-2" /> Add Student
               </Button>
             </div>
           </div>
 
-          {/* Table starts here - outside the header div */}
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                <th className="px-6 py-4 font-semibold">Name</th>
-                <th className="px-6 py-4 font-semibold">Username</th>
-                <th className="px-6 py-4 font-semibold">Class</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map(s => (
-                <tr
-                  key={s.id}
-                  className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                  onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
-                >
-                  <td className="px-6 py-4 font-semibold text-primary">{s.fullName}</td>
-                  <td className="px-6 py-4 text-muted-foreground font-mono">{s.username}</td>
-                  <td className="px-6 py-4"><Badge>{s.class}</Badge></td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </td>
+          {/* Table - Horizontal scroll on mobile */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-125">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border text-sm">
+                  <th className="px-4 py-3 font-semibold">Name</th>
+                  <th className="px-4 py-3 font-semibold hidden sm:table-cell">Username</th>
+                  <th className="px-4 py-3 font-semibold">Class</th>
+                  <th className="px-4 py-3 font-semibold text-right">Actions</th>
                 </tr>
-              ))}
-              {students.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {studentsLoading ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Loading students…</td></tr>
+                ) : students.length === 0 ? (
+                  <tr><td colSpan={4} className="px-4 py-12 text-center text-muted-foreground">No students in {classFilter}.</td></tr>
+                ) : (
+                  students.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                      onClick={() => { setSelectedStudentId(s.id); setSelectedStudentName(s.fullName || s.username); }}
+                    >
+                      <td className="px-4 py-3 font-semibold text-primary text-sm">{s.fullName}</td>
+                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs hidden sm:table-cell">{s.username}</td>
+                      <td className="px-4 py-3"><Badge className="text-xs">{s.class}</Badge></td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={e => { e.stopPropagation(); deleteStudent({ schoolCode, studentId: s.id }); }}
+                            className="p-1.5"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
