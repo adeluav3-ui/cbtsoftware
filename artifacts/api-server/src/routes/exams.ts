@@ -29,19 +29,30 @@ interface Session {
   schoolCode?: string | null;
 }
 
-interface RequestWithSession extends Request {
-  session: Session;
-}
+type RequestWithSession = Request & { session: Session };
 
 const router = Router({ mergeParams: true });
 
+// Helper function to safely convert param to number
+const toNumber = (value: string | string[]): number => {
+  return parseInt(String(value), 10);
+};
+
+// Helper function to safely convert param to string
+const toString = (value: string | string[]): string => {
+  return String(value);
+};
+
 // List exams for a school
-router.get("/", async (req: Request<SchoolParams>, res: Response) => {
+router.get("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
+  const schoolCodeStr = toString(schoolCode);
   const { class: examClass, active } = req.query;
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
 
   try {
-    const conditions: any[] = [eq(examsTable.schoolCode, schoolCode)];
+    const conditions: any[] = [eq(examsTable.schoolCode, schoolCodeStr)];
 
     if (examClass && typeof examClass === "string") {
       conditions.push(eq(examsTable.class, examClass));
@@ -49,6 +60,10 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 
     if (active !== undefined) {
       conditions.push(eq(examsTable.isActive, active === "true"));
+    }
+
+    if (userRole === 'teacher' && userId) {
+      conditions.push(eq(examsTable.teacherId, userId));
     }
 
     const exams = await db
@@ -82,6 +97,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 // Create exam
 router.post("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
+  const schoolCodeStr = toString(schoolCode);
   const session = req.session;
   const { title, subject, class: examClass, durationMinutes, assessmentType, term } = req.body;
 
@@ -104,11 +120,11 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
         subject: String(subject),
         class: className,
         durationMinutes: Number(durationMinutes),
-        schoolCode: String(schoolCode),
+        schoolCode: schoolCodeStr,
         teacherId: Number(teacherId),
         isActive: false,
         assessmentType: assessmentType || "exam",
-        term: term || "First Term", // Add this
+        term: term || "First Term",
       })
       .returning();
 
@@ -121,24 +137,22 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
   }
 });
 
+// Create a new group for an exam
 router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { groupImageUrl } = req.body;
 
   try {
-    // Get the next group ID
     const [maxGroup] = await db
       .select({ maxId: sql<number>`COALESCE(MAX(group_id), 0)` })
       .from(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)));
+      .where(eq(questionsTable.examId, examIdNum));
 
     const newGroupId = (maxGroup?.maxId || 0) + 1;
 
-    // Create a placeholder question to represent the group?
-    // Actually, groups don't need a separate record - just return the new group ID
-    // The group will be created when questions are added with this groupId
-
-    console.log(`Created new group ${newGroupId} for exam ${examId}`);
+    console.log(`Created new group ${newGroupId} for exam ${examIdNum}`);
 
     res.json({
       success: true,
@@ -154,45 +168,11 @@ router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) =
   }
 });
 
-// Add question to a specific group
-router.post("/:examId/questions/group", async (req: Request<ExamParams>, res: Response) => {
-  const { schoolCode, examId } = req.params;
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
-
-  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
-    return res.status(400).json({ error: "All question fields are required" });
-  }
-
-  try {
-    const [question] = await db
-      .insert(questionsTable)
-      .values({
-        examId: parseInt(examId),
-        text,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
-        correctOption,
-        schoolCode,
-        imageUrl: imageUrl || null,
-        groupId: groupId || null,
-        groupOrder: groupOrder || 0,
-      })
-      .returning();
-
-    res.status(201).json(question);
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
 // Get exam with questions (grouped)
 router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
 
   try {
     const [exam] = await db
@@ -200,8 +180,8 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
       .from(examsTable)
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .limit(1);
@@ -213,21 +193,18 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
     const questions = await db
       .select()
       .from(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)))
+      .where(eq(questionsTable.examId, examIdNum))
       .orderBy(questionsTable.groupId, questionsTable.groupOrder, questionsTable.id);
 
-    // Group questions by groupId
     const groupedResult: any[] = [];
     let currentGroup: any = null;
     let currentGroupId: number | null = null;
 
     for (const q of questions) {
       if (q.groupId !== null && q.groupId !== currentGroupId) {
-        // New group found - push previous group if exists
         if (currentGroup) {
           groupedResult.push(currentGroup);
         }
-        // Start new group
         currentGroup = {
           isGroup: true,
           groupId: q.groupId,
@@ -237,16 +214,13 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
         };
         currentGroupId = q.groupId;
       } else if (q.groupId !== null && q.groupId === currentGroupId) {
-        // Add to existing group
         currentGroup.questions.push(q);
       } else {
-        // No group - push previous group if exists, then add individual question
         if (currentGroup) {
           groupedResult.push(currentGroup);
           currentGroup = null;
           currentGroupId = null;
         }
-        // Add as individual question
         groupedResult.push({
           isGroup: false,
           question: q,
@@ -254,7 +228,6 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
       }
     }
 
-    // Push the last group if exists
     if (currentGroup) {
       groupedResult.push(currentGroup);
     }
@@ -269,23 +242,48 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
 });
 
 // Delete exam
-router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
+router.delete("/:examId", async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
-  const examIdNum = parseInt(examId);
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
 
   try {
-    // 1. First, get all results for this exam
+    const [existingExam] = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
+        )
+      )
+      .limit(1);
+
+    if (!existingExam) {
+      return res.status(404).json({ error: "Exam not found" });
+    }
+
+    if (userRole === 'teacher') {
+      if (!userId) {
+        return res.status(401).json({ error: "User ID not found in session" });
+      }
+      if (existingExam.teacherId !== userId) {
+        return res.status(403).json({ error: "You don't have permission to delete this exam" });
+      }
+    }
+
     const examResults = await db
       .select({ id: resultsTable.id, studentId: resultsTable.studentId })
       .from(resultsTable)
       .where(
         and(
           eq(resultsTable.examId, examIdNum),
-          eq(resultsTable.schoolCode, schoolCode)
+          eq(resultsTable.schoolCode, schoolCodeStr)
         )
       );
 
-    // 2. Delete result_answers for all results
     if (examResults.length > 0) {
       for (const result of examResults) {
         await db
@@ -294,33 +292,28 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
       }
     }
 
-    // 3. Delete results
     await db
       .delete(resultsTable)
       .where(
         and(
           eq(resultsTable.examId, examIdNum),
-          eq(resultsTable.schoolCode, schoolCode)
+          eq(resultsTable.schoolCode, schoolCodeStr)
         )
       );
 
-    // 4. Get the exam to know the subject
     const [exam] = await db
       .select()
       .from(examsTable)
       .where(
         and(
           eq(examsTable.id, examIdNum),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .limit(1);
 
-    // 5. Delete subject scores for this specific exam
-    // We need to subtract the scores from subject_scores table
     if (exam && examResults.length > 0) {
       for (const result of examResults) {
-        // Get the current subject score for this student
         const [subjectScore] = await db
           .select()
           .from(subjectScoresTable)
@@ -328,40 +321,33 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
             and(
               eq(subjectScoresTable.studentId, result.studentId),
               eq(subjectScoresTable.subjectName, exam.subject),
-              eq(subjectScoresTable.schoolCode, schoolCode)
+              eq(subjectScoresTable.schoolCode, schoolCodeStr)
             )
           )
           .limit(1);
 
         if (subjectScore) {
-          // Determine which component to update based on exam type
           const updateData: any = { updatedAt: new Date() };
 
           if (exam.assessmentType === 'mid_term') {
-            // Reset mid-term score
             updateData.midTermScore = null;
           } else if (exam.assessmentType === 'exam') {
-            // Reset exam score
             updateData.examScore = null;
           } else if (exam.assessmentType === 'class_activity') {
-            // Reset class activity score
             updateData.classActivityScore = null;
           }
 
-          // Also reset total and percentage if any component becomes null
           const hasMidTerm = updateData.midTermScore !== undefined ? false : (subjectScore.midTermScore !== null);
           const hasExam = updateData.examScore !== undefined ? false : (subjectScore.examScore !== null);
           const hasActivity = updateData.classActivityScore !== undefined ? false : (subjectScore.classActivityScore !== null);
 
           const allComponentsExist = hasMidTerm && hasActivity && hasExam;
 
-          // In the delete endpoint, replace the grade calculation section
           if (!allComponentsExist) {
             updateData.totalScore = null;
             updateData.percentage = null;
             updateData.grade = null;
           } else {
-            // Recalculate total if all components exist
             const midTerm = subjectScore.midTermScore || 0;
             const activity = subjectScore.classActivityScore || 0;
             const examScore = subjectScore.examScore || 0;
@@ -369,11 +355,10 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
             updateData.totalScore = total;
             updateData.percentage = total;
 
-            // Get grading scheme for dynamic grade calculation
             const [gradingScheme] = await db
               .select()
               .from(gradingSchemesTable)
-              .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+              .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
               .limit(1);
 
             const defaultScheme = { gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 };
@@ -397,18 +382,16 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
       }
     }
 
-    // 6. Delete questions
     await db
       .delete(questionsTable)
       .where(eq(questionsTable.examId, examIdNum));
 
-    // 7. Finally, delete the exam
     const [deleted] = await db
       .delete(examsTable)
       .where(
         and(
           eq(examsTable.id, examIdNum),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .returning();
@@ -427,30 +410,54 @@ router.delete("/:examId", async (req: Request<ExamParams>, res: Response) => {
 });
 
 // Toggle exam active/inactive
-router.post("/:examId/toggle", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/toggle", async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { isActive } = req.body;
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
 
   try {
+    const [existingExam] = await db
+      .select()
+      .from(examsTable)
+      .where(
+        and(
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
+        )
+      )
+      .limit(1);
+
+    if (!existingExam) {
+      return res.status(404).json({ error: "Exam not found" });
+    }
+
+    if (userRole === 'teacher') {
+      if (!userId) {
+        return res.status(401).json({ error: "User ID not found in session" });
+      }
+      if (existingExam.teacherId !== userId) {
+        return res.status(403).json({ error: "You don't have permission to modify this exam" });
+      }
+    }
+
     const [exam] = await db
       .update(examsTable)
       .set({ isActive })
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .returning();
 
-    if (!exam) {
-      return res.status(404).json({ error: "Exam not found" });
-    }
-
     const questionCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)));
+      .where(eq(questionsTable.examId, examIdNum));
 
     res.json({ ...exam, questionCount: questionCount[0]?.count ?? 0 });
     return;
@@ -461,10 +468,11 @@ router.post("/:examId/toggle", async (req: Request<ExamParams>, res: Response) =
   }
 });
 
-// Bulk add questions
 // Bulk add questions (with optional group)
 router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { questions, groupId } = req.body;
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
@@ -484,7 +492,6 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
   }
 
   try {
-    // If groupId is provided, get the starting groupOrder
     let startOrder = 0;
     if (groupId) {
       const existingInGroup = await db
@@ -492,7 +499,7 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
         .from(questionsTable)
         .where(
           and(
-            eq(questionsTable.examId, parseInt(examId)),
+            eq(questionsTable.examId, examIdNum),
             eq(questionsTable.groupId, groupId)
           )
         );
@@ -503,14 +510,14 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
       .insert(questionsTable)
       .values(
         questions.map((q: any, idx: number) => ({
-          examId: parseInt(examId),
+          examId: examIdNum,
           text: String(q.text),
           optionA: String(q.optionA),
           optionB: String(q.optionB),
           optionC: String(q.optionC),
           optionD: String(q.optionD),
           correctOption: String(q.correctOption),
-          schoolCode,
+          schoolCode: schoolCodeStr,
           imageUrl: q.imageUrl || null,
           groupId: groupId || null,
           groupOrder: groupId ? startOrder + idx : 0,
@@ -527,10 +534,11 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
   }
 });
 
-// Add question to exam
 // Add question to exam (with optional group)
 router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
 
   if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
@@ -538,7 +546,6 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
   }
 
   try {
-    // If groupId is provided, get the next groupOrder for that group
     let finalGroupOrder = groupOrder || 0;
     if (groupId) {
       const existingInGroup = await db
@@ -546,7 +553,7 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
         .from(questionsTable)
         .where(
           and(
-            eq(questionsTable.examId, parseInt(examId)),
+            eq(questionsTable.examId, examIdNum),
             eq(questionsTable.groupId, groupId)
           )
         );
@@ -556,14 +563,14 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
     const [question] = await db
       .insert(questionsTable)
       .values({
-        examId: parseInt(examId),
+        examId: examIdNum,
         text,
         optionA,
         optionB,
         optionC,
         optionD,
         correctOption,
-        schoolCode,
+        schoolCode: schoolCodeStr,
         imageUrl: imageUrl || null,
         groupId: groupId || null,
         groupOrder: finalGroupOrder,
@@ -582,14 +589,16 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
 // Delete question
 router.delete("/:examId/questions/:questionId", async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
+  const examIdNum = toNumber(examId);
+  const questionIdNum = toNumber(questionId);
 
   try {
     const [deleted] = await db
       .delete(questionsTable)
       .where(
         and(
-          eq(questionsTable.id, parseInt(questionId)),
-          eq(questionsTable.examId, parseInt(examId))
+          eq(questionsTable.id, questionIdNum),
+          eq(questionsTable.examId, examIdNum)
         )
       )
       .returning();
@@ -608,8 +617,12 @@ router.delete("/:examId/questions/:questionId", async (req: Request<QuestionPara
 });
 
 // Get exam results with full breakdown
-router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) => {
+router.get("/:examId/results", async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
 
   try {
     const [exam] = await db
@@ -617,8 +630,8 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       .from(examsTable)
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .limit(1);
@@ -627,11 +640,19 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       return res.status(404).json({ error: "Exam not found" });
     }
 
-    // Get grading scheme
+    if (userRole === 'teacher') {
+      if (!userId) {
+        return res.status(401).json({ error: "User ID not found in session" });
+      }
+      if (exam.teacherId !== userId) {
+        return res.status(403).json({ error: "You don't have permission to view results for this exam" });
+      }
+    }
+
     const [gradingScheme] = await db
       .select()
       .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
       .limit(1);
 
     const defaultScheme = {
@@ -667,14 +688,13 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       componentTotal = scheme.classActivityTotal;
     }
 
-    // Get all results for this exam
     const resultsList = await db
       .select()
       .from(resultsTable)
       .where(
         and(
-          eq(resultsTable.examId, parseInt(examId)),
-          eq(resultsTable.schoolCode, schoolCode)
+          eq(resultsTable.examId, examIdNum),
+          eq(resultsTable.schoolCode, schoolCodeStr)
         )
       );
 
@@ -696,17 +716,15 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
       return;
     }
 
-    // Get student IDs from results
     const studentIds = resultsList.map(r => r.studentId);
 
-    // Get subject scores for these students
     const subjectScoresList = await db
       .select()
       .from(subjectScoresTable)
       .where(
         and(
           eq(subjectScoresTable.subjectName, exam.subject),
-          eq(subjectScoresTable.schoolCode, schoolCode),
+          eq(subjectScoresTable.schoolCode, schoolCodeStr),
           sql`${subjectScoresTable.studentId} IN (${studentIds.join(',')})`
         )
       );
@@ -769,10 +787,11 @@ router.get("/:examId/results", async (req: Request<ExamParams>, res: Response) =
   }
 });
 
-// Submit exam with grading scheme support
-// Submit exam with grading scheme support
+// Submit exam
 router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { studentId, fullName, answers } = req.body;
 
   if (!studentId || !fullName || !answers) {
@@ -785,8 +804,8 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       .from(examsTable)
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .limit(1);
@@ -798,7 +817,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
     const questions = await db
       .select()
       .from(questionsTable)
-      .where(eq(questionsTable.examId, parseInt(examId)));
+      .where(eq(questionsTable.examId, examIdNum));
 
     let cbtScore = 0;
     for (const q of questions) {
@@ -814,7 +833,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
     const [gradingScheme] = await db
       .select()
       .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
       .limit(1);
 
     const defaultScheme = {
@@ -848,7 +867,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
     const [student] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.id, parseInt(studentId)))
+      .where(eq(usersTable.id, parseInt(String(studentId), 10)))
       .limit(1);
 
     const studentClass = student?.class ?? "Unknown";
@@ -856,14 +875,14 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
     const [result] = await db
       .insert(resultsTable)
       .values({
-        examId: parseInt(examId),
-        studentId: parseInt(studentId),
+        examId: examIdNum,
+        studentId: parseInt(String(studentId), 10),
         fullName,
         class: studentClass,
         score: cbtScore,
         totalQuestions,
         percentage: (cbtScore / totalQuestions) * 100,
-        schoolCode,
+        schoolCode: schoolCodeStr,
       })
       .returning();
 
@@ -881,29 +900,26 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
           correctOption: q.correctOption,
           selectedOption: answers[q.id.toString()] ?? null,
           isCorrect: (answers[q.id.toString()] ?? null) === q.correctOption,
-          schoolCode,
+          schoolCode: schoolCodeStr,
         }))
       );
     }
 
-    // Check if record exists
     const [existingScore] = await db
       .select()
       .from(subjectScoresTable)
       .where(
         and(
-          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
           eq(subjectScoresTable.subjectName, exam.subject)
         )
       )
       .limit(1);
 
     if (existingScore) {
-      // Update existing record - only set the CBT portion, preserve theory that might have been entered
       const updateData: any = { updatedAt: new Date() };
 
       if (exam.assessmentType === 'mid_term') {
-        // Store only the CBT portion, theory will be added separately
         updateData.midTermScore = Math.round(scaledCbtScore);
       } else if (exam.assessmentType === 'exam') {
         updateData.examScore = Math.round(scaledCbtScore);
@@ -916,19 +932,18 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
         .set(updateData)
         .where(
           and(
-            eq(subjectScoresTable.studentId, parseInt(studentId)),
+            eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
             eq(subjectScoresTable.subjectName, exam.subject)
           )
         );
     } else {
-      // Insert new record with only CBT portion
       await db
         .insert(subjectScoresTable)
         .values({
-          studentId: parseInt(studentId),
+          studentId: parseInt(String(studentId), 10),
           subjectName: exam.subject,
           className: studentClass,
-          schoolCode,
+          schoolCode: schoolCodeStr,
           ...(exam.assessmentType === 'mid_term' && { midTermScore: Math.round(scaledCbtScore) }),
           ...(exam.assessmentType === 'exam' && { examScore: Math.round(scaledCbtScore) }),
           ...(exam.assessmentType === 'class_activity' && { classActivityScore: Math.round(scaledCbtScore) }),
@@ -953,9 +968,10 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Teacher enters theory and class activity scores
-// Teacher enters theory and class activity scores
 router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
   const { studentId, theoryScore, classActivityScore } = req.body;
 
   if (!studentId) {
@@ -968,8 +984,8 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       .from(examsTable)
       .where(
         and(
-          eq(examsTable.id, parseInt(examId)),
-          eq(examsTable.schoolCode, schoolCode)
+          eq(examsTable.id, examIdNum),
+          eq(examsTable.schoolCode, schoolCodeStr)
         )
       )
       .limit(1);
@@ -981,7 +997,7 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
     const [gradingScheme] = await db
       .select()
       .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
       .limit(1);
 
     const defaultScheme = {
@@ -1015,7 +1031,7 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       .from(subjectScoresTable)
       .where(
         and(
-          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
           eq(subjectScoresTable.subjectName, exam.subject)
         )
       )
@@ -1025,13 +1041,11 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       return res.status(404).json({ error: "Student score record not found" });
     }
 
-    // Check if the score is already locked (already entered)
     if (exam.assessmentType === 'class_activity' && existing.classActivityScore !== null && existing.classActivityScore !== 0) {
       return res.status(403).json({ error: "Class activity score already entered and cannot be changed. Contact admin if correction needed." });
     }
 
     if (exam.assessmentType === 'mid_term' && existing.midTermScore !== null && existing.midTermScore !== 0) {
-      // Check if the current score includes theory already (if midTermScore > cbtPortion)
       const cbtPortion = existing.midTermScore || 0;
       if (cbtPortion > 0) {
         return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
@@ -1081,7 +1095,7 @@ router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) =
       .set(updateData)
       .where(
         and(
-          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
           eq(subjectScoresTable.subjectName, exam.subject)
         )
       )
