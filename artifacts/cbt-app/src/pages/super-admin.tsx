@@ -334,8 +334,8 @@ export default function SuperAdminDashboard() {
         </form>
       </Modal>
 
-      {/* School Detail Modal */}
-      <Modal isOpen={!!detailSchool} onClose={() => setDetailSchool(null)} title={`${detailSchool?.name || detailSchool?.code || "School"} Details`}>
+      {/* School Detail Modal — hidden when delete confirmation is open to avoid z-index overlap */}
+      <Modal isOpen={!!detailSchool && !isDeleteOpen} onClose={() => setDetailSchool(null)} title={`${detailSchool?.name || detailSchool?.code || "School"} Details`}>
         {detailSchool && (
           <div className="space-y-6">
             {/* Identity */}
