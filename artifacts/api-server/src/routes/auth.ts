@@ -76,6 +76,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
 
     req.session.userId = user.id;
     req.session.role = user.role;
+
     req.session.schoolCode = user.schoolCode;
 
     res.json({

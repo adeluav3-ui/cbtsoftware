@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
-import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
+import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 
 interface SchoolParams {
   schoolCode: string;
@@ -11,7 +12,7 @@ interface SchoolParams {
 const router = Router();
 
 // Create a new school with admin account
-router.post("/create", async (req: Request, res: Response) => {
+router.post("/create", requireSuperAdmin, async (req: Request, res: Response) => {
   const { code, name, adminUsername, adminPassword } = req.body;
 
   if (!code || !name || !adminUsername || !adminPassword) {
@@ -67,7 +68,7 @@ router.post("/create", async (req: Request, res: Response) => {
 });
 
 // List all schools
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", requireSuperAdmin, async (_req: Request, res: Response) => {
   try {
     const schools = await db.select().from(schoolsTable).orderBy(schoolsTable.id);
     res.json(schools);
@@ -80,7 +81,7 @@ router.get("/", async (_req: Request, res: Response) => {
 });
 
 // Update school name
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireSuperAdmin, async (req: Request, res: Response) => {
   const { code, name } = req.body;
 
   if (!code || !name) {
@@ -108,7 +109,7 @@ router.post("/", async (req: Request, res: Response) => {
 });
 
 // Get school's retake passcode (for school admin)
-router.get("/:schoolCode/retake-passcode", async (req: Request, res: Response) => {
+router.get("/:schoolCode/retake-passcode", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
 
@@ -133,7 +134,7 @@ router.get("/:schoolCode/retake-passcode", async (req: Request, res: Response) =
 });
 
 // Update school's retake passcode (for school admin)
-router.post("/:schoolCode/retake-passcode", async (req: Request, res: Response) => {
+router.post("/:schoolCode/retake-passcode", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { passcode } = req.body;
@@ -163,7 +164,7 @@ router.post("/:schoolCode/retake-passcode", async (req: Request, res: Response) 
 });
 
 // Submit exam retake with passcode verification
-router.post("/:schoolCode/exams/:examId/retake", async (req: Request, res: Response) => {
+router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const examIdNum = Number(examId);
@@ -300,8 +301,8 @@ router.post("/admin/login", async (req: Request, res: Response) => {
 });
 
 // Get all subject scores for a school
-router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) => {
-  const { schoolCode } = req.params;
+router.get("/subject-scores", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const schoolCode = String(req.params.schoolCode || "");
 
   try {
     const scores = await db
@@ -319,7 +320,7 @@ router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) 
 });
 
 // Get all subjects for a school
-router.get("/:schoolCode/subjects", async (req: Request, res: Response) => {
+router.get("/:schoolCode/subjects", requireSchoolStaff, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { level } = req.query;
@@ -347,7 +348,7 @@ router.get("/:schoolCode/subjects", async (req: Request, res: Response) => {
 });
 
 // Add a subject
-router.post("/:schoolCode/subjects", async (req: Request, res: Response) => {
+router.post("/:schoolCode/subjects", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { name, level } = req.body;
@@ -376,7 +377,7 @@ router.post("/:schoolCode/subjects", async (req: Request, res: Response) => {
 });
 
 // Delete a subject
-router.delete("/:schoolCode/subjects/:subjectId", async (req: Request, res: Response) => {
+router.delete("/:schoolCode/subjects/:subjectId", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode, subjectId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const subjectIdNum = Number(String(subjectId)); // Convert to number safely
@@ -406,7 +407,7 @@ router.delete("/:schoolCode/subjects/:subjectId", async (req: Request, res: Resp
 });
 
 // Get grading scheme for a school
-router.get("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
+router.get("/:schoolCode/grading-scheme", requireSchoolStaff, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
 
@@ -446,7 +447,7 @@ router.get("/:schoolCode/grading-scheme", async (req: Request, res: Response) =>
 });
 
 // Update grading scheme for a school
-router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
+router.post("/:schoolCode/grading-scheme", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const {
@@ -517,7 +518,7 @@ router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) =
 });
 
 // Update school logo
-router.post("/:schoolCode/logo", async (req: Request, res: Response) => {
+router.post("/:schoolCode/logo", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { logoUrl } = req.body;
@@ -547,8 +548,7 @@ router.post("/:schoolCode/logo", async (req: Request, res: Response) => {
 });
 
 // Update teacher commentary for a student's subject
-// Update teacher commentary endpoint
-router.post("/:schoolCode/students/:studentId/subject-comment", async (req: Request, res: Response) => {
+router.post("/:schoolCode/students/:studentId/subject-comment", requireSchoolStaff, async (req: Request, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const studentIdNum = Number(String(studentId)); // Convert safely
@@ -623,9 +623,8 @@ router.get("/:schoolCode", async (req: Request, res: Response) => {
   }
 });
 
-// In schools.ts - add endpoint to update term and session
 // Update school term and academic session
-router.post("/:schoolCode/update-term", async (req: Request, res: Response) => {
+router.post("/:schoolCode/update-term", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { term } = req.body;
@@ -655,7 +654,7 @@ router.post("/:schoolCode/update-term", async (req: Request, res: Response) => {
 });
 
 // Update academic session
-router.post("/:schoolCode/update-academic-session", async (req: Request, res: Response) => {
+router.post("/:schoolCode/update-academic-session", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const { academicSession } = req.body;
@@ -685,7 +684,7 @@ router.post("/:schoolCode/update-academic-session", async (req: Request, res: Re
 });
 
 // Start new session: advance academic session and promote all students one class
-router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
+router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
   const classOrder = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
@@ -752,6 +751,121 @@ router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: 
     });
     return;
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get school overview stats (super admin)
+router.get("/:schoolCode/overview", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+
+  try {
+    const [[teacherCount], [studentCount], [examCount], admin] = await Promise.all([
+      db.select({ count: count() }).from(usersTable)
+        .where(and(eq(usersTable.schoolCode, schoolCodeStr), eq(usersTable.role, "teacher"))),
+      db.select({ count: count() }).from(usersTable)
+        .where(and(eq(usersTable.schoolCode, schoolCodeStr), eq(usersTable.role, "student"))),
+      db.select({ count: count() }).from(examsTable)
+        .where(eq(examsTable.schoolCode, schoolCodeStr)),
+      db.select({ username: usersTable.username, fullName: usersTable.fullName })
+        .from(usersTable)
+        .where(and(eq(usersTable.schoolCode, schoolCodeStr), eq(usersTable.role, "school_admin")))
+        .limit(1),
+    ]);
+
+    res.json({
+      teachers: teacherCount?.count ?? 0,
+      students: studentCount?.count ?? 0,
+      exams: examCount?.count ?? 0,
+      admin: admin[0] ?? null,
+    });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Reset school admin password (super admin)
+router.post("/:schoolCode/reset-admin-password", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  const { newPassword } = req.body;
+
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+  }
+
+  try {
+    const hashed = await bcrypt.hash(String(newPassword), 10);
+    const [updated] = await db
+      .update(usersTable)
+      .set({ password: hashed })
+      .where(and(eq(usersTable.schoolCode, schoolCodeStr), eq(usersTable.role, "school_admin")))
+      .returning({ id: usersTable.id, username: usersTable.username });
+
+    if (!updated) {
+      return res.status(404).json({ error: "School admin not found" });
+    }
+
+    res.json({ message: "Admin password reset successfully", username: updated.username });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Delete a school and all its data (super admin)
+router.delete("/:schoolCode", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+
+  try {
+    await db.transaction(async (tx) => {
+      const exams = await tx
+        .select({ id: examsTable.id })
+        .from(examsTable)
+        .where(eq(examsTable.schoolCode, schoolCodeStr));
+
+      if (exams.length > 0) {
+        const examIds = exams.map(e => e.id);
+        const results = await tx
+          .select({ id: resultsTable.id })
+          .from(resultsTable)
+          .where(inArray(resultsTable.examId, examIds));
+
+        if (results.length > 0) {
+          const resultIds = results.map(r => r.id);
+          await tx.delete(resultAnswersTable).where(inArray(resultAnswersTable.resultId, resultIds));
+        }
+        await tx.delete(resultsTable).where(eq(resultsTable.schoolCode, schoolCodeStr));
+        await tx.delete(questionsTable).where(inArray(questionsTable.examId, examIds));
+        await tx.delete(examsTable).where(eq(examsTable.schoolCode, schoolCodeStr));
+      }
+
+      await tx.delete(subjectScoresTable).where(eq(subjectScoresTable.schoolCode, schoolCodeStr));
+      await tx.delete(subjectsTable).where(eq(subjectsTable.schoolCode, schoolCodeStr));
+      await tx.delete(gradingSchemesTable).where(eq(gradingSchemesTable.schoolCode, schoolCodeStr));
+      await tx.delete(usersTable).where(eq(usersTable.schoolCode, schoolCodeStr));
+
+      const [deleted] = await tx
+        .delete(schoolsTable)
+        .where(eq(schoolsTable.code, schoolCodeStr))
+        .returning();
+
+      if (!deleted) throw new Error("School not found");
+    });
+
+    res.json({ message: "School deleted successfully" });
+    return;
+  } catch (err) {
+    if (err instanceof Error && err.message === "School not found") {
+      res.status(404).json({ error: "School not found" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Server error" });
     return;

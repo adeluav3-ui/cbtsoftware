@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import { requireAuth, requireSchoolAdmin } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import { usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
@@ -15,7 +16,7 @@ interface TeacherParams extends SchoolParams {
 const router = Router({ mergeParams: true });
 
 // List teachers for a school
-router.get("/", async (req: Request<SchoolParams>, res: Response) => {
+router.get("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {
@@ -46,7 +47,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Create a teacher
-router.post("/", async (req: Request<SchoolParams>, res: Response) => {
+router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { username, password, fullName } = req.body;
 
@@ -100,7 +101,7 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Delete a teacher
-router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) => {
+router.delete("/:teacherId", requireSchoolAdmin, async (req: Request<TeacherParams>, res: Response) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
@@ -152,7 +153,7 @@ router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) 
 });
 
 // Get a teacher's full profile: exams + their questions + results
-router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Response) => {
+router.get("/:teacherId/detail", requireSchoolAdmin, async (req: Request<TeacherParams>, res: Response) => {
   const { schoolCode, teacherId } = req.params;
 
   try {
@@ -229,7 +230,7 @@ router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Respon
 });
 
 // Update teacher profile picture
-router.post("/profile-picture", async (req: Request, res: Response) => {
+router.post("/profile-picture", requireAuth, async (req: Request, res: Response) => {
   // Get user from session (custom auth)
   const session = (req as any).session;
   const userId = session?.userId;

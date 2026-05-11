@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import { requireAuth, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -22,7 +23,7 @@ interface StudentParams extends SchoolParams {
 const router = Router({ mergeParams: true });
 
 // List students for a school, optionally filtered by class
-router.get("/", async (req: Request<SchoolParams>, res: Response) => {
+router.get("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { class: studentClass, page, limit } = req.query;
   const pageNum = page ? parseInt(page as string) : null;
@@ -66,7 +67,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Create a student
-router.post("/", async (req: Request<SchoolParams>, res: Response) => {
+router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { username, password, fullName, class: studentClass } = req.body;
 
@@ -128,7 +129,7 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Delete a student
-router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) => {
+router.delete("/:studentId", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
@@ -170,7 +171,7 @@ router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) 
 });
 
 // Get a student's full profile (include password for admin view)
-router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Response) => {
+router.get("/:studentId/detail", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
@@ -257,7 +258,7 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
 });
 
 // Reset student password
-router.post("/:studentId/reset-password", async (req: Request<StudentParams>, res: Response) => {
+router.post("/:studentId/reset-password", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const { newPassword } = req.body;
 
@@ -298,7 +299,7 @@ router.post("/:studentId/reset-password", async (req: Request<StudentParams>, re
 });
 
 // Get subject scores for a student
-router.get("/:studentId/subject-scores", async (req: Request<StudentParams>, res: Response) => {
+router.get("/:studentId/subject-scores", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
@@ -465,7 +466,7 @@ router.get("/:studentId/subject-scores", async (req: Request<StudentParams>, res
 });
 
 // Save or update subject score for a student
-router.post("/:studentId/subject-scores", async (req: Request<StudentParams>, res: Response) => {
+router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const { subjectName, component, score } = req.body;
 
@@ -540,7 +541,7 @@ router.post("/:studentId/subject-scores", async (req: Request<StudentParams>, re
 });
 
 // Get all subject scores for a school
-router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) => {
+router.get("/subject-scores", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {
@@ -559,7 +560,7 @@ router.get("/subject-scores", async (req: Request<SchoolParams>, res: Response) 
 });
 
 // Update student profile picture
-router.post("/:studentId/profile-picture", async (req: Request<StudentParams>, res: Response) => {
+router.post("/:studentId/profile-picture", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const { profilePictureUrl } = req.body;
 

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { requireAuth, requireSchoolStaff } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import {
   examsTable,
@@ -44,7 +45,7 @@ const toString = (value: string | string[]): string => {
 };
 
 // List exams for a school
-router.get("/", async (req: RequestWithSession, res: Response) => {
+router.get("/", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const { class: examClass, active, page, limit } = req.query;
@@ -101,7 +102,7 @@ router.get("/", async (req: RequestWithSession, res: Response) => {
 });
 
 // Create exam
-router.post("/", async (req: RequestWithSession, res: Response) => {
+router.post("/", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const session = req.session;
@@ -144,7 +145,7 @@ router.post("/", async (req: RequestWithSession, res: Response) => {
 });
 
 // Create a new group for an exam
-router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -175,7 +176,7 @@ router.post("/:examId/groups", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Get exam with questions (grouped)
-router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
+router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -248,7 +249,7 @@ router.get("/:examId", async (req: Request<ExamParams>, res: Response) => {
 });
 
 // Delete exam
-router.delete("/:examId", async (req: RequestWithSession, res: Response) => {
+router.delete("/:examId", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -346,7 +347,7 @@ router.delete("/:examId", async (req: RequestWithSession, res: Response) => {
 });
 
 // Toggle exam active/inactive
-router.post("/:examId/toggle", async (req: RequestWithSession, res: Response) => {
+router.post("/:examId/toggle", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -405,7 +406,7 @@ router.post("/:examId/toggle", async (req: RequestWithSession, res: Response) =>
 });
 
 // Bulk add questions (with optional group)
-router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -471,7 +472,7 @@ router.post("/:examId/questions/bulk", async (req: Request<ExamParams>, res: Res
 });
 
 // Add question to exam (with optional group)
-router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -523,7 +524,7 @@ router.post("/:examId/questions", async (req: Request<ExamParams>, res: Response
 });
 
 // Delete question
-router.delete("/:examId/questions/:questionId", async (req: Request<QuestionParams>, res: Response) => {
+router.delete("/:examId/questions/:questionId", requireSchoolStaff, async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
   const examIdNum = toNumber(examId);
   const questionIdNum = toNumber(questionId);
@@ -553,7 +554,7 @@ router.delete("/:examId/questions/:questionId", async (req: Request<QuestionPara
 });
 
 // Get exam results with full breakdown
-router.get("/:examId/results", async (req: RequestWithSession, res: Response) => {
+router.get("/:examId/results", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -726,7 +727,7 @@ router.get("/:examId/results", async (req: RequestWithSession, res: Response) =>
 });
 
 // Submit exam
-router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -888,7 +889,7 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
 });
 
 // Teacher enters theory and class activity scores
-router.post("/:examId/scores", async (req: Request<ExamParams>, res: Response) => {
+router.post("/:examId/scores", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
