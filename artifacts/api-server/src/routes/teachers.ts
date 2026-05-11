@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -103,64 +103,37 @@ router.delete("/:teacherId", async (req: Request<TeacherParams>, res: Response) 
   try {
     const id = parseInt(teacherId);
 
-    // 1. Get all exams by this teacher
-    const teacherExams = await db
-      .select({ id: examsTable.id })
-      .from(examsTable)
-      .where(
-        and(
-          eq(examsTable.teacherId, id),
-          eq(examsTable.schoolCode, schoolCode)
-        )
-      );
+    const deleted = await db.transaction(async (tx) => {
+      const teacherExams = await tx
+        .select({ id: examsTable.id })
+        .from(examsTable)
+        .where(and(eq(examsTable.teacherId, id), eq(examsTable.schoolCode, schoolCode)));
 
-    if (teacherExams.length > 0) {
-      const examIds = teacherExams.map(e => e.id);
+      if (teacherExams.length > 0) {
+        const examIds = teacherExams.map(e => e.id);
 
-      for (const examId of examIds) {
-        // 2. Get all results for this exam
-        const examResults = await db
+        const examResults = await tx
           .select({ id: resultsTable.id })
           .from(resultsTable)
-          .where(eq(resultsTable.examId, examId));
+          .where(inArray(resultsTable.examId, examIds));
 
-        // 3. Delete result answers
-        for (const result of examResults) {
-          await db
-            .delete(resultAnswersTable)
-            .where(eq(resultAnswersTable.resultId, result.id));
+        if (examResults.length > 0) {
+          const resultIds = examResults.map(r => r.id);
+          await tx.delete(resultAnswersTable).where(inArray(resultAnswersTable.resultId, resultIds));
         }
 
-        // 4. Delete results
-        await db
-          .delete(resultsTable)
-          .where(eq(resultsTable.examId, examId));
-
-        // 5. Delete questions
-        await db
-          .delete(questionsTable)
-          .where(eq(questionsTable.examId, examId));
+        await tx.delete(resultsTable).where(inArray(resultsTable.examId, examIds));
+        await tx.delete(questionsTable).where(inArray(questionsTable.examId, examIds));
+        await tx.delete(examsTable).where(inArray(examsTable.id, examIds));
       }
 
-      // 6. Delete exams
-      for (const examId of examIds) {
-        await db
-          .delete(examsTable)
-          .where(eq(examsTable.id, examId));
-      }
-    }
+      const [deletedTeacher] = await tx
+        .delete(usersTable)
+        .where(and(eq(usersTable.id, id), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "teacher")))
+        .returning();
 
-    // 7. Finally delete the teacher
-    const [deleted] = await db
-      .delete(usersTable)
-      .where(
-        and(
-          eq(usersTable.id, id),
-          eq(usersTable.schoolCode, schoolCode),
-          eq(usersTable.role, "teacher")
-        )
-      )
-      .returning();
+      return deletedTeacher;
+    });
 
     if (!deleted) {
       return res.status(404).json({ error: "Teacher not found" });
@@ -206,38 +179,42 @@ router.get("/:teacherId/detail", async (req: Request<TeacherParams>, res: Respon
     const exams = await db
       .select()
       .from(examsTable)
-      .where(
-        and(
-          eq(examsTable.schoolCode, schoolCode),
-          eq(examsTable.teacherId, parseInt(teacherId))
-        )
-      )
+      .where(and(eq(examsTable.schoolCode, schoolCode), eq(examsTable.teacherId, parseInt(teacherId))))
       .orderBy(examsTable.createdAt);
 
-    // For each exam, get questions and results
-    type Exam = typeof examsTable.$inferSelect;
-    const examsWithDetails = await Promise.all(
-      exams.map(async (exam: Exam) => {
-        const questions = await db
-          .select()
-          .from(questionsTable)
-          .where(eq(questionsTable.examId, exam.id))
-          .orderBy(questionsTable.id);
+    if (exams.length === 0) {
+      res.json({ ...teacher, exams: [] });
+      return;
+    }
 
-        const results = await db
-          .select()
-          .from(resultsTable)
-          .where(
-            and(
-              eq(resultsTable.examId, exam.id),
-              eq(resultsTable.schoolCode, schoolCode)
-            )
-          )
-          .orderBy(resultsTable.submittedAt);
+    const examIds = exams.map(e => e.id);
 
-        return { ...exam, questions, results };
-      })
-    );
+    // Batch fetch all questions and results in 2 queries instead of 2N
+    const [allQuestions, allResults] = await Promise.all([
+      db.select().from(questionsTable).where(inArray(questionsTable.examId, examIds)).orderBy(questionsTable.id),
+      db.select().from(resultsTable)
+        .where(and(inArray(resultsTable.examId, examIds), eq(resultsTable.schoolCode, schoolCode)))
+        .orderBy(resultsTable.submittedAt),
+    ]);
+
+    const questionsByExam = new Map<number, typeof allQuestions>();
+    for (const q of allQuestions) {
+      if (!questionsByExam.has(q.examId)) questionsByExam.set(q.examId, []);
+      questionsByExam.get(q.examId)!.push(q);
+    }
+
+    const resultsByExam = new Map<number, typeof allResults>();
+    for (const r of allResults) {
+      if (r.examId === null) continue;
+      if (!resultsByExam.has(r.examId)) resultsByExam.set(r.examId, []);
+      resultsByExam.get(r.examId)!.push(r);
+    }
+
+    const examsWithDetails = exams.map(exam => ({
+      ...exam,
+      questions: questionsByExam.get(exam.id) ?? [],
+      results: resultsByExam.get(exam.id) ?? [],
+    }));
 
     res.json({ ...teacher, exams: examsWithDetails });
     return;

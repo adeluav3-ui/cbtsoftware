@@ -115,56 +115,6 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// Start new session (promote students)
-router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
-  const { schoolCode } = req.params;
-  const classOrder = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
-
-  try {
-    // Get all students in this school
-    const students = await db
-      .select()
-      .from(usersTable)
-      .where(
-        and(
-          eq(usersTable.schoolCode, schoolCode),
-          eq(usersTable.role, "student")
-        )
-      );
-
-    let promoted = 0;
-    let archived = 0;
-
-    for (const student of students) {
-      const currentClassIndex = classOrder.indexOf(student.class ?? "");
-      if (currentClassIndex === -1) continue;
-
-      if (currentClassIndex === classOrder.length - 1) {
-        // SSS3 -> archive (delete)
-        await db.delete(usersTable).where(eq(usersTable.id, student.id));
-        archived++;
-      } else {
-        // Promote to next class
-        const nextClass = classOrder[currentClassIndex + 1];
-        await db
-          .update(usersTable)
-          .set({ class: nextClass })
-          .where(eq(usersTable.id, student.id));
-        promoted++;
-      }
-    }
-
-    res.json({
-      message: `New session started. ${promoted} students promoted, ${archived} students graduated and archived.`,
-    });
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
 // Get school's retake passcode (for school admin)
 router.get("/:schoolCode/retake-passcode", async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
@@ -335,97 +285,6 @@ router.post("/admin/login", async (req: Request, res: Response) => {
       fullName: user.fullName,
       class: user.class,
     });
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
-// Get grading scheme for a school
-router.get("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
-  const { schoolCode } = req.params;
-  const schoolCodeStr = String(schoolCode);
-
-  try {
-    const [scheme] = await db
-      .select()
-      .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-      .limit(1);
-
-    if (!scheme) {
-      // Return default scheme
-      res.json({
-        midTermTotal: 20,
-        midTermCbt: 10,
-        midTermTheory: 10,
-        examTotal: 60,
-        examCbt: 30,
-        examTheory: 30,
-        classActivityTotal: 20,
-      });
-      return;
-    }
-
-    res.json(scheme);
-    return;
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-    return;
-  }
-});
-
-// Update grading scheme for a school
-router.post("/:schoolCode/grading-scheme", async (req: Request, res: Response) => {
-  const { schoolCode } = req.params;
-  const schoolCodeStr = String(schoolCode);
-  const { midTermTotal, midTermCbt, midTermTheory, examTotal, examCbt, examTheory, classActivityTotal } = req.body;
-
-  try {
-    const [existing] = await db
-      .select()
-      .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-      .limit(1);
-
-    let result;
-    if (existing) {
-      // Update existing
-      [result] = await db
-        .update(gradingSchemesTable)
-        .set({
-          midTermTotal,
-          midTermCbt,
-          midTermTheory,
-          examTotal,
-          examCbt,
-          examTheory,
-          classActivityTotal,
-          updatedAt: new Date(),
-        })
-        .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-        .returning();
-    } else {
-      // Insert new
-      [result] = await db
-        .insert(gradingSchemesTable)
-        .values({
-          schoolCode: schoolCodeStr,
-          midTermTotal,
-          midTermCbt,
-          midTermTheory,
-          examTotal,
-          examCbt,
-          examTheory,
-          classActivityTotal,
-        })
-        .returning();
-    }
-
-    res.json(result);
     return;
   } catch (err) {
     console.error(err);
@@ -819,7 +678,7 @@ router.post("/:schoolCode/update-academic-session", async (req: Request, res: Re
   }
 });
 
-// Update the new session endpoint to also advance academic session
+// Start new session: advance academic session and promote all students one class
 router.post("/:schoolCode/new-session", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);

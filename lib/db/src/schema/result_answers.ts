@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,7 +15,9 @@ export const resultAnswersTable = pgTable("result_answers", {
   selectedOption: text("selected_option"), // null if skipped
   isCorrect: boolean("is_correct").notNull().default(false),
   schoolCode: text("school_code").notNull(),
-});
+}, (table) => ({
+  resultIdIdx: index("result_answers_result_id_idx").on(table.resultId),
+}));
 
 export const insertResultAnswerSchema = createInsertSchema(resultAnswersTable).omit({ id: true });
 export type InsertResultAnswer = z.infer<typeof insertResultAnswerSchema>;

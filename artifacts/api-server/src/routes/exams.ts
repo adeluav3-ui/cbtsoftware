@@ -9,7 +9,7 @@ import {
   gradingSchemesTable,
   subjectScoresTable,
 } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -274,127 +274,57 @@ router.delete("/:examId", async (req: RequestWithSession, res: Response) => {
       }
     }
 
-    const examResults = await db
-      .select({ id: resultsTable.id, studentId: resultsTable.studentId })
-      .from(resultsTable)
-      .where(
-        and(
-          eq(resultsTable.examId, examIdNum),
-          eq(resultsTable.schoolCode, schoolCodeStr)
-        )
-      );
+    const deleted = await db.transaction(async (tx) => {
+      const examResults = await tx
+        .select({ id: resultsTable.id, studentId: resultsTable.studentId })
+        .from(resultsTable)
+        .where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.schoolCode, schoolCodeStr)));
 
-    if (examResults.length > 0) {
-      for (const result of examResults) {
-        await db
-          .delete(resultAnswersTable)
-          .where(eq(resultAnswersTable.resultId, result.id));
-      }
-    }
+      if (examResults.length > 0) {
+        const resultIds = examResults.map(r => r.id);
+        await tx.delete(resultAnswersTable).where(inArray(resultAnswersTable.resultId, resultIds));
+        await tx.delete(resultsTable).where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.schoolCode, schoolCodeStr)));
 
-    await db
-      .delete(resultsTable)
-      .where(
-        and(
-          eq(resultsTable.examId, examIdNum),
-          eq(resultsTable.schoolCode, schoolCodeStr)
-        )
-      );
-
-    const [exam] = await db
-      .select()
-      .from(examsTable)
-      .where(
-        and(
-          eq(examsTable.id, examIdNum),
-          eq(examsTable.schoolCode, schoolCodeStr)
-        )
-      )
-      .limit(1);
-
-    if (exam && examResults.length > 0) {
-      for (const result of examResults) {
-        const [subjectScore] = await db
-          .select()
-          .from(subjectScoresTable)
-          .where(
-            and(
-              eq(subjectScoresTable.studentId, result.studentId),
-              eq(subjectScoresTable.subjectName, exam.subject),
+        // Null out the score component for this assessment type on each affected student
+        if (existingExam.assessmentType === 'mid_term') {
+          const studentIds = examResults.map(r => r.studentId);
+          await tx.update(subjectScoresTable)
+            .set({ midTermScore: null, totalScore: null, percentage: null, grade: null, updatedAt: new Date() })
+            .where(and(
+              inArray(subjectScoresTable.studentId, studentIds),
+              eq(subjectScoresTable.subjectName, existingExam.subject),
               eq(subjectScoresTable.schoolCode, schoolCodeStr)
-            )
-          )
-          .limit(1);
-
-        if (subjectScore) {
-          const updateData: any = { updatedAt: new Date() };
-
-          if (exam.assessmentType === 'mid_term') {
-            updateData.midTermScore = null;
-          } else if (exam.assessmentType === 'exam') {
-            updateData.examScore = null;
-          } else if (exam.assessmentType === 'class_activity') {
-            updateData.classActivityScore = null;
-          }
-
-          const hasMidTerm = updateData.midTermScore !== undefined ? false : (subjectScore.midTermScore !== null);
-          const hasExam = updateData.examScore !== undefined ? false : (subjectScore.examScore !== null);
-          const hasActivity = updateData.classActivityScore !== undefined ? false : (subjectScore.classActivityScore !== null);
-
-          const allComponentsExist = hasMidTerm && hasActivity && hasExam;
-
-          if (!allComponentsExist) {
-            updateData.totalScore = null;
-            updateData.percentage = null;
-            updateData.grade = null;
-          } else {
-            const midTerm = subjectScore.midTermScore || 0;
-            const activity = subjectScore.classActivityScore || 0;
-            const examScore = subjectScore.examScore || 0;
-            const total = midTerm + activity + examScore;
-            updateData.totalScore = total;
-            updateData.percentage = total;
-
-            const [gradingScheme] = await db
-              .select()
-              .from(gradingSchemesTable)
-              .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-              .limit(1);
-
-            const defaultScheme = { gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 };
-            const scheme = gradingScheme || defaultScheme;
-
-            let grade = 'F';
-            if (total >= scheme.gradeAMin) grade = 'A';
-            else if (total >= scheme.gradeBMin) grade = 'B';
-            else if (total >= scheme.gradeCMin) grade = 'C';
-            else if (total >= scheme.gradeDMin) grade = 'D';
-            else grade = 'F';
-
-            updateData.grade = grade;
-          }
-
-          await db
-            .update(subjectScoresTable)
-            .set(updateData)
-            .where(eq(subjectScoresTable.id, subjectScore.id));
+            ));
+        } else if (existingExam.assessmentType === 'exam') {
+          const studentIds = examResults.map(r => r.studentId);
+          await tx.update(subjectScoresTable)
+            .set({ examScore: null, totalScore: null, percentage: null, grade: null, updatedAt: new Date() })
+            .where(and(
+              inArray(subjectScoresTable.studentId, studentIds),
+              eq(subjectScoresTable.subjectName, existingExam.subject),
+              eq(subjectScoresTable.schoolCode, schoolCodeStr)
+            ));
+        } else if (existingExam.assessmentType === 'class_activity') {
+          const studentIds = examResults.map(r => r.studentId);
+          await tx.update(subjectScoresTable)
+            .set({ classActivityScore: null, totalScore: null, percentage: null, grade: null, updatedAt: new Date() })
+            .where(and(
+              inArray(subjectScoresTable.studentId, studentIds),
+              eq(subjectScoresTable.subjectName, existingExam.subject),
+              eq(subjectScoresTable.schoolCode, schoolCodeStr)
+            ));
         }
       }
-    }
 
-    await db
-      .delete(questionsTable)
-      .where(eq(questionsTable.examId, examIdNum));
+      await tx.delete(questionsTable).where(eq(questionsTable.examId, examIdNum));
 
-    const [deleted] = await db
-      .delete(examsTable)
-      .where(
-        and(
-          eq(examsTable.id, examIdNum),
-          eq(examsTable.schoolCode, schoolCodeStr)
-        )
-      )
-      .returning();
+      const [deletedExam] = await tx
+        .delete(examsTable)
+        .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+        .returning();
+
+      return deletedExam;
+    });
 
     if (!deleted) {
       return res.status(404).json({ error: "Exam not found" });
@@ -725,12 +655,14 @@ router.get("/:examId/results", async (req: RequestWithSession, res: Response) =>
         and(
           eq(subjectScoresTable.subjectName, exam.subject),
           eq(subjectScoresTable.schoolCode, schoolCodeStr),
-          sql`${subjectScoresTable.studentId} IN (${studentIds.join(',')})`
+          inArray(subjectScoresTable.studentId, studentIds)
         )
       );
 
+    const scoreByStudentId = new Map(subjectScoresList.map(s => [s.studentId, s]));
+
     const mergedResults = resultsList.map(result => {
-      const scoreRecord = subjectScoresList.find(s => s.studentId === result.studentId);
+      const scoreRecord = scoreByStudentId.get(result.studentId);
       const rawCbtPercentage = (result.score / result.totalQuestions) * 100;
       const scaledCbtScore = (rawCbtPercentage / 100) * componentCbt;
 
@@ -905,50 +837,32 @@ router.post("/:examId/submit", async (req: Request<ExamParams>, res: Response) =
       );
     }
 
-    const [existingScore] = await db
-      .select()
-      .from(subjectScoresTable)
-      .where(
-        and(
-          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
-          eq(subjectScoresTable.subjectName, exam.subject)
-        )
-      )
-      .limit(1);
+    const scoreValues: any = {
+      studentId: parseInt(String(studentId), 10),
+      subjectName: exam.subject,
+      className: studentClass,
+      schoolCode: schoolCodeStr,
+    };
+    const scoreUpdate: any = { updatedAt: new Date() };
 
-    if (existingScore) {
-      const updateData: any = { updatedAt: new Date() };
-
-      if (exam.assessmentType === 'mid_term') {
-        updateData.midTermScore = Math.round(scaledCbtScore);
-      } else if (exam.assessmentType === 'exam') {
-        updateData.examScore = Math.round(scaledCbtScore);
-      } else if (exam.assessmentType === 'class_activity') {
-        updateData.classActivityScore = Math.round(scaledCbtScore);
-      }
-
-      await db
-        .update(subjectScoresTable)
-        .set(updateData)
-        .where(
-          and(
-            eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
-            eq(subjectScoresTable.subjectName, exam.subject)
-          )
-        );
-    } else {
-      await db
-        .insert(subjectScoresTable)
-        .values({
-          studentId: parseInt(String(studentId), 10),
-          subjectName: exam.subject,
-          className: studentClass,
-          schoolCode: schoolCodeStr,
-          ...(exam.assessmentType === 'mid_term' && { midTermScore: Math.round(scaledCbtScore) }),
-          ...(exam.assessmentType === 'exam' && { examScore: Math.round(scaledCbtScore) }),
-          ...(exam.assessmentType === 'class_activity' && { classActivityScore: Math.round(scaledCbtScore) }),
-        });
+    if (exam.assessmentType === 'mid_term') {
+      scoreValues.midTermScore = Math.round(scaledCbtScore);
+      scoreUpdate.midTermScore = Math.round(scaledCbtScore);
+    } else if (exam.assessmentType === 'exam') {
+      scoreValues.examScore = Math.round(scaledCbtScore);
+      scoreUpdate.examScore = Math.round(scaledCbtScore);
+    } else if (exam.assessmentType === 'class_activity') {
+      scoreValues.classActivityScore = Math.round(scaledCbtScore);
+      scoreUpdate.classActivityScore = Math.round(scaledCbtScore);
     }
+
+    await db
+      .insert(subjectScoresTable)
+      .values(scoreValues)
+      .onConflictDoUpdate({
+        target: [subjectScoresTable.studentId, subjectScoresTable.subjectName],
+        set: scoreUpdate,
+      });
 
     res.json({
       ...result,

@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, unique, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 
 export const subjectScoresTable = pgTable("subject_scores", {
@@ -25,6 +25,8 @@ export const subjectScoresTable = pgTable("subject_scores", {
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
     uniqueStudentSubject: unique().on(table.studentId, table.subjectName),
+    studentIdIdx: index("subject_scores_student_id_idx").on(table.studentId),
+    schoolCodeIdx: index("subject_scores_school_code_idx").on(table.schoolCode),
 }));
 
 export const insertSubjectScoreSchema = createInsertSchema(subjectScoresTable).omit({ id: true, createdAt: true, updatedAt: true });

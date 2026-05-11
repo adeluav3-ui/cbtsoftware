@@ -8,7 +8,7 @@ import {
   subjectScoresTable,
   gradingSchemesTable
 } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -124,48 +124,27 @@ router.delete("/:studentId", async (req: Request<StudentParams>, res: Response) 
   try {
     const id = parseInt(studentId);
 
-    // 1. Get all result IDs for this student
-    const studentResults = await db
-      .select({ id: resultsTable.id })
-      .from(resultsTable)
-      .where(
-        and(
-          eq(resultsTable.studentId, id),
-          eq(resultsTable.schoolCode, schoolCode)
-        )
-      );
+    const deleted = await db.transaction(async (tx) => {
+      const studentResults = await tx
+        .select({ id: resultsTable.id })
+        .from(resultsTable)
+        .where(and(eq(resultsTable.studentId, id), eq(resultsTable.schoolCode, schoolCode)));
 
-    // 2. Delete result answers first
-    if (studentResults.length > 0) {
-      const resultIds = studentResults.map(r => r.id);
-      for (const resultId of resultIds) {
-        await db
-          .delete(resultAnswersTable)
-          .where(eq(resultAnswersTable.resultId, resultId));
+      if (studentResults.length > 0) {
+        const resultIds = studentResults.map(r => r.id);
+        await tx.delete(resultAnswersTable).where(inArray(resultAnswersTable.resultId, resultIds));
       }
-    }
 
-    // 3. Delete results
-    await db
-      .delete(resultsTable)
-      .where(
-        and(
-          eq(resultsTable.studentId, id),
-          eq(resultsTable.schoolCode, schoolCode)
-        )
-      );
+      await tx.delete(resultsTable).where(and(eq(resultsTable.studentId, id), eq(resultsTable.schoolCode, schoolCode)));
+      await tx.delete(subjectScoresTable).where(and(eq(subjectScoresTable.studentId, id), eq(subjectScoresTable.schoolCode, schoolCode)));
 
-    // 4. Now delete the student
-    const [deleted] = await db
-      .delete(usersTable)
-      .where(
-        and(
-          eq(usersTable.id, id),
-          eq(usersTable.schoolCode, schoolCode),
-          eq(usersTable.role, "student")
-        )
-      )
-      .returning();
+      const [deletedStudent] = await tx
+        .delete(usersTable)
+        .where(and(eq(usersTable.id, id), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "student")))
+        .returning();
+
+      return deletedStudent;
+    });
 
     if (!deleted) {
       return res.status(404).json({ error: "Student not found" });
@@ -234,30 +213,29 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
       )
       .orderBy(resultsTable.submittedAt);
 
-    // For each result, get answer breakdown
-    type Result = {
-      id: number;
-      examId: number | null;
-      fullName: string | null;
-      class: string | null;
-      score: number | null;
-      totalQuestions: number | null;
-      percentage: number | null;
-      submittedAt: Date | null;
-      examTitle: string | null;
-      subject: string | null;
-    };
+    if (results.length === 0) {
+      res.json({ ...student, results: [] });
+      return;
+    }
 
-    const resultsWithAnswers = await Promise.all(
-      results.map(async (result: Result) => {
-        const answers = await db
-          .select()
-          .from(resultAnswersTable)
-          .where(eq(resultAnswersTable.resultId, result.id))
-          .orderBy(resultAnswersTable.id);
-        return { ...result, answers };
-      })
-    );
+    // Batch fetch all answers in one query instead of N queries
+    const resultIds = results.map(r => r.id);
+    const allAnswers = await db
+      .select()
+      .from(resultAnswersTable)
+      .where(inArray(resultAnswersTable.resultId, resultIds))
+      .orderBy(resultAnswersTable.id);
+
+    const answersByResult = new Map<number, typeof allAnswers>();
+    for (const a of allAnswers) {
+      if (!answersByResult.has(a.resultId)) answersByResult.set(a.resultId, []);
+      answersByResult.get(a.resultId)!.push(a);
+    }
+
+    const resultsWithAnswers = results.map(result => ({
+      ...result,
+      answers: answersByResult.get(result.id) ?? [],
+    }));
 
     res.json({ ...student, results: resultsWithAnswers });
     return;
