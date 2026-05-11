@@ -7,6 +7,8 @@ import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X } from "lucide-react";
 
+const API = import.meta.env.VITE_API_URL as string;
+
 interface SchoolOverview {
   teachers: number;
   students: number;
@@ -81,7 +83,7 @@ export default function SuperAdminDashboard() {
     setAddError("");
     setIsAdding(true);
     try {
-      const res = await fetch("/api/schools/create", {
+      const res = await fetch(`${API}/schools/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -115,7 +117,7 @@ export default function SuperAdminDashboard() {
     if (!overviewCache[school.code]) {
       setOverviewLoading(true);
       try {
-        const res = await fetch(`/api/schools/${school.code}/overview`, { credentials: "include" });
+        const res = await fetch(`${API}/schools/${school.code}/overview`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           setOverviewCache(prev => ({ ...prev, [school.code]: data }));
@@ -132,7 +134,7 @@ export default function SuperAdminDashboard() {
     setResetError("");
     setResetSuccess("");
     try {
-      const res = await fetch(`/api/schools/${detailSchool.code}/reset-admin-password`, {
+      const res = await fetch(`${API}/schools/${detailSchool.code}/reset-admin-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -167,7 +169,7 @@ export default function SuperAdminDashboard() {
     setIsDeleting(true);
     setDeleteError("");
     try {
-      const res = await fetch(`/api/schools/${detailSchool.code}`, {
+      const res = await fetch(`${API}/schools/${detailSchool.code}`, {
         method: "DELETE",
         credentials: "include",
       });
