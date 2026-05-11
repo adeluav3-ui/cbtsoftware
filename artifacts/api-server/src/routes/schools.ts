@@ -19,43 +19,49 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
     return res.status(400).json({ error: "School code, name, admin username and password are all required" });
   }
 
+  const upperCode = code.toUpperCase();
+
   try {
-    // Check if code already exists
+    // Check for duplicates before entering the transaction
     const [existing] = await db
       .select()
       .from(schoolsTable)
-      .where(eq(schoolsTable.code, code.toUpperCase()))
+      .where(eq(schoolsTable.code, upperCode))
       .limit(1);
 
     if (existing) {
       return res.status(400).json({ error: "A school with this code already exists" });
     }
 
-    // Check if admin username already exists in the system
     const [existingUser] = await db
       .select()
       .from(usersTable)
-      .where(and(eq(usersTable.username, adminUsername), eq(usersTable.schoolCode, code.toUpperCase())))
+      .where(and(eq(usersTable.username, adminUsername), eq(usersTable.schoolCode, upperCode)))
       .limit(1);
 
     if (existingUser) {
       return res.status(400).json({ error: "Admin username already exists for this school" });
     }
 
-    // Create the school
-    const [school] = await db
-      .insert(schoolsTable)
-      .values({ code: code.toUpperCase(), name })
-      .returning();
-
-    // Create the school admin
+    // Hash before transaction to keep the transaction short
     const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
-    await db.insert(usersTable).values({
-      username: adminUsername,
-      password: hashedAdminPassword,
-      role: "school_admin",
-      fullName: `${name} Admin`,
-      schoolCode: code.toUpperCase(),
+
+    // Wrap school + admin creation in a transaction so partial failures roll back
+    const school = await db.transaction(async (tx) => {
+      const [newSchool] = await tx
+        .insert(schoolsTable)
+        .values({ code: upperCode, name })
+        .returning();
+
+      await tx.insert(usersTable).values({
+        username: adminUsername,
+        password: hashedAdminPassword,
+        role: "school_admin",
+        fullName: `${name} Admin`,
+        schoolCode: upperCode,
+      });
+
+      return newSchool;
     });
 
     res.status(201).json(school);
