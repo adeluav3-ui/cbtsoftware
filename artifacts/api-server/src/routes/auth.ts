@@ -1,22 +1,21 @@
 import { Router, Request, Response } from "express";
+import { rateLimit } from "express-rate-limit";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
-// Add session type
-interface Session {
-  userId?: number;
-  role?: string;
-  schoolCode?: string | null;
-}
-
-interface RequestWithSession extends Request {
-  session: Session;
-}
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password) {
@@ -30,26 +29,14 @@ router.post("/login", async (req: Request, res: Response) => {
       const [found] = await db
         .select()
         .from(usersTable)
-        .where(
-          and(
-            eq(usersTable.username, username),
-            eq(usersTable.password, password),
-            eq(usersTable.schoolCode, schoolCode)
-          )
-        )
+        .where(and(eq(usersTable.username, username), eq(usersTable.schoolCode, schoolCode)))
         .limit(1);
       user = found;
     } else {
       const [found] = await db
         .select()
         .from(usersTable)
-        .where(
-          and(
-            eq(usersTable.username, username),
-            eq(usersTable.password, password),
-            eq(usersTable.role, "super_admin")
-          )
-        )
+        .where(and(eq(usersTable.username, username), eq(usersTable.role, "super_admin")))
         .limit(1);
       user = found;
     }
@@ -58,7 +45,25 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Get school name if applicable
+    // Rolling bcrypt migration: support both hashed and plain-text passwords
+    const isHashed = user.password.startsWith("$2");
+    let passwordMatch: boolean;
+
+    if (isHashed) {
+      passwordMatch = await bcrypt.compare(password, user.password);
+    } else {
+      passwordMatch = password === user.password;
+      if (passwordMatch) {
+        // Hash it now — this user is self-migrating on login
+        const hashed = await bcrypt.hash(password, 10);
+        await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, user.id));
+      }
+    }
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
     let schoolName: string | null = null;
     if (user.schoolCode) {
       const [school] = await db
@@ -69,11 +74,9 @@ router.post("/login", async (req: Request, res: Response) => {
       schoolName = school?.name ?? null;
     }
 
-    // Store in session
-    const session = (req as RequestWithSession).session = (req as RequestWithSession).session || {};
-    session.userId = user.id;
-    session.role = user.role;
-    session.schoolCode = user.schoolCode;
+    req.session.userId = user.id;
+    req.session.role = user.role;
+    req.session.schoolCode = user.schoolCode;
 
     res.json({
       id: user.id,
@@ -94,19 +97,15 @@ router.post("/login", async (req: Request, res: Response) => {
 });
 
 router.post("/logout", (req: Request, res: Response) => {
-  const session = (req as RequestWithSession).session;
-  if (session) {
-    session.userId = undefined;
-    session.role = undefined;
-    session.schoolCode = undefined;
-  }
-  res.json({ message: "Logged out" });
-  return;
+  req.session.destroy((err) => {
+    if (err) console.error(err);
+    res.clearCookie("session_id");
+    res.json({ message: "Logged out" });
+  });
 });
 
 router.get("/me", async (req: Request, res: Response) => {
-  const session = (req as RequestWithSession).session;
-  const userId = session?.userId;
+  const userId = req.session?.userId;
 
   if (!userId) {
     return res.status(401).json({ error: "Not authenticated" });
@@ -121,7 +120,7 @@ router.get("/me", async (req: Request, res: Response) => {
         schoolCode: usersTable.schoolCode,
         fullName: usersTable.fullName,
         class: usersTable.class,
-        profilePicture: usersTable.profilePicture, // Add this line
+        profilePicture: usersTable.profilePicture,
       })
       .from(usersTable)
       .where(eq(usersTable.id, userId))
@@ -149,7 +148,7 @@ router.get("/me", async (req: Request, res: Response) => {
       schoolName,
       fullName: user.fullName,
       class: user.class,
-      profilePicture: user.profilePicture, // Add this line
+      profilePicture: user.profilePicture,
     });
     return;
   } catch (err) {

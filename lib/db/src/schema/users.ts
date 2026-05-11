@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   schoolCode: text("school_code"), // null for super_admin
   class: text("class"), // only for students
   profilePicture: text("profile_picture"),
+  generatedPassword: text("generated_password"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   schoolCodeIdx: index("users_school_code_idx").on(table.schoolCode),

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
@@ -70,11 +71,13 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
       return res.status(400).json({ error: "Username already exists in this school" });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const [teacher] = await db
       .insert(usersTable)
       .values({
         username,
-        password,
+        password: hashedPassword,
         fullName,
         role: "teacher",
         schoolCode,

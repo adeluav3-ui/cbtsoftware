@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -23,7 +24,9 @@ const router = Router({ mergeParams: true });
 // List students for a school, optionally filtered by class
 router.get("/", async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
-  const { class: studentClass } = req.query;
+  const { class: studentClass, page, limit } = req.query;
+  const pageNum = page ? parseInt(page as string) : null;
+  const limitNum = limit ? parseInt(limit as string) : null;
 
   try {
     const conditions: any[] = [
@@ -35,7 +38,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
       conditions.push(eq(usersTable.class, studentClass));
     }
 
-    const students = await db
+    const baseQuery = db
       .select({
         id: usersTable.id,
         username: usersTable.username,
@@ -48,6 +51,10 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
       .from(usersTable)
       .where(and(...conditions))
       .orderBy(usersTable.fullName);
+
+    const students = (pageNum && limitNum)
+      ? await baseQuery.limit(limitNum).offset((pageNum - 1) * limitNum)
+      : await baseQuery;
 
     res.json(students);
     return;
@@ -89,11 +96,14 @@ router.post("/", async (req: Request<SchoolParams>, res: Response) => {
       return res.status(400).json({ error: "Username already exists in this school" });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const [student] = await db
       .insert(usersTable)
       .values({
         username,
-        password,
+        password: hashedPassword,
+        generatedPassword: password,
         fullName,
         role: "student",
         schoolCode,
@@ -168,7 +178,7 @@ router.get("/:studentId/detail", async (req: Request<StudentParams>, res: Respon
       .select({
         id: usersTable.id,
         username: usersTable.username,
-        password: usersTable.password, // Add password field
+        password: usersTable.generatedPassword,
         fullName: usersTable.fullName,
         class: usersTable.class,
         schoolCode: usersTable.schoolCode,
@@ -256,9 +266,11 @@ router.post("/:studentId/reset-password", async (req: Request<StudentParams>, re
   }
 
   try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
     const [updated] = await db
       .update(usersTable)
-      .set({ password: newPassword })
+      .set({ password: hashedPassword, generatedPassword: newPassword })
       .where(
         and(
           eq(usersTable.id, parseInt(studentId)),

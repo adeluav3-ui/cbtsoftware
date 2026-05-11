@@ -1,13 +1,26 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import router from "./routes/index.js";  // Added /index.js
+import session from "express-session";
+import { createClient } from "redis";
+import RedisStore from "connect-redis";
+import router from "./routes/index.js";
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: number;
+    role?: string;
+    schoolCode?: string | null;
+  }
+}
 
 const app: Express = express();
 
+app.set("trust proxy", 1);
+
 app.use(cors({
-  origin: "https://cbtsoftware-cbt-app.vercel.app",  // exact origin, NOT "*"
-  credentials: true,   // Must be true for cookies
+  origin: "https://cbtsoftware-cbt-app.vercel.app",
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
@@ -15,33 +28,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Simple in-memory session middleware
-const sessions: Record<string, any> = {};
+const redisClient = createClient({ url: process.env.REDIS_URL });
+redisClient.connect().catch(console.error);
 
-app.use((req, _res, next) => {
-  let sessionId = req.cookies?.["session_id"];
-
-  if (!sessionId || !sessions[sessionId]) {
-    sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessions[sessionId] = {};
-  }
-
-  (req as any).session = sessions[sessionId];
-  (req as any).sessionId = sessionId;
-
-  const origJson = _res.json.bind(_res);
-  _res.json = function (body: any) {
-    _res.cookie("session_id", sessionId, {
-      sameSite: "none",   // Required for cross-origin
-      secure: true,       // Required when sameSite is "none"
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-    return origJson(body);
-  };
-
-  next();
-});
+app.use(session({
+  store: new RedisStore({ client: redisClient }),
+  name: "session_id",
+  secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  },
+}));
 
 app.use("/api", router);
 

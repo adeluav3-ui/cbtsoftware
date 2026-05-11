@@ -1,20 +1,11 @@
 import { Router, Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
-}
-
-interface Session {
-  userId?: number;
-  role?: string;
-  schoolCode?: string | null;
-}
-
-interface RequestWithSession extends Request {
-  session: Session;
 }
 
 const router = Router();
@@ -57,9 +48,10 @@ router.post("/create", async (req: Request, res: Response) => {
       .returning();
 
     // Create the school admin
+    const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
     await db.insert(usersTable).values({
       username: adminUsername,
-      password: adminPassword,
+      password: hashedAdminPassword,
       role: "school_admin",
       fullName: `${name} Admin`,
       schoolCode: code.toUpperCase(),
@@ -254,7 +246,6 @@ router.post("/admin/login", async (req: Request, res: Response) => {
       .where(
         and(
           eq(usersTable.username, username),
-          eq(usersTable.password, password),
           eq(usersTable.schoolCode, schoolCode),
           eq(usersTable.role, "school_admin")
         )
@@ -265,16 +256,31 @@ router.post("/admin/login", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    const isHashed = user.password.startsWith("$2");
+    let passwordMatch: boolean;
+    if (isHashed) {
+      passwordMatch = await bcrypt.compare(password, user.password);
+    } else {
+      passwordMatch = password === user.password;
+      if (passwordMatch) {
+        const hashed = await bcrypt.hash(password, 10);
+        await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, user.id));
+      }
+    }
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
     const [school] = await db
       .select()
       .from(schoolsTable)
       .where(eq(schoolsTable.code, schoolCode))
       .limit(1);
 
-    const session = (req as RequestWithSession).session = (req as RequestWithSession).session || {};
-    session.userId = user.id;
-    session.role = user.role;
-    session.schoolCode = user.schoolCode;
+    req.session.userId = user.id;
+    req.session.role = user.role;
+    req.session.schoolCode = user.schoolCode;
 
     res.json({
       id: user.id,

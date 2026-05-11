@@ -47,9 +47,11 @@ const toString = (value: string | string[]): string => {
 router.get("/", async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = toString(schoolCode);
-  const { class: examClass, active } = req.query;
+  const { class: examClass, active, page, limit } = req.query;
   const userId = req.session?.userId;
   const userRole = req.session?.role;
+  const pageNum = page ? parseInt(page as string) : null;
+  const limitNum = limit ? parseInt(limit as string) : null;
 
   try {
     const conditions: any[] = [eq(examsTable.schoolCode, schoolCodeStr)];
@@ -66,7 +68,7 @@ router.get("/", async (req: RequestWithSession, res: Response) => {
       conditions.push(eq(examsTable.teacherId, userId));
     }
 
-    const exams = await db
+    const baseQuery = db
       .select({
         id: examsTable.id,
         title: examsTable.title,
@@ -84,6 +86,10 @@ router.get("/", async (req: RequestWithSession, res: Response) => {
       .from(examsTable)
       .where(and(...conditions))
       .orderBy(examsTable.createdAt);
+
+    const exams = (pageNum && limitNum)
+      ? await baseQuery.limit(limitNum).offset((pageNum - 1) * limitNum)
+      : await baseQuery;
 
     res.json(exams);
     return;
