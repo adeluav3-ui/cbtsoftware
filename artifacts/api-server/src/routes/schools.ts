@@ -1,9 +1,34 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "express-rate-limit";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const retakeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many retake requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many password reset requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 interface SchoolParams {
   schoolCode: string;
@@ -170,7 +195,7 @@ router.post("/:schoolCode/retake-passcode", requireSchoolAdmin, async (req: Requ
 });
 
 // Submit exam retake with passcode verification
-router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, async (req: Request, res: Response) => {
+router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, retakeLimiter, async (req: Request, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const examIdNum = Number(examId);
@@ -239,7 +264,7 @@ router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, async (req:
 });
 
 // School admin login (also uses /auth/login, kept for compatibility)
-router.post("/admin/login", async (req: Request, res: Response) => {
+router.post("/admin/login", adminLoginLimiter, async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password || !schoolCode) {
@@ -284,6 +309,10 @@ router.post("/admin/login", async (req: Request, res: Response) => {
       .from(schoolsTable)
       .where(eq(schoolsTable.code, schoolCode))
       .limit(1);
+
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate(err => err ? reject(err) : resolve());
+    });
 
     req.session.userId = user.id;
     req.session.role = user.role;
@@ -796,7 +825,7 @@ router.get("/:schoolCode/overview", requireSuperAdmin, async (req: Request, res:
 });
 
 // Reset school admin password (super admin)
-router.post("/:schoolCode/reset-admin-password", requireSuperAdmin, async (req: Request, res: Response) => {
+router.post("/:schoolCode/reset-admin-password", requireSuperAdmin, passwordResetLimiter, async (req: Request, res: Response) => {
   const schoolCodeStr = String(req.params.schoolCode);
   const { newPassword } = req.body;
 

@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import { createClient } from "redis";
 import RedisStore from "connect-redis";
+import helmet from "helmet";
 import router from "./routes/index.js";
 
 declare module "express-session" {
@@ -14,9 +15,22 @@ declare module "express-session" {
   }
 }
 
+// Hard-fail on missing SESSION_SECRET in production — a missing secret makes
+// sessions forgeable and must never silently fall back to a known value.
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.error("FATAL: SESSION_SECRET environment variable must be set in production");
+  process.exit(1);
+}
+
 const app: Express = express();
 
 app.set("trust proxy", 1);
+
+// Security headers for every response
+app.use(helmet({
+  contentSecurityPolicy: false, // API-only server, no HTML served
+  crossOriginEmbedderPolicy: false,
+}));
 
 app.use(cors({
   origin: "https://cbtsoftware-cbt-app.vercel.app",
@@ -24,8 +38,10 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Cap request body at 2 MB to prevent payload abuse
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
 const redisClient = createClient({ url: process.env.REDIS_URL });

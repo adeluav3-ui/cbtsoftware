@@ -74,9 +74,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       schoolName = school?.name ?? null;
     }
 
+    // Regenerate session ID on login to prevent session fixation attacks
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate(err => err ? reject(err) : resolve());
+    });
+
     req.session.userId = user.id;
     req.session.role = user.role;
-
     req.session.schoolCode = user.schoolCode;
 
     res.json({
