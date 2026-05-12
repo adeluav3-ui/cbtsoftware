@@ -4,7 +4,8 @@ import { useLocation, Link } from "wouter";
 import { useLogout } from "@workspace/api-client-react";
 import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Upload, Camera } from "lucide-react";
 import { cn } from "./ui-elements";
-import { supabase } from "@/lib/supabase";
+
+const API = import.meta.env.VITE_API_URL as string;
 
 function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -84,23 +85,22 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
 
     setUploadingPicture(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "profile-pictures");
 
-      const { data, error } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, file);
+      const uploadRes = await fetch(`${API}/upload`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
 
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(fileName);
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${user?.schoolCode}/teachers/profile-picture`, {
+      const response = await fetch(`${API}/schools/${user?.schoolCode}/teachers/profile-picture`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profilePictureUrl: publicUrl }),
+        body: JSON.stringify({ profilePictureUrl: url }),
         credentials: "include",
       });
 

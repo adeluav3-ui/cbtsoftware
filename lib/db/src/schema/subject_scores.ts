@@ -27,6 +27,7 @@ export const subjectScoresTable = pgTable("subject_scores", {
     uniqueStudentSubject: unique().on(table.studentId, table.subjectName),
     studentIdIdx: index("subject_scores_student_id_idx").on(table.studentId),
     schoolCodeIdx: index("subject_scores_school_code_idx").on(table.schoolCode),
+    schoolTermSessionIdx: index("subject_scores_school_term_session_idx").on(table.schoolCode, table.term, table.academicSession),
 }));
 
 export const insertSubjectScoreSchema = createInsertSchema(subjectScoresTable).omit({ id: true, createdAt: true, updatedAt: true });

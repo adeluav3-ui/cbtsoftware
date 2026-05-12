@@ -18,6 +18,9 @@ export const resultsTable = pgTable("results", {
   examIdIdx: index("results_exam_id_idx").on(table.examId),
   studentIdIdx: index("results_student_id_idx").on(table.studentId),
   schoolCodeIdx: index("results_school_code_idx").on(table.schoolCode),
+  // Composite indexes for common query patterns
+  schoolExamIdx: index("results_school_exam_idx").on(table.schoolCode, table.examId),
+  studentExamIdx: index("results_student_exam_idx").on(table.studentId, table.examId),
 }));
 
 export const insertResultSchema = createInsertSchema(resultsTable).omit({ id: true, submittedAt: true });

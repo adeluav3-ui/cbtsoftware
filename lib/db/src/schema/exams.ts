@@ -17,6 +17,7 @@ export const examsTable = pgTable("exams", {
 }, (table) => ({
   schoolCodeIdx: index("exams_school_code_idx").on(table.schoolCode),
   teacherIdIdx: index("exams_teacher_id_idx").on(table.teacherId),
+  schoolActiveIdx: index("exams_school_active_idx").on(table.schoolCode, table.isActive),
 }));
 
 export const questionsTable = pgTable("questions", {

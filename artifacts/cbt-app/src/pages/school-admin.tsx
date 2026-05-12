@@ -10,7 +10,6 @@ import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
 
 export default function SchoolAdminDashboard() {
@@ -409,29 +408,27 @@ export default function SchoolAdminDashboard() {
 
     setUploadingLogo(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `school-logo-${Date.now()}.${fileExt}`;
-      const filePath = `logos/${fileName}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "school-logos");
 
-      const { data, error } = await supabase.storage
-        .from('school-logos')
-        .upload(filePath, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('school-logos')
-        .getPublicUrl(filePath);
+      const uploadRes = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/logo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logoUrl: publicUrl }),
+        body: JSON.stringify({ logoUrl: url }),
         credentials: "include",
       });
 
       if (response.ok) {
-        setSchoolLogo(publicUrl);
+        setSchoolLogo(url);
       }
     } catch (err) {
       console.error("Upload failed", err);

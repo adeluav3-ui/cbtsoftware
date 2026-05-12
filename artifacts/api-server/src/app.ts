@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import * as Sentry from "@sentry/node";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import session from "express-session";
@@ -62,5 +63,8 @@ app.use(session({
 }));
 
 app.use("/api", router);
+
+// Sentry error handler — must come after routes, before any other error middleware
+Sentry.setupExpressErrorHandler(app);
 
 export default app;

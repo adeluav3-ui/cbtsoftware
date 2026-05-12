@@ -8,7 +8,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
 import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload, Layers } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
-import { supabase } from "@/lib/supabase";
 
 export default function TeacherExamDetails() {
   const { examId: rawExamId } = useParams();
@@ -79,30 +78,28 @@ export default function TeacherExamDetails() {
     }
   }, [exam]);
 
+  const uploadToBackend = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bucket", "question-images");
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Upload failed");
+    const { url } = await res.json();
+    return url as string;
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `questions/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('question-images')
-        .upload(filePath, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('question-images')
-        .getPublicUrl(filePath);
-
-      setImageUrl(publicUrl);
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload image. Please try again.');
+      setImageUrl(await uploadToBackend(file));
+    } catch {
+      alert("Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -111,27 +108,11 @@ export default function TeacherExamDetails() {
   const handleGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setIsUploadingGroupImage(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `group-images/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = fileName;
-
-      const { data, error } = await supabase.storage
-        .from('question-images')
-        .upload(filePath, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('question-images')
-        .getPublicUrl(filePath);
-
-      setGroupImageUrl(publicUrl);
-    } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Failed to upload group image. Please try again.');
+      setGroupImageUrl(await uploadToBackend(file));
+    } catch {
+      alert("Failed to upload group image. Please try again.");
     } finally {
       setIsUploadingGroupImage(false);
     }

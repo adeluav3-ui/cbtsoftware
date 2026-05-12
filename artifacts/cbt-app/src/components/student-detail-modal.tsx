@@ -3,7 +3,6 @@ import { Modal, Badge, Button, Input } from "@/components/ui-elements";
 import { ChevronDown, ChevronRight, CheckCircle, XCircle, MinusCircle, Save, Clock, Upload, User, Key, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
 
 interface StudentDetailModalProps {
   studentId: number | null;
@@ -173,26 +172,24 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
 
     setUploadingImage(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `student-profiles/${fileName}`;
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "student-images");
 
-      const { data, error } = await supabase.storage
-        .from('student-images')
-        .upload(filePath, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('student-images')
-        .getPublicUrl(filePath);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
 
       const response = await fetch(
         `${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/profile-picture`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profilePictureUrl: publicUrl }),
+          body: JSON.stringify({ profilePictureUrl: url }),
           credentials: "include",
         }
       );
