@@ -53,7 +53,9 @@ export function StudentResultsModal({
                 `${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/subject-scores`,
                 { credentials: "include" }
             );
+            if (!response.ok) return;
             const data = await response.json();
+            if (!Array.isArray(data)) return;
 
             const processedSubjects = data.map((subject: any) => {
                 const hasMidTerm = subject.midTermScore !== null && subject.midTermScore !== undefined;
@@ -136,11 +138,6 @@ export function StudentResultsModal({
         } finally {
             setSaving(null);
         }
-    };
-
-    const getScoreDisplay = (score: number | null) => {
-        if (score === null) return <span className="text-muted-foreground">—</span>;
-        return <span className="font-medium">{score}</span>;
     };
 
     const getGradeColor = (grade?: string | null) => {

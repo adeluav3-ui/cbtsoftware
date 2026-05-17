@@ -68,6 +68,7 @@ export default function ComprehensiveResults() {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}`, {
                 credentials: "include",
             });
+            if (!response.ok) return;
             const data = await response.json();
             setSchoolInfo({
                 name: data.name || "School",
@@ -87,8 +88,9 @@ export default function ComprehensiveResults() {
             const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students`, {
                 credentials: "include",
             });
+            if (!response.ok) return;
             const data = await response.json();
-            setStudents(data);
+            if (Array.isArray(data)) setStudents(data);
         } catch (err) {
             console.error("Failed to fetch students", err);
         } finally {
@@ -104,7 +106,9 @@ export default function ComprehensiveResults() {
                 `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/${selectedStudent.id}/subject-scores`,
                 { credentials: "include" }
             );
+            if (!response.ok) return;
             const data = await response.json();
+            if (!Array.isArray(data)) return;
             setSubjects(data);
 
             // Set existing comment if any

@@ -13,7 +13,8 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const router = Router();
+const router =
+  Router();
 
 router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;

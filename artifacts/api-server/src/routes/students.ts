@@ -32,7 +32,7 @@ interface StudentParams extends SchoolParams {
 const router = Router({ mergeParams: true });
 
 // List students for a school, optionally filtered by class
-router.get("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+router.get("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { class: studentClass, page, limit } = req.query;
   const pageNum = page ? parseInt(page as string) : null;
@@ -550,7 +550,7 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
 });
 
 // Get all subject scores for a school
-router.get("/subject-scores", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+router.get("/subject-scores", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {

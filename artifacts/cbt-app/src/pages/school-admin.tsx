@@ -176,6 +176,7 @@ export default function SchoolAdminDashboard() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}`, {
         credentials: "include",
       });
+      if (!response.ok) return;
       const data = await response.json();
       setSchoolLogo(data.logoUrl);
       setCurrentTerm(data.currentTerm || "First Term");
@@ -220,8 +221,9 @@ export default function SchoolAdminDashboard() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects`, {
         credentials: "include",
       });
+      if (!response.ok) return;
       const data = await response.json();
-      setSubjects(data);
+      if (Array.isArray(data)) setSubjects(data);
     } catch (err) {
       console.error("Failed to fetch subjects", err);
     } finally {

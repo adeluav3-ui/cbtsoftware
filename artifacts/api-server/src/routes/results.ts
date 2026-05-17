@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { requireAuth } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import { resultsTable, examsTable, resultAnswersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -14,7 +15,7 @@ interface ResultParams extends SchoolParams {
 const router = Router({ mergeParams: true });
 
 // List results for a school
-router.get("/", async (req: Request<SchoolParams>, res: Response) => {
+router.get("/", requireAuth, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
   try {
@@ -64,7 +65,7 @@ router.get("/", async (req: Request<SchoolParams>, res: Response) => {
 });
 
 // Get detailed result (with per-question answer breakdown)
-router.get("/:resultId/detail", async (req: Request<ResultParams>, res: Response) => {
+router.get("/:resultId/detail", requireAuth, async (req: Request<ResultParams>, res: Response) => {
   const { schoolCode, resultId } = req.params;
 
   try {

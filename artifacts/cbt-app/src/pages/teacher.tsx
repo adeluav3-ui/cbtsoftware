@@ -4,13 +4,12 @@ import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import {
   useListExams, useCreateExam, useDeleteExam, useToggleExamStatus,
-  useListResults, useListStudents, useCreateStudent, useDeleteStudent,
+  useListStudents, useCreateStudent, useDeleteStudent,
 } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload } from "lucide-react";
-import { format } from "date-fns";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
 import { StudentResultsModal } from "@/components/student-results-modal";
@@ -119,9 +118,6 @@ export default function TeacherDashboard() {
   });
 
   // ── Results ───────────────────────────────────────
-  const teacherExamIds = new Set(exams.map(e => e.id));
-  const { data: allResults = [], isLoading: resultsLoading } = useListResults(schoolCode);
-  const results = allResults.filter(r => r.examId !== undefined && teacherExamIds.has(r.examId));
   const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
 
   const fetchSubjects = async (level: string) => {
@@ -144,6 +140,7 @@ export default function TeacherDashboard() {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}`, {
           credentials: "include",
         });
+        if (!response.ok) return;
         const data = await response.json();
         setCurrentTerm(data.currentTerm || "First Term");
       } catch (err) {
@@ -159,8 +156,9 @@ export default function TeacherDashboard() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/subject-scores`, {
         credentials: "include",
       });
+      if (!response.ok) return;
       const data = await response.json();
-      setSubjectScores(data);
+      if (Array.isArray(data)) setSubjectScores(data);
     } catch (err) {
       console.error("Failed to fetch subject scores", err);
     }
