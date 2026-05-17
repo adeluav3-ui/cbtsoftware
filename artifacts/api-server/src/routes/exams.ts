@@ -146,10 +146,13 @@ router.post("/", requireSchoolStaff, async (req: RequestWithSession, res: Respon
 
 // Create a new group for an exam
 router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
-  const { schoolCode, examId } = req.params;
-  const schoolCodeStr = toString(schoolCode);
+  const { examId } = req.params;
   const examIdNum = toNumber(examId);
-  const { groupImageUrl } = req.body;
+  const { groupImageUrl, groupTitle, groupText } = req.body;
+
+  if (!groupTitle || !groupTitle.trim()) {
+    return res.status(400).json({ error: "Group title is required" });
+  }
 
   try {
     const [maxGroup] = await db
@@ -159,18 +162,17 @@ router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParam
 
     const newGroupId = (maxGroup?.maxId || 0) + 1;
 
-    console.log(`Created new group ${newGroupId} for exam ${examIdNum}`);
-
     res.json({
       success: true,
       groupId: newGroupId,
-      groupOrder: 0,
-      groupImageUrl: groupImageUrl || null
+      groupImageUrl: groupImageUrl || null,
+      groupTitle: groupTitle.trim(),
+      groupText: groupText?.trim() || null,
     });
     return;
   } catch (err) {
     console.error("Error creating group:", err);
-    res.status(500).json({ error: "Server error", details: err });
+    res.status(500).json({ error: "Server error" });
     return;
   }
 });
@@ -215,8 +217,9 @@ router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Respon
         currentGroup = {
           isGroup: true,
           groupId: q.groupId,
-          groupOrder: q.groupOrder || 0,
           groupImageUrl: q.groupImageUrl,
+          groupTitle: q.groupTitle,
+          groupText: q.groupText,
           questions: [q],
         };
         currentGroupId = q.groupId;
@@ -410,7 +413,7 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
-  const { questions, groupId } = req.body;
+  const { questions, groupId, groupTitle, groupText, groupImageUrl } = req.body;
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
     return res.status(400).json({ error: "Questions array is required" });
@@ -458,6 +461,9 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
           imageUrl: q.imageUrl || null,
           groupId: groupId || null,
           groupOrder: groupId ? startOrder + idx : 0,
+          groupTitle: groupId ? (groupTitle || null) : null,
+          groupText: groupId ? (groupText || null) : null,
+          groupImageUrl: groupId ? (groupImageUrl || null) : null,
         }))
       )
       .returning();
@@ -476,7 +482,7 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder } = req.body;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder, groupTitle, groupText, groupImageUrl } = req.body;
 
   if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
     return res.status(400).json({ error: "All question fields are required" });
@@ -511,6 +517,9 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
         imageUrl: imageUrl || null,
         groupId: groupId || null,
         groupOrder: finalGroupOrder,
+        groupTitle: groupId ? (groupTitle || null) : null,
+        groupText: groupId ? (groupText || null) : null,
+        groupImageUrl: groupId ? (groupImageUrl || null) : null,
       })
       .returning();
 

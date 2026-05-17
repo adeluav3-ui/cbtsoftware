@@ -31,9 +31,11 @@ export const questionsTable = pgTable("questions", {
   correctOption: text("correct_option").notNull(), // A, B, C, D
   schoolCode: text("school_code").notNull(),
   imageUrl: text("image_url"),
-  groupId: integer("group_id"), // Add this
-  groupOrder: integer("group_order").default(0), // Add this
-  groupImageUrl: text("group_image_url"), // Add this
+  groupId: integer("group_id"),
+  groupOrder: integer("group_order").default(0),
+  groupImageUrl: text("group_image_url"),
+  groupTitle: text("group_title"),
+  groupText: text("group_text"),
 }, (table) => ({
   examIdIdx: index("questions_exam_id_idx").on(table.examId),
 }));

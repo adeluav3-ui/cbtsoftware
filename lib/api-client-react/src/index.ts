@@ -65,6 +65,8 @@ export interface Question {
     groupId?: number | null;
     groupOrder?: number | null;
     groupImageUrl?: string | null;
+    groupTitle?: string | null;
+    groupText?: string | null;
 }
 
 export interface GroupedQuestion {
@@ -72,6 +74,8 @@ export interface GroupedQuestion {
     groupId?: number;
     groupOrder?: number;
     groupImageUrl?: string | null;
+    groupTitle?: string | null;
+    groupText?: string | null;
     questions?: Question[];
     question?: Question;
 }
@@ -245,11 +249,11 @@ export const api = {
 
         bulkAddQuestions: async (schoolCode: string, examId: number, questions: Array<{
             text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string;
-        }>, groupId?: number | null) => {
+        }>, groupId?: number | null, groupTitle?: string | null, groupText?: string | null, groupImageUrl?: string | null) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questions, groupId }),
+                body: JSON.stringify({ questions, groupId, groupTitle, groupText, groupImageUrl }),
                 credentials: 'include',
             });
             return response.json();
@@ -294,7 +298,7 @@ export const api = {
         },
 
         addQuestion: async (schoolCode: string, examId: number, data: {
-            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null;
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null;
         }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions`, {
                 method: 'POST',
@@ -531,7 +535,7 @@ export function useListExams(schoolCode: string, filters?: { class?: string; act
 export function useBulkAddQuestions(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, examId, questions, groupId }: {
+        mutationFn: ({ schoolCode, examId, questions, groupId, groupTitle, groupText, groupImageUrl }: {
             schoolCode: string;
             examId: number;
             questions: Array<{
@@ -539,7 +543,10 @@ export function useBulkAddQuestions(options?: MutationOptions) {
                 optionC: string; optionD: string; correctOption: string;
             }>;
             groupId?: number | null;
-        }) => api.exams.bulkAddQuestions(schoolCode, examId, questions, groupId),
+            groupTitle?: string | null;
+            groupText?: string | null;
+            groupImageUrl?: string | null;
+        }) => api.exams.bulkAddQuestions(schoolCode, examId, questions, groupId, groupTitle, groupText, groupImageUrl),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
             options?.mutation?.onSuccess?.();
@@ -601,7 +608,7 @@ export function useAddQuestion(options?: MutationOptions) {
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
             schoolCode: string; examId: number; data: {
-                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null;
+                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null;
             }
         }) => api.exams.addQuestion(schoolCode, examId, data),
         onSuccess: (_, variables) => {

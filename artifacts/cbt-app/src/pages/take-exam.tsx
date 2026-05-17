@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useSubmitExam, Question, type GroupedQuestion } from "@workspace/api-client-react";
+import { useGetExam, useSubmitExam, Question, GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal } from "@/components/ui-elements";
 import { Clock, AlertCircle, CheckCircle2, Layers } from "lucide-react";
 import { motion } from "framer-motion";
@@ -31,44 +31,16 @@ export default function TakeExam() {
   const [isFinished, setIsFinished] = useState(false);
   const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
 
-  // Shuffle groups and individual questions while preserving group order
-  const shuffledExamItems = useMemo(() => {
-    if (!exam?.questions) return [];
+  // Use exam questions in teacher's original order — no shuffling
+  const orderedExamItems = useMemo<GroupedQuestion[]>(
+    () => (exam?.questions as GroupedQuestion[]) ?? [],
+    [exam?.questions]
+  );
 
-    const groups: any[] = [];
-    const individuals: any[] = [];
-
-    for (const item of exam.questions) {
-      if (item.isGroup) {
-        groups.push(item);
-      } else if (item.question) {
-        individuals.push(item);
-      }
-    }
-
-    for (let i = groups.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [groups[i], groups[j]] = [groups[j], groups[i]];
-    }
-
-    for (let i = individuals.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [individuals[i], individuals[j]] = [individuals[j], individuals[i]];
-    }
-
-    const allItems = [...groups, ...individuals];
-    for (let i = allItems.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
-    }
-
-    return allItems;
-  }, [exam?.questions]);
-
-  // Flatten questions for easy navigation
+  // Flatten all questions in order for navigation
   const flattenedQuestions = useMemo(() => {
-    const flat: any[] = [];
-    for (const item of shuffledExamItems) {
+    const flat: Question[] = [];
+    for (const item of orderedExamItems) {
       if (item.isGroup && item.questions) {
         flat.push(...item.questions);
       } else if (item.question) {
@@ -76,46 +48,52 @@ export default function TakeExam() {
       }
     }
     return flat;
-  }, [shuffledExamItems]);
+  }, [orderedExamItems]);
 
-  // Get current question/group context
+  // Get current question and its full group context
   const getCurrentContext = () => {
-    if (!shuffledExamItems.length) return { question: null, groupImage: null, isGroupStart: false, groupId: null };
+    if (!orderedExamItems.length) {
+      return { question: null, groupTitle: null, groupText: null, groupImage: null, groupId: null };
+    }
 
     let flatIndex = 0;
-    for (const item of shuffledExamItems) {
+    for (const item of orderedExamItems) {
       if (item.isGroup && item.questions) {
         if (currentIdx >= flatIndex && currentIdx < flatIndex + item.questions.length) {
           const questionIndex = currentIdx - flatIndex;
           return {
             question: item.questions[questionIndex],
-            groupImage: item.groupImageUrl,
-            isGroupStart: questionIndex === 0,
-            groupId: item.groupId
+            groupTitle: item.groupTitle || null,
+            groupText: item.groupText || null,
+            groupImage: item.groupImageUrl || null,
+            groupId: item.groupId || null,
           };
         }
         flatIndex += item.questions.length;
       } else if (item.question) {
         if (currentIdx === flatIndex) {
-          return { question: item.question, groupImage: null, isGroupStart: false, groupId: null };
+          return { question: item.question, groupTitle: null, groupText: null, groupImage: null, groupId: null };
         }
         flatIndex++;
       }
     }
-    return { question: null, groupImage: null, isGroupStart: false, groupId: null };
+    return { question: null, groupTitle: null, groupText: null, groupImage: null, groupId: null };
   };
 
   const currentContext = getCurrentContext();
   const q = currentContext.question;
 
   useEffect(() => {
-    if (hasStarted && timeLeft > 0 && !isFinished) {
-      const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
-      return () => clearInterval(timer);
-    } else if (hasStarted && timeLeft === 0 && !isFinished) {
+    if (!hasStarted || isFinished || timeLeft <= 0) return;
+    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    return () => clearInterval(timer);
+  }, [hasStarted, timeLeft, isFinished]);
+
+  useEffect(() => {
+    if (hasStarted && !isFinished && timeLeft === 0) {
       handleFinalSubmit();
     }
-  }, [hasStarted, timeLeft, isFinished]);
+  }, [hasStarted, isFinished, timeLeft]);
 
   useEffect(() => {
     if (hasStarted && Object.keys(answers).length > 0) {
@@ -240,22 +218,30 @@ export default function TakeExam() {
                 Question {currentIdx + 1} of {flattenedQuestions.length}
               </div>
 
-              {/* Group Image Display */}
-              {currentContext.groupImage && currentContext.isGroupStart && (
-                <div className="mb-4 p-3 bg-muted/20 rounded-xl border border-primary/20">
+              {/* Group Context — shown on every question in the group */}
+              {currentContext.groupId && (currentContext.groupText || currentContext.groupImage) && (
+                <div className="mb-5 p-4 bg-muted/30 rounded-xl border border-primary/20">
                   <div className="flex items-center gap-2 mb-2 text-primary">
-                    <Layers className="w-3 h-3" />
-                    <span className="text-xs font-semibold">Group {currentContext.groupId}</span>
+                    <Layers className="w-4 h-4" />
+                    <span className="text-sm font-bold">{currentContext.groupTitle}</span>
                   </div>
-                  <img src={currentContext.groupImage} alt="Group illustration" className="max-w-full max-h-48 object-contain rounded-lg mx-auto" />
-                  <p className="text-center text-xs text-muted-foreground mt-2">Answer based on the image above</p>
+                  {currentContext.groupText && (
+                    <p className="text-sm text-foreground leading-relaxed mb-3 whitespace-pre-line">{currentContext.groupText}</p>
+                  )}
+                  {currentContext.groupImage && (
+                    <img
+                      src={currentContext.groupImage}
+                      alt="Group illustration"
+                      className="max-w-full max-h-56 object-contain rounded-lg mx-auto border border-border"
+                    />
+                  )}
                 </div>
               )}
 
               {/* Question Content */}
               <div className="mb-6">
                 <h2 className="text-base md:text-2xl font-semibold">{q.text}</h2>
-                {q.imageUrl && !currentContext.groupImage && (
+                {q.imageUrl && (
                   <div className="mt-3">
                     <img src={q.imageUrl} alt="Question illustration" className="max-w-full max-h-48 object-contain rounded-lg border border-border mx-auto" loading="lazy" />
                   </div>
