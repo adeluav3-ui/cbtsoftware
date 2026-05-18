@@ -75,7 +75,7 @@ export default function SuperAdminDashboard() {
 
   const handleAssign = (e: React.FormEvent) => {
     e.preventDefault();
-    updateName({ data: { code: selectedCode, name: nameInput } });
+    updateName({ code: selectedCode, name: nameInput });
   };
 
   const handleAddSchool = async (e: React.FormEvent) => {

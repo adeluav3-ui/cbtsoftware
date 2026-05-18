@@ -321,14 +321,14 @@ export default function TeacherDashboard() {
                     <p className="text-muted-foreground">No students in {classFilter} yet.</p>
                   </td></tr>
                 ) : (
-                  students.map((s: Student) => (
+                  students.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
                       onClick={() => {
                         setSelectedStudentId(s.id);
                         setSelectedStudentName(s.fullName || s.username);
-                        setSelectedStudentClass(s.class);
+                        setSelectedStudentClass(s.class || '');
                         setStudentResultsModalOpen(true);
                       }}
                     >
@@ -367,7 +367,7 @@ export default function TeacherDashboard() {
 
           <div className="space-y-6">
             {CLASSES.map(className => {
-              const classStudents = students.filter((s: Student) => s.class === className);
+              const classStudents = students.filter((s) => s.class === className);
               if (classStudents.length === 0) return null;
 
               return (
@@ -390,7 +390,7 @@ export default function TeacherDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {classStudents.map((student: Student) => {
+                        {classStudents.map((student) => {
                           const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
                           const completedSubjects = studentSubjectScores.filter((s: any) => {
                             return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
@@ -405,10 +405,10 @@ export default function TeacherDashboard() {
                           }
                           return (
                             <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer">
-                              <td className="px-3 py-2 font-semibold text-primary" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class); setStudentResultsModalOpen(true); }}>
+                              <td className="px-3 py-2 font-semibold text-primary" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
                                 {student.fullName}
                               </td>
-                              <td className="px-3 py-2 text-muted-foreground text-xs" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class); setStudentResultsModalOpen(true); }}>
+                              <td className="px-3 py-2 text-muted-foreground text-xs" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
                                 {student.username}
                               </td>
                               <td className="px-3 py-2 text-center">{studentSubjectScores.length}</td>
@@ -426,7 +426,7 @@ export default function TeacherDashboard() {
                                 </Badge>
                               </td>
                               <td className="px-3 py-2 text-center">
-                                <Button variant="secondary" size="sm" className="p-1.5" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class); setStudentResultsModalOpen(true); }}>
+                                <Button variant="secondary" size="sm" className="p-1.5" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
                                   <ClipboardList className="w-4 h-4" />
                                 </Button>
                               </td>

@@ -104,7 +104,7 @@ export default function StudentDashboard() {
             </div>
             <div className="text-right flex items-center gap-2">
               <div className="text-xl font-bold text-primary">{result.percentage}%</div>
-              <Button variant="outline" size="sm" className="p-1.5" onClick={() => openRetakeModal(result.examId, result.examTitle || result.subject)}>
+              <Button variant="outline" size="sm" className="p-1.5" onClick={() => openRetakeModal(result.examId, result.examTitle || result.subject || '')}>
                 <RotateCcw className="w-3 h-3" />
               </Button>
             </div>

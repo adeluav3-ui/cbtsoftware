@@ -168,7 +168,7 @@ export const api = {
     },
 
     teachers: {
-        list: async (schoolCode: string) => {
+        list: async (schoolCode: string): Promise<User[]> => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/teachers`, {
                 credentials: 'include',
             });
@@ -202,7 +202,7 @@ export const api = {
     },
 
     students: {
-        list: async (schoolCode: string, className?: string) => {
+        list: async (schoolCode: string, className?: string): Promise<User[]> => {
             const params = className ? `?class=${encodeURIComponent(className)}` : '';
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students${params}`, {
                 credentials: 'include',
@@ -329,7 +329,7 @@ export const api = {
     },
 
     results: {
-        list: async (schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }) => {
+        list: async (schoolCode: string, filters?: { examId?: number; studentId?: number; teacherId?: number }): Promise<Result[]> => {
             const params = new URLSearchParams();
             if (filters?.examId) params.append('examId', String(filters.examId));
             if (filters?.studentId) params.append('studentId', String(filters.studentId));

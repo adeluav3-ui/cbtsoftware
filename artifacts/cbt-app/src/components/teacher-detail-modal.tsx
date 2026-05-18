@@ -97,7 +97,7 @@ export function TeacherDetailModal({ teacherId, teacherName, schoolCode, onClose
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Badge variant={exam.isActive ? "success" : "secondary"}>
+                          <Badge variant={exam.isActive ? "success" : "default"}>
                             {exam.isActive ? "Live" : "Draft"}
                           </Badge>
                           {expandedExam === exam.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
