@@ -18,21 +18,29 @@ const router = Router({ mergeParams: true });
 router.get("/", requireAuth, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
 
+  // Verify the user belongs to this school (super_admin can access any school)
+  if (req.session.role !== "super_admin" && req.session.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
+  }
+
   try {
     const { teacherId, examId, studentId } = req.query;
 
     const conditions: any[] = [eq(resultsTable.schoolCode, schoolCode)];
 
-    if (examId) {
-      conditions.push(eq(resultsTable.examId, parseInt(examId as string)));
-    }
-
-    if (studentId) {
-      conditions.push(eq(resultsTable.studentId, parseInt(studentId as string)));
-    }
-
-    if (teacherId) {
-      conditions.push(eq(examsTable.teacherId, parseInt(teacherId as string)));
+    if (req.session.role === "student") {
+      // Students can only ever see their own results — ignore any query filters
+      conditions.push(eq(resultsTable.studentId, req.session.userId!));
+    } else {
+      if (examId) {
+        conditions.push(eq(resultsTable.examId, parseInt(examId as string)));
+      }
+      if (studentId) {
+        conditions.push(eq(resultsTable.studentId, parseInt(studentId as string)));
+      }
+      if (teacherId) {
+        conditions.push(eq(examsTable.teacherId, parseInt(teacherId as string)));
+      }
     }
 
     const results = await db
@@ -68,6 +76,11 @@ router.get("/", requireAuth, async (req: Request<SchoolParams>, res: Response) =
 router.get("/:resultId/detail", requireAuth, async (req: Request<ResultParams>, res: Response) => {
   const { schoolCode, resultId } = req.params;
 
+  // Verify the user belongs to this school (super_admin can access any school)
+  if (req.session.role !== "super_admin" && req.session.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
+  }
+
   try {
     const [result] = await db
       .select({
@@ -95,6 +108,11 @@ router.get("/:resultId/detail", requireAuth, async (req: Request<ResultParams>, 
 
     if (!result) {
       return res.status(404).json({ error: "Result not found" });
+    }
+
+    // Students can only view their own result detail
+    if (req.session.role === "student" && result.studentId !== req.session.userId) {
+      return res.status(403).json({ error: "Not authorized" });
     }
 
     const answers = await db

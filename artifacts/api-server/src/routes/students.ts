@@ -573,6 +573,11 @@ router.post("/:studentId/profile-picture", requireAuth, async (req: Request<Stud
   const { schoolCode, studentId } = req.params;
   const { profilePictureUrl } = req.body;
 
+  // Students can only update their own profile picture
+  if (req.session.role === "student" && req.session.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
   if (!profilePictureUrl) {
     return res.status(400).json({ error: "Profile picture URL required" });
   }
