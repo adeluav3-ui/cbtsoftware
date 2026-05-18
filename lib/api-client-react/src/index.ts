@@ -10,8 +10,8 @@ export const getListSchoolsQueryKey = () => ['schools'];
 export const getListTeachersQueryKey = (schoolCode: string) => ['teachers', schoolCode];
 export const getListStudentsQueryKey = (schoolCode: string, className?: string) => ['students', schoolCode, className];
 export const getListExamsQueryKey = (schoolCode: string, filters?: any) => ['exams', schoolCode, filters];
-export const getExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
 export const getGetExamQueryKey = (schoolCode: string, examId: number) => ['exam', schoolCode, examId];
+export const getExamQueryKey = getGetExamQueryKey;
 export const getListResultsQueryKey = (schoolCode: string, filters?: any) => ['results', schoolCode, filters];
 export const getResultDetailQueryKey = (schoolCode: string, resultId: number) => ['result', schoolCode, resultId];
 

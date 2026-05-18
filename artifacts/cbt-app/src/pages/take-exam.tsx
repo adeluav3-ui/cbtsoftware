@@ -9,7 +9,7 @@ import { ResultDetailModal } from "@/components/result-detail-modal";
 
 export default function TakeExam() {
   const { examId: rawExamId } = useParams();
-  const examId = parseInt(rawExamId || "0");
+  const examId = parseInt(rawExamId ?? "");
   const { user } = useAuth();
   const schoolCode = user?.schoolCode || "";
   const [, setLocation] = useLocation();
@@ -162,6 +162,7 @@ export default function TakeExam() {
     });
   };
 
+  if (isNaN(examId)) return <div className="h-screen flex items-center justify-center text-sm text-destructive">Invalid exam link.</div>;
   if (isLoading || !exam) return <div className="h-screen flex items-center justify-center text-sm">Loading exam...</div>;
 
   if (!hasStarted) {

@@ -126,8 +126,9 @@ export default function TeacherDashboard() {
         `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects?level=${level}`,
         { credentials: "include" }
       );
+      if (!response.ok) return;
       const data = await response.json();
-      setSubjects(data);
+      if (Array.isArray(data)) setSubjects(data);
     } catch (err) {
       console.error("Failed to fetch subjects", err);
     }

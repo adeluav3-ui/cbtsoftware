@@ -4,7 +4,7 @@ import { rateLimit } from "express-rate-limit";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, inArray } from "drizzle-orm";
-import { requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
+import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -195,7 +195,7 @@ router.post("/:schoolCode/retake-passcode", requireSchoolAdmin, async (req: Requ
 });
 
 // Submit exam retake with passcode verification
-router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, retakeLimiter, async (req: Request, res: Response) => {
+router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, async (req: Request, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const examIdNum = Number(examId);
@@ -203,6 +203,11 @@ router.post("/:schoolCode/exams/:examId/retake", requireSchoolAdmin, retakeLimit
 
   if (!studentId || !passcode) {
     return res.status(400).json({ error: "studentId and passcode are required" });
+  }
+
+  // Students can only retake their own exam
+  if (req.session.role === "student" && req.session.userId !== Number(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
   }
 
   try {
