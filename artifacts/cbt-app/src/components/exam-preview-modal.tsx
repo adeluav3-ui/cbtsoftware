@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { type GroupedQuestion, type Question } from "@workspace/api-client-react";
 import { Button } from "@/components/ui-elements";
 import { Clock, Layers, X, CheckCircle2 } from "lucide-react";
@@ -74,8 +75,8 @@ export function ExamPreviewModal({ isOpen, onClose, exam }: Props) {
   const ctx = getCurrentContext();
   const q = ctx.question;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-9999 bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-card border-b border-border p-3 shadow-sm shrink-0 flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -240,6 +241,7 @@ export function ExamPreviewModal({ isOpen, onClose, exam }: Props) {
           </div>
         </div>
       </main>
-    </div>
+    </div>,
+    document.body
   );
 }
