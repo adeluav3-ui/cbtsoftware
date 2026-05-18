@@ -6,8 +6,9 @@ import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, use
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload, Layers } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload, Layers, Eye } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
+import { ExamPreviewModal } from "@/components/exam-preview-modal";
 
 interface GroupMeta {
   groupId: number;
@@ -48,6 +49,9 @@ export default function TeacherExamDetails() {
   // Bulk upload modal state
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [bulkGroupMeta, setBulkGroupMeta] = useState<GroupMeta | null>(null);
+
+  // Preview modal state
+  const [isPreviewOpen, setPreviewOpen] = useState(false);
 
   // Extract available groups from exam data
   const getAvailableGroups = (): GroupMeta[] => {
@@ -292,6 +296,9 @@ export default function TeacherExamDetails() {
               <Radio className="w-4 h-4 mr-2" /> Publish Exam
             </Button>
           )}
+          <Button variant="outline" onClick={() => setPreviewOpen(true)} disabled={flatQuestionCount === 0}>
+            <Eye className="w-4 h-4 mr-2" /> Preview
+          </Button>
           <Button variant="outline" onClick={() => setGroupModalOpen(true)}>
             <Layers className="w-4 h-4 mr-2" /> Create Group
           </Button>
@@ -554,6 +561,18 @@ export default function TeacherExamDetails() {
           groupImageUrl: bulkGroupMeta?.groupImageUrl ?? null,
         })}
         isPending={isBulkPending}
+      />
+
+      {/* Exam preview — full-screen student view with correct answers shown */}
+      <ExamPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setPreviewOpen(false)}
+        exam={{
+          title: exam.title,
+          subject: exam.subject,
+          durationMinutes: exam.durationMinutes,
+          questions: (exam.questions as GroupedQuestion[]) ?? [],
+        }}
       />
     </DashboardLayout>
   );
