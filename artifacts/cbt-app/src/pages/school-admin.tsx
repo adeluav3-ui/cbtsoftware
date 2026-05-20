@@ -18,8 +18,8 @@ export default function SchoolAdminDashboard() {
   const [activeTab, setActiveTab] = useState("Teachers");
   const queryClient = useQueryClient();
 
-  const [classFilter, setClassFilter] = useState("JSS1");
-  const CLASSES = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const [classFilter, setClassFilter] = useState("KG1");
+  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
@@ -51,7 +51,7 @@ export default function SchoolAdminDashboard() {
   const [sUsername, setSUsername] = useState("");
   const [sPassword, setSPassword] = useState("");
   const [sFullName, setSFullName] = useState("");
-  const [sClass, setSClass] = useState("JSS1");
+  const [sClass, setSClass] = useState("KG1");
 
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
@@ -65,7 +65,7 @@ export default function SchoolAdminDashboard() {
   const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
-  const [newSubjectLevel, setNewSubjectLevel] = useState<"primary" | "junior" | "senior">("primary");
+  const [newSubjectLevel, setNewSubjectLevel] = useState<"kg" | "nursery" | "primary" | "junior" | "senior">("kg");
   const [subjectError, setSubjectError] = useState("");
   const [isAddingSubject, setIsAddingSubject] = useState(false);
 
@@ -80,7 +80,7 @@ export default function SchoolAdminDashboard() {
   // Bulk subject upload state
   const [bulkSubjectModalOpen, setBulkSubjectModalOpen] = useState(false);
   const [bulkSubjectsText, setBulkSubjectsText] = useState("");
-  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"primary" | "junior" | "senior">("primary");
+  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"kg" | "nursery" | "primary" | "junior" | "senior">("kg");
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [bulkSubjectError, setBulkSubjectError] = useState("");
   const [bulkSubjectSuccess, setBulkSubjectSuccess] = useState("");
@@ -306,7 +306,7 @@ export default function SchoolAdminDashboard() {
       await fetchSubjects();
       setSubjectModalOpen(false);
       setNewSubjectName("");
-      setNewSubjectLevel("junior");
+      setNewSubjectLevel("kg");
       setSubjectError("");
     } catch (err) {
       setSubjectError("Network error. Please try again.");
@@ -756,7 +756,7 @@ export default function SchoolAdminDashboard() {
             <div>
               <h2 className="text-lg md:text-xl font-bold font-display">Subject Management</h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                Add subjects for Primary (Pry 1-5), Junior Secondary (JSS1-3) and Senior Secondary (SSS1-3)
+                Add subjects for KG, Nursery, Primary, Junior and Senior Secondary classes
               </p>      </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" size="sm" onClick={() => setBulkSubjectModalOpen(true)} className="w-full sm:w-auto">
@@ -777,49 +777,38 @@ export default function SchoolAdminDashboard() {
               <p className="text-sm mt-1">Click "Add Subject" to start adding subjects for your school</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-semibold">Junior Secondary (JSS1-3)</h3>
-                  <Badge variant="default">{subjects.filter(s => s.level === 'junior').length}</Badge>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {([
+                { level: 'kg', label: 'Kindergarten (KG1, KG2)' },
+                { level: 'nursery', label: 'Nursery (Nursery 1, Nursery 2)' },
+                { level: 'primary', label: 'Primary (Pry 1-5)' },
+                { level: 'junior', label: 'Junior Secondary (JSS1-3)' },
+                { level: 'senior', label: 'Senior Secondary (SSS1-3)' },
+              ] as const).map(({ level, label }) => (
+                <div key={level}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="text-base font-semibold">{label}</h3>
+                    <Badge variant="default">{subjects.filter(s => s.level === level).length}</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {subjects.filter(s => s.level === level).length === 0 ? (
+                      <p className="text-xs text-muted-foreground px-1">No subjects added yet</p>
+                    ) : subjects.filter(s => s.level === level).map(subject => (
+                      <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
+                        <span className="font-medium">{subject.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSubject(subject.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {subjects.filter(s => s.level === 'junior').map(subject => (
-                    <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
-                      <span className="font-medium">{subject.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteSubject(subject.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-semibold">Senior Secondary (SSS1-3)</h3>
-                  <Badge variant="default">{subjects.filter(s => s.level === 'senior').length}</Badge>
-                </div>
-                <div className="space-y-2">
-                  {subjects.filter(s => s.level === 'senior').map(subject => (
-                    <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
-                      <span className="font-medium">{subject.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteSubject(subject.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
           )}
 
@@ -837,7 +826,9 @@ export default function SchoolAdminDashboard() {
               </div>
               <div>
                 <Label>Level</Label>
-                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "primary" | "junior" | "senior")}>
+                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                  <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
@@ -858,7 +849,9 @@ export default function SchoolAdminDashboard() {
             <div className="space-y-4">
               <div>
                 <Label>Level</Label>
-                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "primary" | "junior" | "senior")}>
+                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                  <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
@@ -883,7 +876,20 @@ export default function SchoolAdminDashboard() {
               <div className="bg-muted/20 p-3 rounded-lg">
                 <p className="text-sm font-semibold mb-2">Common Subjects:</p>
                 <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                  {bulkSubjectsLevel === "primary" ? (
+                  {bulkSubjectsLevel === "kg" ? (
+                    <>
+                      <span>• Literacy</span> <span>• Numeracy</span> <span>• Phonics</span>
+                      <span>• Creative Arts</span> <span>• Music & Movement</span> <span>• Environmental Studies</span>
+                      <span>• Physical Education</span> <span>• Religious Studies</span> <span>• Social Skills</span>
+                    </>
+                  ) : bulkSubjectsLevel === "nursery" ? (
+                    <>
+                      <span>• Literacy</span> <span>• Numeracy</span> <span>• Phonics</span>
+                      <span>• Creative Arts</span> <span>• Social Studies</span> <span>• Religious Studies</span>
+                      <span>• Physical Education</span> <span>• Music</span> <span>• Environmental Studies</span>
+                      <span>• Handwriting</span> <span>• Science</span> <span>• French</span>
+                    </>
+                  ) : bulkSubjectsLevel === "primary" ? (
                     <>
                       <span>• Mathematics</span> <span>• English Language</span> <span>• Basic Science</span>
                       <span>• Social Studies</span> <span>• Civic Education</span> <span>• Christian Religious Studies</span>
@@ -951,7 +957,7 @@ export default function SchoolAdminDashboard() {
       <Modal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Start New Academic Session">
         <div className="space-y-4 text-muted-foreground">
           <p>Are you sure you want to start a new academic session?</p>
-          <p className="text-destructive font-bold">This will automatically promote all students to their next class (e.g. JSS1 to JSS2). SSS3 students will be graduated.</p>
+          <p className="text-destructive font-bold">This will automatically promote all students to their next class (e.g. KG1 → KG2, Nursery 2 → Pry 1, JSS1 → JSS2). SSS3 students will be graduated.</p>
           <div className="flex justify-end pt-4">
             <Button variant="ghost" onClick={() => setSessionModalOpen(false)} className="mr-3">Cancel</Button>
             <Button variant="destructive" onClick={() => newSession({ schoolCode })} isLoading={isNSPending}>Yes, Promote Students</Button>

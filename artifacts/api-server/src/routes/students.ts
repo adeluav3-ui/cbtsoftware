@@ -84,9 +84,9 @@ router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Res
     return res.status(400).json({ error: "Username, password, full name and class required" });
   }
 
-  const validClasses = ["JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
   if (!validClasses.includes(studentClass)) {
-    return res.status(400).json({ error: "Invalid class. Must be JSS1, JSS2, JSS3, SSS1, SSS2, or SSS3" });
+    return res.status(400).json({ error: "Invalid class. Must be one of: KG1, KG2, Nursery 1, Nursery 2, Pry 1-5, JSS1-3, or SSS1-3" });
   }
 
   try {
@@ -464,6 +464,41 @@ router.get("/:studentId/subject-scores", requireSchoolStaff, async (req: Request
       });
     }
 
+    // Also include subjects that have manually-entered scores but no CBT exam
+    // (covers KG/Nursery/Primary students who don't do CBT)
+    for (const score of existingScores) {
+      if (!subjectMap.has(score.subjectName)) {
+        const hasMidTerm = score.midTermScore !== null && score.midTermScore !== undefined;
+        const hasClassActivity = score.classActivityScore !== null && score.classActivityScore !== undefined;
+        const hasExam = score.examScore !== null && score.examScore !== undefined;
+
+        let totalScore: number | null = null;
+        let percentage: number | null = null;
+        let grade: string | null = null;
+
+        if (hasMidTerm && hasClassActivity && hasExam) {
+          totalScore = (score.midTermScore || 0) + (score.classActivityScore || 0) + (score.examScore || 0);
+          percentage = totalScore;
+
+          if (percentage >= scheme.gradeAMin) grade = 'A';
+          else if (percentage >= scheme.gradeBMin) grade = 'B';
+          else if (percentage >= scheme.gradeCMin) grade = 'C';
+          else if (percentage >= scheme.gradeDMin) grade = 'D';
+          else grade = 'F';
+        }
+
+        subjectMap.set(score.subjectName, {
+          subjectName: score.subjectName,
+          midTermScore: hasMidTerm ? score.midTermScore : null,
+          classActivityScore: hasClassActivity ? score.classActivityScore : null,
+          examScore: hasExam ? score.examScore : null,
+          totalScore,
+          percentage,
+          grade,
+        });
+      }
+    }
+
     const result = Array.from(subjectMap.values());
     res.json(result);
     return;
@@ -541,6 +576,61 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
     }
 
     res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Initialize an empty subject entry for a student (for non-CBT students like KG/Nursery)
+router.post("/:studentId/init-subject", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { subjectName } = req.body;
+
+  if (!subjectName || !subjectName.trim()) {
+    return res.status(400).json({ error: "subjectName is required" });
+  }
+
+  try {
+    const [student] = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.id, parseInt(studentId)), eq(usersTable.schoolCode, schoolCode)))
+      .limit(1);
+
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    const [existing] = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.subjectName, subjectName.trim()),
+          eq(subjectScoresTable.schoolCode, schoolCode)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return res.status(409).json({ error: "Subject already exists for this student" });
+    }
+
+    const [created] = await db
+      .insert(subjectScoresTable)
+      .values({
+        studentId: parseInt(studentId),
+        subjectName: subjectName.trim(),
+        className: student.class || "Unknown",
+        schoolCode,
+      })
+      .returning();
+
+    res.status(201).json(created);
     return;
   } catch (err) {
     console.error(err);

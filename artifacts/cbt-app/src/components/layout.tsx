@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation, Link } from "wouter";
 import { useLogout } from "@workspace/api-client-react";
-import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Upload, Camera } from "lucide-react";
+import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Upload, Camera, ClipboardList } from "lucide-react";
 import { cn } from "./ui-elements";
 
 const API = import.meta.env.VITE_API_URL as string;
@@ -132,7 +132,10 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     super_admin: [{ title: "Schools", path: "/super-admin", icon: Building }],
     school_admin: [{ title: "Dashboard", path: "/school-admin", icon: LayoutDashboard }],
     teacher: [{ title: "Dashboard", path: "/teacher", icon: BookOpen }],
-    student: [{ title: "My Exams", path: "/student", icon: PenTool }],
+    student: [
+      { title: "My Exams", path: "/student", icon: PenTool },
+      { title: "My Results", path: "/student/results", icon: ClipboardList },
+    ],
   }[user.role] || [];
 
   // Sidebar content component (reused for both desktop and mobile)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal, Badge, Button, Input } from "@/components/ui-elements";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Pencil, X, Plus } from "lucide-react";
 
 interface SubjectResult {
     subjectName: string;
@@ -24,6 +24,68 @@ interface StudentResultsModalProps {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
 
+// ScoreInput defined outside parent to avoid hook identity issues on re-render
+interface ScoreInputProps {
+    subjectName: string;
+    component: string;
+    currentScore: number | null;
+    maxScore: number;
+    label: string;
+    editingScores: Record<string, number>;
+    saving: string | null;
+    onEdit: (key: string, value: number) => void;
+    onCancelEdit: (key: string) => void;
+    onSave: (subjectName: string, component: string, value: number) => void;
+}
+
+function ScoreInput({ subjectName, component, currentScore, maxScore, label, editingScores, saving, onEdit, onCancelEdit, onSave }: ScoreInputProps) {
+    const key = `${subjectName}-${component}`;
+    const isEditing = key in editingScores;
+    const tempValue = isEditing ? editingScores[key] : (currentScore ?? 0);
+
+    if (isEditing) {
+        return (
+            <div className="flex gap-1 justify-center items-center">
+                <Input
+                    type="number"
+                    min={0}
+                    max={maxScore}
+                    value={tempValue}
+                    onChange={(e) => onEdit(key, Math.min(maxScore, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-16 text-center text-sm"
+                />
+                <Button size="sm" onClick={() => onSave(subjectName, component, tempValue)} isLoading={saving === key} className="px-2">
+                    <Save className="w-3 h-3" />
+                </Button>
+                <button className="text-muted-foreground hover:text-foreground p-1" onClick={() => onCancelEdit(key)}>
+                    <X className="w-3 h-3" />
+                </button>
+            </div>
+        );
+    }
+
+    if (currentScore !== null) {
+        return (
+            <div className="flex items-center justify-center gap-1">
+                <span className="font-medium">{currentScore}/{maxScore}</span>
+                <button
+                    className="text-muted-foreground hover:text-primary transition-colors p-0.5"
+                    title="Edit score"
+                    onClick={() => onEdit(key, currentScore)}
+                >
+                    <Pencil className="w-3 h-3" />
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <Button variant="outline" size="sm" onClick={() => onEdit(key, 0)} className="text-xs">
+            Enter {label}
+        </Button>
+    );
+}
+
 export function StudentResultsModal({
     isOpen,
     onClose,
@@ -37,12 +99,25 @@ export function StudentResultsModal({
     const [isLoading, setIsLoading] = useState(true);
     const [overallAverage, setOverallAverage] = useState(0);
     const [completedSubjectsCount, setCompletedSubjectsCount] = useState(0);
-    const [editingScores, setEditingScores] = useState<{ [key: string]: { type: string; value: number } }>({});
+    // key = "subjectName-component", value = current input value while editing
+    const [editingScores, setEditingScores] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState<string | null>(null);
+
+    // Add subject state
+    const [showAddSubject, setShowAddSubject] = useState(false);
+    const [newSubjectName, setNewSubjectName] = useState("");
+    const [isAddingSubject, setIsAddingSubject] = useState(false);
+    const [addSubjectError, setAddSubjectError] = useState("");
 
     useEffect(() => {
         if (isOpen && studentId) {
             fetchResults();
+        }
+        if (!isOpen) {
+            setEditingScores({});
+            setShowAddSubject(false);
+            setNewSubjectName("");
+            setAddSubjectError("");
         }
     }, [isOpen, studentId]);
 
@@ -57,7 +132,7 @@ export function StudentResultsModal({
             const data = await response.json();
             if (!Array.isArray(data)) return;
 
-            const processedSubjects = data.map((subject: any) => {
+            const processedSubjects: SubjectResult[] = data.map((subject: any) => {
                 const hasMidTerm = subject.midTermScore !== null && subject.midTermScore !== undefined;
                 const hasActivity = subject.classActivityScore !== null && subject.classActivityScore !== undefined;
                 const hasExam = subject.examScore !== null && subject.examScore !== undefined;
@@ -80,22 +155,23 @@ export function StudentResultsModal({
 
                 return {
                     subjectName: subject.subjectName,
-                    midTermScore: subject.midTermScore,
-                    classActivityScore: subject.classActivityScore,
-                    examScore: subject.examScore,
-                    totalScore: totalScore,
-                    percentage: percentage,
-                    grade: grade,
+                    midTermScore: hasMidTerm ? subject.midTermScore : null,
+                    classActivityScore: hasActivity ? subject.classActivityScore : null,
+                    examScore: hasExam ? subject.examScore : null,
+                    totalScore,
+                    percentage,
+                    grade,
                 };
             });
 
             setSubjects(processedSubjects);
+            setEditingScores({});
 
-            const completedSubjects = processedSubjects.filter((s: SubjectResult) => s.percentage !== null);
+            const completedSubjects = processedSubjects.filter((s) => s.percentage !== null);
             setCompletedSubjectsCount(completedSubjects.length);
 
             if (completedSubjects.length > 0) {
-                const total = completedSubjects.reduce((acc: number, s: SubjectResult) => acc + (s.percentage || 0), 0);
+                const total = completedSubjects.reduce((acc, s) => acc + (s.percentage || 0), 0);
                 setOverallAverage(total / completedSubjects.length);
             } else {
                 setOverallAverage(0);
@@ -108,18 +184,15 @@ export function StudentResultsModal({
     };
 
     const handleSaveScore = async (subjectName: string, component: string, score: number) => {
-        setSaving(`${subjectName}-${component}`);
+        const key = `${subjectName}-${component}`;
+        setSaving(key);
         try {
             const response = await fetch(
                 `${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/subject-scores`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        subjectName,
-                        component,
-                        score,
-                    }),
+                    body: JSON.stringify({ subjectName, component, score }),
                     credentials: "include",
                 }
             );
@@ -127,17 +200,56 @@ export function StudentResultsModal({
             if (response.ok) {
                 await fetchResults();
                 onScoresUpdated?.();
-                setEditingScores(prev => {
-                    const newState = { ...prev };
-                    delete newState[`${subjectName}-${component}`];
-                    return newState;
-                });
             }
         } catch (err) {
             console.error("Failed to save", err);
         } finally {
             setSaving(null);
         }
+    };
+
+    const handleAddSubject = async () => {
+        const name = newSubjectName.trim();
+        if (!name) return;
+        setAddSubjectError("");
+        setIsAddingSubject(true);
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/init-subject`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ subjectName: name }),
+                    credentials: "include",
+                }
+            );
+
+            if (response.ok) {
+                setNewSubjectName("");
+                setShowAddSubject(false);
+                await fetchResults();
+                onScoresUpdated?.();
+            } else {
+                const data = await response.json();
+                setAddSubjectError(data.error || "Failed to add subject");
+            }
+        } catch (err) {
+            setAddSubjectError("Network error. Please try again.");
+        } finally {
+            setIsAddingSubject(false);
+        }
+    };
+
+    const handleEditScore = (key: string, value: number) => {
+        setEditingScores(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleCancelEdit = (key: string) => {
+        setEditingScores(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
     };
 
     const getGradeColor = (grade?: string | null) => {
@@ -149,70 +261,6 @@ export function StudentResultsModal({
             case 'D': return 'bg-orange-600 text-white';
             default: return 'bg-red-600 text-white';
         }
-    };
-
-    const ScoreInput = ({
-        subjectName,
-        component,
-        currentScore,
-        maxScore,
-        label
-    }: {
-        subjectName: string;
-        component: string;
-        currentScore: number | null;
-        maxScore: number;
-        label: string;
-    }) => {
-        const isEditing = editingScores[`${subjectName}-${component}`];
-        const [tempValue, setTempValue] = useState(currentScore || 0);
-
-        if (currentScore !== null) {
-            return (
-                <div className="text-center">
-                    <span className="font-medium">{currentScore}/{maxScore}</span>
-                </div>
-            );
-        }
-
-        return (
-            <div className="flex flex-col gap-1">
-                {isEditing ? (
-                    <div className="flex gap-1">
-                        <Input
-                            type="number"
-                            min={0}
-                            max={maxScore}
-                            value={tempValue}
-                            onChange={(e) => setTempValue(parseInt(e.target.value) || 0)}
-                            className="w-16 text-center text-sm"
-                        />
-                        <Button
-                            size="sm"
-                            onClick={() => handleSaveScore(subjectName, component, tempValue)}
-                            isLoading={saving === `${subjectName}-${component}`}
-                            className="px-2"
-                        >
-                            <Save className="w-3 h-3" />
-                        </Button>
-                    </div>
-                ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setEditingScores(prev => ({
-                                ...prev,
-                                [`${subjectName}-${component}`]: { type: component, value: 0 }
-                            }));
-                            setTempValue(0);
-                        }}
-                    >
-                        Enter {label}
-                    </Button>
-                )}
-            </div>
-        );
     };
 
     return (
@@ -243,103 +291,128 @@ export function StudentResultsModal({
                     <div className="flex justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
-                ) : subjects.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                        No results available for this student yet.
-                    </div>
                 ) : (
-                    <div className="overflow-x-auto max-h-[60vh]">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="sticky top-0 bg-background">
-                                <tr className="border-b border-border">
-                                    <th className="px-4 py-3 font-semibold">Subject</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Mid-Term (20 marks)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Class Activity (20 marks)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Exam (60 marks)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Total (100 marks)</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Grade</th>
-                                    <th className="px-4 py-3 font-semibold text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {subjects.map((subject) => {
-                                    const hasMidTerm = subject.midTermScore !== null;
-                                    const hasActivity = subject.classActivityScore !== null;
-                                    const hasExam = subject.examScore !== null;
-                                    const isComplete = hasMidTerm && hasActivity && hasExam;
-
-                                    return (
-                                        <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
-                                            <td className="px-4 py-3 font-medium">{subject.subjectName}</td>
-                                            <td className="px-4 py-3">
-                                                {hasMidTerm ? (
-                                                    <div className="text-center font-medium">{subject.midTermScore}/20</div>
-                                                ) : (
-                                                    <ScoreInput
-                                                        subjectName={subject.subjectName}
-                                                        component="midterm"
-                                                        currentScore={subject.midTermScore}
-                                                        maxScore={20}
-                                                        label="Mid-Term"
-                                                    />
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {hasActivity ? (
-                                                    <div className="text-center font-medium">{subject.classActivityScore}/20</div>
-                                                ) : (
-                                                    <ScoreInput
-                                                        subjectName={subject.subjectName}
-                                                        component="activity"
-                                                        currentScore={subject.classActivityScore}
-                                                        maxScore={20}
-                                                        label="Activity"
-                                                    />
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {hasExam ? (
-                                                    <div className="text-center font-medium">{subject.examScore}/60</div>
-                                                ) : (
-                                                    <ScoreInput
-                                                        subjectName={subject.subjectName}
-                                                        component="exam"
-                                                        currentScore={subject.examScore}
-                                                        maxScore={60}
-                                                        label="Exam"
-                                                    />
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center font-bold">
-                                                {isComplete ? `${subject.totalScore}/100` : "—"}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {subject.grade ? (
-                                                    <Badge className={getGradeColor(subject.grade)}>
-                                                        {subject.grade}
-                                                    </Badge>
-                                                ) : (
-                                                    "—"
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {isComplete ? (
-                                                    <Badge variant="success">Complete</Badge>
-                                                ) : (
-                                                    <Badge variant="default">In Progress</Badge>
-                                                )}
-                                            </td>
+                    <>
+                        {subjects.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <p className="mb-3">No subjects added yet for this student.</p>
+                                <p className="text-xs">Click "Add Subject" below to start entering scores.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto max-h-[55vh]">
+                                <table className="w-full text-left border-collapse text-sm">
+                                    <thead className="sticky top-0 bg-background">
+                                        <tr className="border-b border-border">
+                                            <th className="px-3 py-3 font-semibold">Subject</th>
+                                            <th className="px-3 py-3 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Activity<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/60</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Total<br /><span className="font-normal text-xs text-muted-foreground">/100</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Grade</th>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                    </thead>
+                                    <tbody>
+                                        {subjects.map((subject) => {
+                                            const isComplete = subject.midTermScore !== null && subject.classActivityScore !== null && subject.examScore !== null;
 
-                <div className="pt-4 text-xs text-muted-foreground text-center border-t border-border">
-                    Click "Enter" to add missing scores. Final percentage and grade appear when all three components are entered.
-                </div>
+                                            return (
+                                                <tr key={subject.subjectName} className="border-b border-border/50 hover:bg-muted/20">
+                                                    <td className="px-3 py-2 font-medium">{subject.subjectName}</td>
+                                                    <td className="px-3 py-2">
+                                                        <ScoreInput
+                                                            subjectName={subject.subjectName}
+                                                            component="midterm"
+                                                            currentScore={subject.midTermScore}
+                                                            maxScore={20}
+                                                            label="Mid-Term"
+                                                            editingScores={editingScores}
+                                                            saving={saving}
+                                                            onEdit={handleEditScore}
+                                                            onCancelEdit={handleCancelEdit}
+                                                            onSave={handleSaveScore}
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <ScoreInput
+                                                            subjectName={subject.subjectName}
+                                                            component="activity"
+                                                            currentScore={subject.classActivityScore}
+                                                            maxScore={20}
+                                                            label="Activity"
+                                                            editingScores={editingScores}
+                                                            saving={saving}
+                                                            onEdit={handleEditScore}
+                                                            onCancelEdit={handleCancelEdit}
+                                                            onSave={handleSaveScore}
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <ScoreInput
+                                                            subjectName={subject.subjectName}
+                                                            component="exam"
+                                                            currentScore={subject.examScore}
+                                                            maxScore={60}
+                                                            label="Exam"
+                                                            editingScores={editingScores}
+                                                            saving={saving}
+                                                            onEdit={handleEditScore}
+                                                            onCancelEdit={handleCancelEdit}
+                                                            onSave={handleSaveScore}
+                                                        />
+                                                    </td>
+                                                    <td className="px-3 py-2 text-center font-bold">
+                                                        {isComplete ? `${subject.totalScore}/100` : "—"}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-center">
+                                                        {subject.grade ? (
+                                                            <Badge className={getGradeColor(subject.grade)}>
+                                                                {subject.grade}
+                                                            </Badge>
+                                                        ) : "—"}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* Add Subject Row */}
+                        {showAddSubject ? (
+                            <div className="flex gap-2 items-center pt-1">
+                                <Input
+                                    value={newSubjectName}
+                                    onChange={e => { setNewSubjectName(e.target.value); setAddSubjectError(""); }}
+                                    placeholder="Subject name (e.g. Mathematics)"
+                                    className="flex-1 text-sm"
+                                    onKeyDown={e => { if (e.key === 'Enter') handleAddSubject(); if (e.key === 'Escape') { setShowAddSubject(false); setNewSubjectName(""); } }}
+                                    autoFocus
+                                />
+                                <Button size="sm" onClick={handleAddSubject} isLoading={isAddingSubject} disabled={!newSubjectName.trim()}>
+                                    Add
+                                </Button>
+                                <button className="text-muted-foreground hover:text-foreground p-1" onClick={() => { setShowAddSubject(false); setNewSubjectName(""); setAddSubjectError(""); }}>
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                className="flex items-center gap-1 text-sm text-primary hover:underline mt-1"
+                                onClick={() => setShowAddSubject(true)}
+                            >
+                                <Plus className="w-4 h-4" /> Add Subject
+                            </button>
+                        )}
+                        {addSubjectError && (
+                            <p className="text-destructive text-xs">{addSubjectError}</p>
+                        )}
+
+                        <div className="pt-3 text-xs text-muted-foreground text-center border-t border-border">
+                            Click the pencil icon to edit a saved score. Grade appears when all 3 components are entered.
+                        </div>
+                    </>
+                )}
             </div>
         </Modal>
     );

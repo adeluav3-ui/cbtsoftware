@@ -9,11 +9,12 @@ import {
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload } from "lucide-react";
+import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap } from "lucide-react";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
 import { StudentResultsModal } from "@/components/student-results-modal";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
+import { ClassResultsModal } from "@/components/class-results-modal";
 
 interface Student {
   id: number;
@@ -29,7 +30,7 @@ export default function TeacherDashboard() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("My Exams");
-  const CLASSES = ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   // ── Exams ────────────────────────────────────────
   const { data: exams = [], isLoading } = useListExams(schoolCode);
@@ -37,7 +38,7 @@ export default function TeacherDashboard() {
   const [isExamModalOpen, setExamModalOpen] = useState(false);
   const [eTitle, setETitle] = useState("");
   const [eSubject, setESubject] = useState("");
-  const [eClass, setEClass] = useState("JSS1");
+  const [eClass, setEClass] = useState("KG1");
   const [eDuration, setEDuration] = useState("45");
   const [eAssessmentType, setEAssessmentType] = useState("exam");
   const [bulkStudentModalOpen, setBulkStudentModalOpen] = useState(false);
@@ -62,6 +63,10 @@ export default function TeacherDashboard() {
   const [subjectScores, setSubjectScores] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<{ id: number; name: string; level: string }[]>([]);
   const [currentTerm, setCurrentTerm] = useState("First Term");
+
+  // Class results modal (for KG/Nursery/Primary bulk score entry)
+  const [classResultsModalOpen, setClassResultsModalOpen] = useState(false);
+  const [classResultsDefaultClass, setClassResultsDefaultClass] = useState("KG1");
 
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
@@ -92,21 +97,21 @@ export default function TeacherDashboard() {
   };
 
   // ── Students ─────────────────────────────────────
-  const [classFilter, setClassFilter] = useState("JSS1");
+  const [classFilter, setClassFilter] = useState("KG1");
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
 
   const [isStudentModalOpen, setStudentModalOpen] = useState(false);
   const [sFullName, setSFullName] = useState("");
   const [sUsername, setSUsername] = useState("");
   const [sPassword, setSPassword] = useState("");
-  const [sClass, setSClass] = useState("JSS1");
+  const [sClass, setSClass] = useState("KG1");
 
   const { mutate: createStudent, isPending: isCSPending } = useCreateStudent({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         setStudentModalOpen(false);
-        setSFullName(""); setSUsername(""); setSPassword(""); setSClass("JSS1");
+        setSFullName(""); setSUsername(""); setSPassword(""); setSClass("KG1");
       }
     }
   });
@@ -168,8 +173,10 @@ export default function TeacherDashboard() {
   // Determine level based on selected class
   useEffect(() => {
     if (eClass && schoolCode) {
-      let level = 'primary';
-      if (eClass.startsWith('JSS')) level = 'junior';
+      let level = 'kg';
+      if (eClass === 'Nursery 1' || eClass === 'Nursery 2') level = 'nursery';
+      else if (eClass.startsWith('Pry')) level = 'primary';
+      else if (eClass.startsWith('JSS')) level = 'junior';
       else if (eClass.startsWith('SSS')) level = 'senior';
       fetchSubjects(level);
     }
@@ -214,7 +221,7 @@ export default function TeacherDashboard() {
 
       {/* Tabs - Scrollable on mobile */}
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["My Exams", "Students", "Results"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["My Exams", "Students", "Class Results", "Results"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* ── My Exams Tab ──────────────────────────────── */}
@@ -447,6 +454,55 @@ export default function TeacherDashboard() {
         </Card>
       )}
 
+      {/* ── Class Results Tab ─────────────────────────── */}
+      {activeTab === "Class Results" && (
+        <div>
+          <div className="mb-4">
+            <h3 className="text-base md:text-lg font-semibold">Early Years & Primary Result Entry</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Click a class to upload scores for all students at once. Subjects must first be configured by the school admin.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {[
+              { label: "KG 1", class: "KG1", color: "from-pink-500 to-rose-500" },
+              { label: "KG 2", class: "KG2", color: "from-pink-400 to-fuchsia-500" },
+              { label: "Nursery 1", class: "Nursery 1", color: "from-purple-500 to-violet-600" },
+              { label: "Nursery 2", class: "Nursery 2", color: "from-purple-400 to-indigo-500" },
+              { label: "Primary 1", class: "Pry 1", color: "from-blue-500 to-cyan-500" },
+              { label: "Primary 2", class: "Pry 2", color: "from-blue-400 to-sky-500" },
+              { label: "Primary 3", class: "Pry 3", color: "from-teal-500 to-emerald-500" },
+              { label: "Primary 4", class: "Pry 4", color: "from-green-500 to-emerald-600" },
+              { label: "Primary 5", class: "Pry 5", color: "from-lime-500 to-green-500" },
+            ].map(({ label, class: cls, color }) => (
+              <button
+                key={cls}
+                onClick={() => {
+                  setClassResultsDefaultClass(cls);
+                  setClassResultsModalOpen(true);
+                }}
+                className={`bg-gradient-to-br ${color} text-white rounded-2xl p-4 text-left hover:scale-105 active:scale-95 transition-transform shadow-md`}
+              >
+                <GraduationCap className="w-6 h-6 mb-2 opacity-80" />
+                <p className="font-bold text-sm">{label}</p>
+                <p className="text-xs opacity-75 mt-0.5">Enter Results</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6 p-4 bg-muted/20 rounded-xl border border-border">
+            <p className="text-sm font-medium mb-1">How to use</p>
+            <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Click a class card above</li>
+              <li>Select the subject you want to enter scores for</li>
+              <li>Fill in Mid-Term, Class Activity, and Exam scores per student</li>
+              <li>Click "Save All" to save — you can come back to edit at any time</li>
+              <li>View the comprehensive results from the "Results" button in the header</li>
+            </ol>
+          </div>
+        </div>
+      )}
+
       {/* Modals - unchanged from original */}
       <Modal isOpen={isExamModalOpen} onClose={() => setExamModalOpen(false)} title="Create New Exam">
         <form onSubmit={handleCreate} className="space-y-4">
@@ -499,6 +555,8 @@ export default function TeacherDashboard() {
       <BulkUploadStudentsModal isOpen={bulkStudentModalOpen} onClose={() => setBulkStudentModalOpen(false)} schoolCode={schoolCode} onSuccess={() => { queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) }); }} />
 
       <StudentResultsModal isOpen={studentResultsModalOpen} onClose={() => setStudentResultsModalOpen(false)} studentId={selectedStudentId !== null ? selectedStudentId : 0} studentName={selectedStudentName} studentClass={selectedStudentClass} schoolCode={schoolCode} onScoresUpdated={() => { fetchSubjectScores(); }} />
+
+      <ClassResultsModal isOpen={classResultsModalOpen} onClose={() => setClassResultsModalOpen(false)} schoolCode={schoolCode} defaultClass={classResultsDefaultClass} />
     </DashboardLayout>
   );
 }

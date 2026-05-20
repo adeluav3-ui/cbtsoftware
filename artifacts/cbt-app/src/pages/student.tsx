@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListExams, useListResults } from "@workspace/api-client-react";
 import { Card, Button, Badge, Modal, Input } from "@/components/ui-elements";
 import { useLocation } from "wouter";
-import { Clock, CheckCircle2, PlayCircle, RotateCcw } from "lucide-react";
+import { Clock, CheckCircle2, PlayCircle, RotateCcw, ClipboardList, BookOpen, TrendingUp } from "lucide-react";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -20,6 +20,29 @@ export default function StudentDashboard() {
   const [passcode, setPasscode] = useState("");
   const [retakeError, setRetakeError] = useState("");
   const [isRetaking, setIsRetaking] = useState(false);
+
+  // Term results summary
+  const [termSubjects, setTermSubjects] = useState<any[]>([]);
+  const [isLoadingTermResults, setIsLoadingTermResults] = useState(false);
+
+  useEffect(() => {
+    if (schoolCode && user?.id) fetchTermResults();
+  }, [schoolCode, user?.id]);
+
+  const fetchTermResults = async () => {
+    setIsLoadingTermResults(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/${user!.id}/subject-scores`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setTermSubjects(data);
+    } catch (_) {} finally {
+      setIsLoadingTermResults(false);
+    }
+  };
 
   const takenExamIds = new Set(results.map(r => r.examId));
   const availableExams = exams.filter(e => !takenExamIds.has(e.id));
@@ -110,6 +133,89 @@ export default function StudentDashboard() {
             </div>
           </Card>
         ))}
+      </div>
+
+      {/* ── Term Results Summary ───────────────────────── */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg md:text-xl font-bold">Term Report Card</h2>
+          <Button variant="outline" size="sm" onClick={() => setLocation("/student/results")}>
+            <ClipboardList className="w-4 h-4 mr-1" /> View Full Report
+          </Button>
+        </div>
+
+        {isLoadingTermResults ? (
+          <Card className="py-8 text-center text-muted-foreground">Loading term results…</Card>
+        ) : termSubjects.length === 0 ? (
+          <Card className="py-8 text-center text-muted-foreground">
+            <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-20" />
+            <p className="font-semibold">No term results yet</p>
+            <p className="text-sm mt-1">Your teachers are still entering scores. Check back later.</p>
+          </Card>
+        ) : (() => {
+          const completed = termSubjects.filter(s => s.percentage !== null);
+          const pending = termSubjects.filter(s => s.percentage === null);
+          const avg = completed.length > 0
+            ? completed.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completed.length
+            : 0;
+          const grade = avg >= 70 ? 'A' : avg >= 60 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'F';
+          const gradeColor = avg >= 70 ? "text-green-600" : avg >= 60 ? "text-blue-600" : avg >= 50 ? "text-yellow-600" : avg >= 40 ? "text-orange-600" : "text-destructive";
+
+          return (
+            <Card className="p-4 md:p-6">
+              {/* Summary row */}
+              <div className="flex flex-wrap gap-4 mb-4">
+                <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Subjects</p>
+                  <p className="text-2xl font-bold">{termSubjects.length}</p>
+                </div>
+                <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-2xl font-bold text-green-600">{completed.length}</p>
+                </div>
+                <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Avg Score</p>
+                  <p className={`text-2xl font-bold ${gradeColor}`}>{completed.length > 0 ? `${avg.toFixed(0)}%` : "—"}</p>
+                </div>
+                <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Grade</p>
+                  <p className={`text-2xl font-bold ${gradeColor}`}>{completed.length > 0 ? grade : "—"}</p>
+                </div>
+              </div>
+
+              {/* Subject mini-list */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {termSubjects.map((s: any) => {
+                  const complete = s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+                  const pct = s.percentage ?? null;
+                  const g = s.grade ?? null;
+                  const gc = pct !== null ? (pct >= 70 ? "text-green-600" : pct >= 60 ? "text-blue-600" : pct >= 50 ? "text-yellow-600" : pct >= 40 ? "text-orange-600" : "text-destructive") : "text-muted-foreground";
+                  return (
+                    <div key={s.subjectName} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/20">
+                      <span className="font-medium text-sm">{s.subjectName}</span>
+                      <div className="flex items-center gap-3 text-sm">
+                        {complete ? (
+                          <>
+                            <span className={`font-bold ${gc}`}>{s.totalScore}/100</span>
+                            <span className={`font-bold w-6 text-center ${gc}`}>{g}</span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Pending</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {pending.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-3 italic flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> {pending.length} subject{pending.length > 1 ? 's' : ''} still awaiting teacher scores.
+                </p>
+              )}
+            </Card>
+          );
+        })()}
       </div>
 
       {/* Retake Modal */}
