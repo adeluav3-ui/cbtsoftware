@@ -165,7 +165,9 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         <nav className={cn("px-2 space-y-1 mt-3", collapsed && "px-1")}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = window.location.pathname === item.path || window.location.pathname.startsWith(item.path + '/');
+            const isActive = window.location.pathname === item.path ||
+              (window.location.pathname.startsWith(item.path + '/') &&
+               !navItems.some(other => other.path !== item.path && window.location.pathname.startsWith(other.path)));
             return (
               <Link key={item.path} href={item.path} onClick={() => setMobileMenuOpen(false)}>
                 <div
