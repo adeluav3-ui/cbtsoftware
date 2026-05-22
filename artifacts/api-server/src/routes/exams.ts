@@ -45,7 +45,7 @@ const toString = (value: string | string[]): string => {
 };
 
 // List exams for a school
-router.get("/", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
+router.get("/", requireAuth, async (req: RequestWithSession, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const { class: examClass, active, page, limit } = req.query;
@@ -65,6 +65,7 @@ router.get("/", requireSchoolStaff, async (req: RequestWithSession, res: Respons
       conditions.push(eq(examsTable.isActive, active === "true"));
     }
 
+    // Teachers only see their own exams; students see all active exams for their class
     if (userRole === 'teacher' && userId) {
       conditions.push(eq(examsTable.teacherId, userId));
     }
@@ -243,6 +244,48 @@ router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Respon
     }
 
     res.json({ ...exam, questions: groupedResult });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Transfer exam to a different class
+router.patch("/:examId", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
+  const { class: newClass } = req.body;
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
+
+  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  if (!newClass || !validClasses.includes(newClass)) {
+    return res.status(400).json({ error: "Valid class is required" });
+  }
+
+  try {
+    const [existingExam] = await db
+      .select()
+      .from(examsTable)
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .limit(1);
+
+    if (!existingExam) return res.status(404).json({ error: "Exam not found" });
+
+    if (userRole === 'teacher' && userId && existingExam.teacherId !== userId) {
+      return res.status(403).json({ error: "You don't have permission to modify this exam" });
+    }
+
+    const [updated] = await db
+      .update(examsTable)
+      .set({ class: newClass })
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .returning();
+
+    res.json(updated);
     return;
   } catch (err) {
     console.error(err);

@@ -12,8 +12,10 @@ export default function StudentDashboard() {
   const schoolCode = user?.schoolCode || "";
   const studentClass = user?.class || "";
 
-  const { data: exams = [], isLoading } = useListExams(schoolCode, { active: true, class: studentClass });
-  const { data: results = [], refetch: refetchResults } = useListResults(schoolCode, { studentId: user?.id });
+  const { data: rawExams, isLoading } = useListExams(schoolCode, { active: true, class: studentClass });
+  const { data: rawResults, refetch: refetchResults } = useListResults(schoolCode, { studentId: user?.id });
+  const exams = Array.isArray(rawExams) ? rawExams : [];
+  const results = Array.isArray(rawResults) ? rawResults : [];
 
   const [retakeModalOpen, setRetakeModalOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<{ id: number; title: string } | null>(null);
@@ -39,6 +41,7 @@ export default function StudentDashboard() {
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data)) setTermSubjects(data);
+      else setTermSubjects([]);
     } catch (_) {} finally {
       setIsLoadingTermResults(false);
     }

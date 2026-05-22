@@ -912,4 +912,83 @@ router.delete("/:schoolCode", requireSuperAdmin, async (req: Request, res: Respo
   }
 });
 
+// Broadsheet: all students in a class with their subject scores, grand total, average, position
+router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const schoolCode = String(req.params.schoolCode);
+  const { class: targetClass } = req.query;
+
+  if (!targetClass || typeof targetClass !== "string") {
+    return res.status(400).json({ error: "class query parameter is required" });
+  }
+
+  try {
+    const students = await db
+      .select({ id: usersTable.id, fullName: usersTable.fullName, class: usersTable.class })
+      .from(usersTable)
+      .where(and(eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "student"), eq(usersTable.class, targetClass)))
+      .orderBy(usersTable.fullName);
+
+    if (students.length === 0) {
+      return res.json({ students: [], subjects: [] });
+    }
+
+    const studentIds = students.map(s => s.id);
+
+    const scores = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(and(eq(subjectScoresTable.schoolCode, schoolCode), inArray(subjectScoresTable.studentId, studentIds)));
+
+    // Collect unique subject names across all students
+    const subjectSet = new Set<string>();
+    for (const s of scores) subjectSet.add(s.subjectName);
+    const subjects = Array.from(subjectSet).sort();
+
+    // Build per-student row
+    const scoreByStudent = new Map<number, Map<string, number | null>>();
+    for (const s of scores) {
+      if (!scoreByStudent.has(s.studentId)) scoreByStudent.set(s.studentId, new Map());
+      scoreByStudent.get(s.studentId)!.set(s.subjectName, s.totalScore ?? null);
+    }
+
+    const rows = students.map(student => {
+      const subjectScoresMap = scoreByStudent.get(student.id) ?? new Map();
+      const subjectTotals: Record<string, number | null> = {};
+      let grandTotal = 0;
+      let subjectCount = 0;
+
+      for (const subj of subjects) {
+        const score = subjectScoresMap.has(subj) ? subjectScoresMap.get(subj)! : null;
+        subjectTotals[subj] = score;
+        if (score !== null) {
+          grandTotal += score;
+          subjectCount++;
+        }
+      }
+
+      const average = subjectCount > 0 ? Math.round((grandTotal / (subjectCount * 100)) * 100 * 10) / 10 : null;
+
+      return { id: student.id, fullName: student.fullName, subjectTotals, grandTotal, average };
+    });
+
+    // Calculate positions based on grandTotal descending
+    const sorted = [...rows].sort((a, b) => b.grandTotal - a.grandTotal);
+    const positionMap = new Map<number, number>();
+    let pos = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].grandTotal !== sorted[i - 1].grandTotal) pos = i + 1;
+      positionMap.set(sorted[i].id, pos);
+    }
+
+    const result = rows.map(r => ({ ...r, position: positionMap.get(r.id) ?? null }));
+
+    res.json({ students: result, subjects });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;

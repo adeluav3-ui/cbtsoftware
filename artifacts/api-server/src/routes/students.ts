@@ -308,8 +308,13 @@ router.post("/:studentId/reset-password", requireSchoolAdmin, passwordResetLimit
 });
 
 // Get subject scores for a student
-router.get("/:studentId/subject-scores", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
+router.get("/:studentId/subject-scores", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
+
+  // Students can only access their own scores
+  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
 
   try {
     // Get all unique subjects from exams taken by this student

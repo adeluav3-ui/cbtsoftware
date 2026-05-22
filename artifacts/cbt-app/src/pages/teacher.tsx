@@ -9,7 +9,7 @@ import {
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap } from "lucide-react";
+import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap, ArrowRightLeft } from "lucide-react";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
 import { StudentResultsModal } from "@/components/student-results-modal";
@@ -68,6 +68,13 @@ export default function TeacherDashboard() {
   const [classResultsModalOpen, setClassResultsModalOpen] = useState(false);
   const [classResultsDefaultClass, setClassResultsDefaultClass] = useState("KG1");
 
+  // Transfer exam to class
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferExam, setTransferExam] = useState<{ id: number; title: string; currentClass: string } | null>(null);
+  const [transferTargetClass, setTransferTargetClass] = useState("KG1");
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState("");
+
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
       onSuccess: () => {
@@ -94,6 +101,32 @@ export default function TeacherDashboard() {
         term: currentTerm
       }
     });
+  };
+
+  const handleTransfer = async () => {
+    if (!transferExam) return;
+    setIsTransferring(true);
+    setTransferError("");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${transferExam.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ class: transferTargetClass }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setTransferError(d.error || "Transfer failed");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: getListExamsQueryKey(schoolCode) });
+      setTransferModalOpen(false);
+      setTransferExam(null);
+    } catch {
+      setTransferError("Network error.");
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   // ── Students ─────────────────────────────────────
@@ -240,6 +273,13 @@ export default function TeacherDashboard() {
                     title="Toggle Status"
                   >
                     {exam.isActive ? <PowerOff size={14} /> : <Power size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { setTransferExam({ id: exam.id, title: exam.title, currentClass: exam.class }); setTransferTargetClass(exam.class); setTransferError(""); setTransferModalOpen(true); }}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="Move to Class"
+                  >
+                    <ArrowRightLeft size={14} />
                   </button>
                   <button
                     onClick={() => deleteExam({ schoolCode, examId: exam.id })}
@@ -557,6 +597,29 @@ export default function TeacherDashboard() {
       <StudentResultsModal isOpen={studentResultsModalOpen} onClose={() => setStudentResultsModalOpen(false)} studentId={selectedStudentId !== null ? selectedStudentId : 0} studentName={selectedStudentName} studentClass={selectedStudentClass} schoolCode={schoolCode} onScoresUpdated={() => { fetchSubjectScores(); }} />
 
       <ClassResultsModal isOpen={classResultsModalOpen} onClose={() => setClassResultsModalOpen(false)} schoolCode={schoolCode} defaultClass={classResultsDefaultClass} />
+
+      <Modal isOpen={transferModalOpen} onClose={() => setTransferModalOpen(false)} title={`Move Exam to Different Class`}>
+        <div className="space-y-4">
+          {transferExam && (
+            <p className="text-sm">
+              Moving <span className="font-semibold">"{transferExam.title}"</span> from <span className="font-semibold">{transferExam.currentClass}</span> to:
+            </p>
+          )}
+          <div>
+            <Label>Target Class</Label>
+            <Select value={transferTargetClass} onChange={e => setTransferTargetClass(e.target.value)}>
+              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+            </Select>
+          </div>
+          {transferError && <div className="bg-destructive/10 text-destructive p-2 rounded text-sm">{transferError}</div>}
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => setTransferModalOpen(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleTransfer} isLoading={isTransferring} className="flex-1">
+              <ArrowRightLeft className="w-4 h-4 mr-2" /> Move Exam
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   );
 }

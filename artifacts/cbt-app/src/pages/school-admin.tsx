@@ -5,7 +5,7 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -502,6 +502,29 @@ export default function SchoolAdminDashboard() {
     setGradingModalOpen(true);
   };
 
+  // Broadsheet state
+  const [broadsheetClass, setBroadsheetClass] = useState("KG1");
+  const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
+  const [isLoadingBroadsheet, setIsLoadingBroadsheet] = useState(false);
+
+  const fetchBroadsheet = async (cls: string) => {
+    setIsLoadingBroadsheet(true);
+    setBroadsheetData(null);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/broadsheet?class=${encodeURIComponent(cls)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setBroadsheetData(data);
+    } catch (err) {
+      console.error("Failed to fetch broadsheet", err);
+    } finally {
+      setIsLoadingBroadsheet(false);
+    }
+  };
+
   useEffect(() => {
     if (schoolCode) {
       fetchSchoolInfo();
@@ -558,7 +581,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -927,6 +950,95 @@ export default function SchoolAdminDashboard() {
             </div>
           </Modal>
         </Card>
+      )}
+
+      {/* ── Broadsheet Tab ───────────────────────────── */}
+      {activeTab === "Broadsheet" && (
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2"><TableIcon className="w-5 h-5" /> Class Broadsheet</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">All students in a class with subject scores, grand total, average, and position.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={broadsheetClass} onChange={e => setBroadsheetClass(e.target.value)} className="w-40">
+                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+              <Button onClick={() => fetchBroadsheet(broadsheetClass)} isLoading={isLoadingBroadsheet}>
+                Generate
+              </Button>
+              {broadsheetData && broadsheetData.students.length > 0 && (
+                <Button variant="outline" onClick={() => window.print()}>
+                  <Printer className="w-4 h-4 mr-2" /> Print
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {isLoadingBroadsheet && (
+            <Card className="py-12 text-center text-muted-foreground">Generating broadsheet…</Card>
+          )}
+
+          {!isLoadingBroadsheet && broadsheetData && broadsheetData.students.length === 0 && (
+            <Card className="py-12 text-center text-muted-foreground">No students found in {broadsheetClass}.</Card>
+          )}
+
+          {!isLoadingBroadsheet && broadsheetData && broadsheetData.students.length > 0 && (
+            <Card className="p-0 overflow-hidden broadsheet-card print:shadow-none">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs md:text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b border-border">
+                      <th className="px-2 py-2 font-semibold whitespace-nowrap">S/N</th>
+                      <th className="px-2 py-2 font-semibold whitespace-nowrap min-w-40">Student Name</th>
+                      {broadsheetData.subjects.map(subj => (
+                        <th key={subj} className="px-2 py-2 font-semibold text-center whitespace-nowrap max-w-24">
+                          <span className="block truncate max-w-20" title={subj}>{subj}</span>
+                          <span className="font-normal text-xs text-muted-foreground">/100</span>
+                        </th>
+                      ))}
+                      <th className="px-2 py-2 font-semibold text-center whitespace-nowrap">Grand Total</th>
+                      <th className="px-2 py-2 font-semibold text-center whitespace-nowrap">Avg %</th>
+                      <th className="px-2 py-2 font-semibold text-center whitespace-nowrap">Position</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {broadsheetData.students.map((student, idx) => (
+                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/10">
+                        <td className="px-2 py-2 text-muted-foreground">{idx + 1}</td>
+                        <td className="px-2 py-2 font-semibold">{student.fullName}</td>
+                        {broadsheetData!.subjects.map(subj => {
+                          const score = student.subjectTotals[subj];
+                          return (
+                            <td key={subj} className="px-2 py-2 text-center">
+                              {score !== null && score !== undefined ? (
+                                <span className={score >= 70 ? "text-green-600 font-bold" : score >= 50 ? "text-blue-600" : "text-destructive"}>
+                                  {score}
+                                </span>
+                              ) : <span className="text-muted-foreground">—</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="px-2 py-2 text-center font-bold">{student.grandTotal}</td>
+                        <td className="px-2 py-2 text-center font-bold">
+                          {student.average !== null ? `${student.average}%` : "—"}
+                        </td>
+                        <td className="px-2 py-2 text-center font-bold text-primary">{student.position ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
+          {!broadsheetData && !isLoadingBroadsheet && (
+            <Card className="py-12 text-center text-muted-foreground">
+              <TableIcon className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="font-semibold">Select a class and click Generate</p>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Add Teacher Modal */}
