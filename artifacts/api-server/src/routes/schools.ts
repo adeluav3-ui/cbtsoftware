@@ -932,17 +932,31 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
       return res.json({ students: [], subjects: [] });
     }
 
+    // Determine the correct level for this class
+    const levelMap: Record<string, string> = {
+      KG1: "kg", KG2: "kg",
+      "Nursery 1": "nursery", "Nursery 2": "nursery",
+      "Pry 1": "primary", "Pry 2": "primary", "Pry 3": "primary", "Pry 4": "primary", "Pry 5": "primary",
+      JSS1: "junior", JSS2: "junior", JSS3: "junior",
+      SSS1: "senior", SSS2: "senior", SSS3: "senior",
+    };
+    const level = levelMap[targetClass] ?? "junior";
+
+    // Subjects come from the configured subjects table for this level — not from score data
+    const configuredSubjects = await db
+      .select({ name: subjectsTable.name })
+      .from(subjectsTable)
+      .where(and(eq(subjectsTable.schoolCode, schoolCode), eq(subjectsTable.level, level)))
+      .orderBy(subjectsTable.name);
+
+    const subjects = configuredSubjects.map(s => s.name);
+
     const studentIds = students.map(s => s.id);
 
     const scores = await db
       .select()
       .from(subjectScoresTable)
       .where(and(eq(subjectScoresTable.schoolCode, schoolCode), inArray(subjectScoresTable.studentId, studentIds)));
-
-    // Collect unique subject names across all students
-    const subjectSet = new Set<string>();
-    for (const s of scores) subjectSet.add(s.subjectName);
-    const subjects = Array.from(subjectSet).sort();
 
     // Build per-student row
     const scoreByStudent = new Map<number, Map<string, number | null>>();
