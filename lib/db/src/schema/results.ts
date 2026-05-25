@@ -13,6 +13,7 @@ export const resultsTable = pgTable("results", {
   percentage: real("percentage").notNull(),
   schoolCode: text("school_code").notNull(),
   term: text("term").default("First Term"),
+  retakeCount: integer("retake_count").default(0),
   submittedAt: timestamp("submitted_at").notNull().defaultNow(),
 }, (table) => ({
   examIdIdx: index("results_exam_id_idx").on(table.examId),
