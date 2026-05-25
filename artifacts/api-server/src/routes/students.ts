@@ -17,9 +17,12 @@ import {
   resultsTable,
   resultAnswersTable,
   subjectScoresTable,
-  gradingSchemesTable
+  gradingSchemesTable,
+  schoolsTable,
+  studentTraitsTable,
+  studentAttendanceTable,
 } from "@workspace/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -317,6 +320,15 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
   }
 
   try {
+    // Fetch school for current term/session
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCode))
+      .limit(1);
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
     // Get all unique subjects from exams taken by this student
     const studentExams = await db
       .select({
@@ -332,14 +344,16 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       )
       .groupBy(examsTable.subject);
 
-    // Get existing subject scores
+    // Get existing subject scores for the current term/session only
     const existingScores = await db
       .select()
       .from(subjectScoresTable)
       .where(
         and(
           eq(subjectScoresTable.studentId, parseInt(studentId)),
-          eq(subjectScoresTable.schoolCode, schoolCode)
+          eq(subjectScoresTable.schoolCode, schoolCode),
+          eq(subjectScoresTable.term, currentTerm),
+          eq(subjectScoresTable.academicSession, currentAcademicSession),
         )
       );
 
@@ -409,19 +423,21 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
         examCbt = Math.round((rawPercentage / 100) * scheme.examCbt);
       }
 
-      // Calculate total scores
+      // Calculate total scores.
+      // midTermScore / examScore in subject_scores already hold the final combined value (cbt + theory).
+      // Only fall back to midTermCbt/examCbt if no subject_scores record exists yet.
       let midTermTotalScore: number | null = null;
       let examTotalScore: number | null = null;
       let classActivityTotalScore: number | null = null;
 
       if (existing?.midTermScore !== null && existing?.midTermScore !== undefined) {
-        midTermTotalScore = (midTermCbt || 0) + (existing.midTermScore || 0);
+        midTermTotalScore = existing.midTermScore;
       } else if (midTermCbt !== null) {
         midTermTotalScore = midTermCbt;
       }
 
       if (existing?.examScore !== null && existing?.examScore !== undefined) {
-        examTotalScore = (examCbt || 0) + (existing.examScore || 0);
+        examTotalScore = existing.examScore;
       } else if (examCbt !== null) {
         examTotalScore = examCbt;
       }
@@ -504,8 +520,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       }
     }
 
-    const result = Array.from(subjectMap.values());
-    res.json(result);
+    res.json(Array.from(subjectMap.values()));
     return;
   } catch (err) {
     console.error(err);
@@ -524,34 +539,35 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
   }
 
   try {
-    // Get student's class
-    const [student] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, parseInt(studentId)))
-      .limit(1);
+    const [[student], [school]] = await Promise.all([
+      db.select().from(usersTable).where(eq(usersTable.id, parseInt(studentId))).limit(1),
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1),
+    ]);
 
     if (!student) {
       return res.status(404).json({ error: "Student not found" });
     }
 
-    // Check if record exists
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    // Check if record exists for this term/session
     const [existing] = await db
       .select()
       .from(subjectScoresTable)
-      .where(
-        and(
-          eq(subjectScoresTable.studentId, parseInt(studentId)),
-          eq(subjectScoresTable.subjectName, subjectName),
-          eq(subjectScoresTable.schoolCode, schoolCode)
-        )
-      )
+      .where(and(
+        eq(subjectScoresTable.studentId, parseInt(studentId)),
+        eq(subjectScoresTable.subjectName, subjectName),
+        eq(subjectScoresTable.schoolCode, schoolCode),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ))
       .limit(1);
 
     let updated;
 
     if (existing) {
-      // Update existing record
       const updateData: any = { updatedAt: new Date() };
       if (component === 'midterm') updateData.midTermScore = score;
       if (component === 'activity') updateData.classActivityScore = score;
@@ -563,12 +579,13 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
         .where(eq(subjectScoresTable.id, existing.id))
         .returning();
     } else {
-      // Create new record
       const insertData: any = {
         studentId: parseInt(studentId),
         subjectName,
         className: student.class || "Unknown",
         schoolCode,
+        term: currentTerm,
+        academicSession: currentAcademicSession,
       };
       if (component === 'midterm') insertData.midTermScore = score;
       if (component === 'activity') insertData.classActivityScore = score;
@@ -599,30 +616,33 @@ router.post("/:studentId/init-subject", requireSchoolStaff, async (req: Request<
   }
 
   try {
-    const [student] = await db
-      .select()
-      .from(usersTable)
-      .where(and(eq(usersTable.id, parseInt(studentId)), eq(usersTable.schoolCode, schoolCode)))
-      .limit(1);
+    const [[student], [school]] = await Promise.all([
+      db.select().from(usersTable).where(and(eq(usersTable.id, parseInt(studentId)), eq(usersTable.schoolCode, schoolCode))).limit(1),
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1),
+    ]);
 
     if (!student) {
       return res.status(404).json({ error: "Student not found" });
     }
 
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
     const [existing] = await db
       .select()
       .from(subjectScoresTable)
-      .where(
-        and(
-          eq(subjectScoresTable.studentId, parseInt(studentId)),
-          eq(subjectScoresTable.subjectName, subjectName.trim()),
-          eq(subjectScoresTable.schoolCode, schoolCode)
-        )
-      )
+      .where(and(
+        eq(subjectScoresTable.studentId, parseInt(studentId)),
+        eq(subjectScoresTable.subjectName, subjectName.trim()),
+        eq(subjectScoresTable.schoolCode, schoolCode),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ))
       .limit(1);
 
     if (existing) {
-      return res.status(409).json({ error: "Subject already exists for this student" });
+      return res.status(409).json({ error: "Subject already exists for this student this term" });
     }
 
     const [created] = await db
@@ -632,6 +652,8 @@ router.post("/:studentId/init-subject", requireSchoolStaff, async (req: Request<
         subjectName: subjectName.trim(),
         className: student.class || "Unknown",
         schoolCode,
+        term: currentTerm,
+        academicSession: currentAcademicSession,
       })
       .returning();
 
@@ -699,6 +721,242 @@ router.post("/:studentId/profile-picture", requireAuth, async (req: Request<Stud
     }
 
     res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get position-in-class for a student (separate from subject-scores to avoid breaking existing callers)
+router.get("/:studentId/class-position", requireAuth, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1);
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    const [thisStudent] = await db
+      .select({ class: usersTable.class })
+      .from(usersTable).where(eq(usersTable.id, parseInt(studentId))).limit(1);
+
+    if (!thisStudent?.class) {
+      return res.json({ positionInClass: null, totalInClass: null });
+    }
+
+    const classmates = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(
+        eq(usersTable.schoolCode, schoolCode),
+        eq(usersTable.role, "student"),
+        eq(usersTable.class, thisStudent.class),
+      ));
+
+    const classmateIds = classmates.map(c => c.id);
+    const totalInClass = classmateIds.length;
+
+    if (classmateIds.length <= 1) {
+      return res.json({ positionInClass: 1, totalInClass });
+    }
+
+    const classmateScores = await db
+      .select({ studentId: subjectScoresTable.studentId, totalScore: subjectScoresTable.totalScore })
+      .from(subjectScoresTable)
+      .where(and(
+        eq(subjectScoresTable.schoolCode, schoolCode),
+        inArray(subjectScoresTable.studentId, classmateIds),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ));
+
+    const grandTotals = new Map<number, number>();
+    for (const s of classmateScores) {
+      if (s.totalScore !== null) {
+        grandTotals.set(s.studentId, (grandTotals.get(s.studentId) ?? 0) + s.totalScore);
+      }
+    }
+
+    const myId = parseInt(studentId);
+    const myTotal = grandTotals.get(myId) ?? 0;
+    const sorted = [...grandTotals.values()].sort((a, b) => b - a);
+    let positionInClass: number | null = null;
+    let pos = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] !== sorted[i - 1]) pos = i + 1;
+      if (sorted[i] === myTotal) { positionInClass = pos; break; }
+    }
+
+    res.json({ positionInClass, totalInClass });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// ── Traits (affective / psychomotor) ─────────────────────────────────────────
+
+// Get traits for a student for the current term/session
+router.get("/:studentId/traits", requireAuth, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1);
+    const term = school?.currentTerm ?? "First Term";
+    const session = school?.currentAcademicSession ?? "2025/2026";
+
+    const traits = await db
+      .select()
+      .from(studentTraitsTable)
+      .where(and(
+        eq(studentTraitsTable.studentId, parseInt(studentId)),
+        eq(studentTraitsTable.schoolCode, schoolCode),
+        eq(studentTraitsTable.term, term),
+        eq(studentTraitsTable.academicSession, session),
+      ));
+    res.json(traits);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Save/update traits for a student (bulk upsert)
+router.post("/:studentId/traits", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { traits } = req.body; // Array of { traitCategory, traitName, rating }
+
+  if (!Array.isArray(traits) || traits.length === 0) {
+    return res.status(400).json({ error: "traits array is required" });
+  }
+
+  try {
+    const [[school], [student]] = await Promise.all([
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1),
+      db.select({ class: usersTable.class }).from(usersTable).where(eq(usersTable.id, parseInt(studentId))).limit(1),
+    ]);
+
+    const term = school?.currentTerm ?? "First Term";
+    const session = school?.currentAcademicSession ?? "2025/2026";
+    const className = student?.class ?? "Unknown";
+
+    const rows = traits.map((t: { traitCategory: string; traitName: string; rating: number }) => ({
+      studentId: parseInt(studentId),
+      schoolCode,
+      term,
+      academicSession: session,
+      className,
+      traitCategory: t.traitCategory,
+      traitName: t.traitName,
+      rating: t.rating,
+    }));
+
+    const result = await db
+      .insert(studentTraitsTable)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [studentTraitsTable.studentId, studentTraitsTable.traitName, studentTraitsTable.term, studentTraitsTable.academicSession],
+        set: { rating: sql`excluded.rating`, updatedAt: new Date() },
+      })
+      .returning();
+
+    res.json(result);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// ── Attendance ────────────────────────────────────────────────────────────────
+
+// Get attendance for a student for the current term/session
+router.get("/:studentId/attendance", requireAuth, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1);
+    const term = school?.currentTerm ?? "First Term";
+    const session = school?.currentAcademicSession ?? "2025/2026";
+
+    const [attendance] = await db
+      .select()
+      .from(studentAttendanceTable)
+      .where(and(
+        eq(studentAttendanceTable.studentId, parseInt(studentId)),
+        eq(studentAttendanceTable.schoolCode, schoolCode),
+        eq(studentAttendanceTable.term, term),
+        eq(studentAttendanceTable.academicSession, session),
+      ))
+      .limit(1);
+
+    res.json(attendance ?? null);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Save/update attendance for a student
+router.post("/:studentId/attendance", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { timesSchoolOpened, timesPresent } = req.body;
+
+  if (timesSchoolOpened === undefined || timesPresent === undefined) {
+    return res.status(400).json({ error: "timesSchoolOpened and timesPresent are required" });
+  }
+
+  try {
+    const [[school], [student]] = await Promise.all([
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1),
+      db.select({ class: usersTable.class }).from(usersTable).where(eq(usersTable.id, parseInt(studentId))).limit(1),
+    ]);
+
+    const term = school?.currentTerm ?? "First Term";
+    const session = school?.currentAcademicSession ?? "2025/2026";
+    const className = student?.class ?? "Unknown";
+
+    const [result] = await db
+      .insert(studentAttendanceTable)
+      .values({
+        studentId: parseInt(studentId),
+        schoolCode,
+        term,
+        academicSession: session,
+        className,
+        timesSchoolOpened,
+        timesPresent,
+      })
+      .onConflictDoUpdate({
+        target: [studentAttendanceTable.studentId, studentAttendanceTable.term, studentAttendanceTable.academicSession],
+        set: { timesSchoolOpened, timesPresent, updatedAt: new Date() },
+      })
+      .returning();
+
+    res.json(result);
     return;
   } catch (err) {
     console.error(err);

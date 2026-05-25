@@ -52,6 +52,7 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
     const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const [saveMessage, setSaveMessage] = useState("");
+    const [scheme, setScheme] = useState({ midTermTotal: 20, classActivityTotal: 20, examTotal: 60 });
 
     const fetchSubjects = useCallback(async (cls: string) => {
         setIsLoadingSubjects(true);
@@ -138,6 +139,10 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
         if (isOpen) {
             fetchSubjects(selectedClass);
             fetchStudents(selectedClass);
+            fetch(`${API_BASE_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
+                .then(r => r.ok ? r.json() : null)
+                .then(d => { if (d) setScheme({ midTermTotal: d.midTermTotal ?? 20, classActivityTotal: d.classActivityTotal ?? 20, examTotal: d.examTotal ?? 60 }); })
+                .catch(() => {});
         }
         if (!isOpen) {
             setSaveMessage("");
@@ -159,7 +164,7 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
     }, [selectedSubject, students.length]);
 
     const handleScoreChange = (studentId: number, field: 'midterm' | 'activity' | 'exam', value: string) => {
-        const max = field === 'exam' ? 60 : 20;
+        const max = field === 'exam' ? scheme.examTotal : field === 'midterm' ? scheme.midTermTotal : scheme.classActivityTotal;
         const num = parseInt(value);
         const clamped = isNaN(num) ? "" : String(Math.min(max, Math.max(0, num)));
         setScores(prev => ({ ...prev, [studentId]: { ...prev[studentId], [field]: value === "" ? "" : clamped, saved: false } }));
@@ -177,26 +182,28 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
         if (row.activity !== "") components.push({ component: 'activity', score: parseInt(row.activity) });
         if (row.exam !== "") components.push({ component: 'exam', score: parseInt(row.exam) });
 
+        let success = true;
         if (components.length === 0) {
-            // Just init the subject entry so it shows up
-            await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/init-subject`, {
+            const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/init-subject`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ subjectName: selectedSubject }),
                 credentials: "include",
-            }).catch(() => {});
+            }).catch(() => null);
+            if (!res || (!res.ok && res.status !== 409)) success = false;
         } else {
             for (const { component, score } of components) {
-                await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/subject-scores`, {
+                const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/subject-scores`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ subjectName: selectedSubject, component, score }),
                     credentials: "include",
-                }).catch(() => {});
+                }).catch(() => null);
+                if (!res || !res.ok) { success = false; break; }
             }
         }
 
-        setScores(prev => ({ ...prev, [studentId]: { ...prev[studentId], saving: false, saved: true } }));
+        setScores(prev => ({ ...prev, [studentId]: { ...prev[studentId], saving: false, saved: success } }));
     };
 
     const handleSaveAll = async () => {

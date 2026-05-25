@@ -100,7 +100,6 @@ export default function SchoolAdminDashboard() {
     gradeDMin: 40,
     gradeFMax: 39,
   });
-  const [isLoadingScheme, setIsLoadingScheme] = useState(false);
   const [isSavingScheme, setIsSavingScheme] = useState(false);
   const [schemeError, setSchemeError] = useState("");
   const [schemeSuccess, setSchemeSuccess] = useState("");
@@ -144,6 +143,16 @@ export default function SchoolAdminDashboard() {
 
   // Update academic session
   const updateAcademicSession = async () => {
+    // Validate YYYY/YYYY format
+    if (!/^\d{4}\/\d{4}$/.test(newAcademicSession.trim())) {
+      setSessionError("Please enter a valid session in YYYY/YYYY format (e.g. 2025/2026).");
+      return;
+    }
+    const [y1, y2] = newAcademicSession.trim().split('/').map(Number);
+    if (y2 !== y1 + 1) {
+      setSessionError("The second year must be one more than the first (e.g. 2025/2026).");
+      return;
+    }
     setIsUpdatingSession(true);
     setSessionError("");
 
@@ -233,7 +242,6 @@ export default function SchoolAdminDashboard() {
 
   // Fetch grading scheme
   const fetchGradingScheme = async () => {
-    setIsLoadingScheme(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
         credentials: "include",
@@ -244,16 +252,29 @@ export default function SchoolAdminDashboard() {
       }
     } catch (err) {
       console.error("Failed to fetch grading scheme", err);
-    } finally {
-      setIsLoadingScheme(false);
     }
   };
 
   // Update grading scheme
   const updateGradingScheme = async () => {
-    setIsSavingScheme(true);
     setSchemeError("");
     setSchemeSuccess("");
+
+    // Validate component totals sum to 100
+    const componentSum = gradingScheme.midTermTotal + gradingScheme.classActivityTotal + gradingScheme.examTotal;
+    if (componentSum !== 100) {
+      setSchemeError(`Component totals must sum to 100 (currently ${componentSum}).`);
+      return;
+    }
+    // Validate grade boundaries are strictly decreasing
+    if (!(gradingScheme.gradeAMin > gradingScheme.gradeBMin &&
+          gradingScheme.gradeBMin > gradingScheme.gradeCMin &&
+          gradingScheme.gradeCMin > gradingScheme.gradeDMin)) {
+      setSchemeError("Grade boundaries must be strictly decreasing: A > B > C > D.");
+      return;
+    }
+
+    setIsSavingScheme(true);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, {
@@ -753,8 +774,8 @@ export default function SchoolAdminDashboard() {
                     <td className="px-6 py-4 font-bold">{r.score} / {r.totalQuestions}</td>
                     <td className="px-6 py-4 font-semibold">{pct.toFixed(1)}%</td>
                     <td className="px-6 py-4 text-center">
-                      <Badge variant={pct >= 70 ? "success" : "destructive"}>
-                        {pct >= 70 ? "Pass" : "Fail"}
+                      <Badge variant={pct >= gradingScheme.gradeAMin ? "success" : "destructive"}>
+                        {pct >= gradingScheme.gradeAMin ? "Pass" : "Fail"}
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-muted-foreground text-sm">

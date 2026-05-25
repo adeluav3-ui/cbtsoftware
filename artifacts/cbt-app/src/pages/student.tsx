@@ -26,9 +26,16 @@ export default function StudentDashboard() {
   // Term results summary
   const [termSubjects, setTermSubjects] = useState<any[]>([]);
   const [isLoadingTermResults, setIsLoadingTermResults] = useState(false);
+  const [gradeScheme, setGradeScheme] = useState({ gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 });
 
   useEffect(() => {
-    if (schoolCode && user?.id) fetchTermResults();
+    if (schoolCode && user?.id) {
+      fetchTermResults();
+      fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setGradeScheme({ gradeAMin: d.gradeAMin ?? 70, gradeBMin: d.gradeBMin ?? 60, gradeCMin: d.gradeCMin ?? 50, gradeDMin: d.gradeDMin ?? 40 }); })
+        .catch(() => {});
+    }
   }, [schoolCode, user?.id]);
 
   const fetchTermResults = async () => {
@@ -161,8 +168,8 @@ export default function StudentDashboard() {
           const avg = completed.length > 0
             ? completed.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completed.length
             : 0;
-          const grade = avg >= 70 ? 'A' : avg >= 60 ? 'B' : avg >= 50 ? 'C' : avg >= 40 ? 'D' : 'F';
-          const gradeColor = avg >= 70 ? "text-green-600" : avg >= 60 ? "text-blue-600" : avg >= 50 ? "text-yellow-600" : avg >= 40 ? "text-orange-600" : "text-destructive";
+          const grade = avg >= gradeScheme.gradeAMin ? 'A' : avg >= gradeScheme.gradeBMin ? 'B' : avg >= gradeScheme.gradeCMin ? 'C' : avg >= gradeScheme.gradeDMin ? 'D' : 'F';
+          const gradeColor = avg >= gradeScheme.gradeAMin ? "text-green-600" : avg >= gradeScheme.gradeBMin ? "text-blue-600" : avg >= gradeScheme.gradeCMin ? "text-yellow-600" : avg >= gradeScheme.gradeDMin ? "text-orange-600" : "text-destructive";
 
           return (
             <Card className="p-4 md:p-6">

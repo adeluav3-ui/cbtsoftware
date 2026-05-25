@@ -211,9 +211,9 @@ router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, asy
   }
 
   try {
-    // Get school's passcode
+    // Get school (need passcode + term/session)
     const [school] = await db
-      .select({ retakePasscode: schoolsTable.retakePasscode })
+      .select()
       .from(schoolsTable)
       .where(eq(schoolsTable.code, schoolCodeStr))
       .limit(1);
@@ -222,22 +222,26 @@ router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, asy
       return res.status(404).json({ error: "School not found" });
     }
 
-    // Verify passcode
     if (school.retakePasscode !== passcode) {
       return res.status(403).json({ error: "Invalid passcode" });
     }
+
+    // Get exam details to know which score fields to reset
+    const [exam] = await db
+      .select({ subject: examsTable.subject, assessmentType: examsTable.assessmentType })
+      .from(examsTable)
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .limit(1);
 
     // Get student's previous result for this exam
     const [previousResult] = await db
       .select()
       .from(resultsTable)
-      .where(
-        and(
-          eq(resultsTable.examId, examIdNum),
-          eq(resultsTable.studentId, Number(studentId)),
-          eq(resultsTable.schoolCode, schoolCodeStr)
-        )
-      )
+      .where(and(
+        eq(resultsTable.examId, examIdNum),
+        eq(resultsTable.studentId, Number(studentId)),
+        eq(resultsTable.schoolCode, schoolCodeStr)
+      ))
       .orderBy(desc(resultsTable.submittedAt))
       .limit(1);
 
@@ -245,15 +249,37 @@ router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, asy
       return res.status(404).json({ error: "No previous result found to retake" });
     }
 
-    // Delete previous result answers first (due to foreign key)
-    await db
-      .delete(resultAnswersTable)
-      .where(eq(resultAnswersTable.resultId, previousResult.id));
+    // Delete previous result answers and result
+    await db.delete(resultAnswersTable).where(eq(resultAnswersTable.resultId, previousResult.id));
+    await db.delete(resultsTable).where(eq(resultsTable.id, previousResult.id));
 
-    // Delete previous result
-    await db
-      .delete(resultsTable)
-      .where(eq(resultsTable.id, previousResult.id));
+    // Reset the CBT portion of subject_scores so theory isn't lost but new CBT can be submitted
+    if (exam) {
+      const currentTerm = school.currentTerm ?? "First Term";
+      const currentAcademicSession = school.currentAcademicSession ?? "2025/2026";
+      const resetData: any = { updatedAt: new Date() };
+
+      if (exam.assessmentType === 'mid_term') {
+        resetData.midTermScore = null;
+        resetData.midTermCbtScore = null;
+      } else if (exam.assessmentType === 'exam') {
+        resetData.examScore = null;
+        resetData.examCbtScore = null;
+      } else if (exam.assessmentType === 'class_activity') {
+        resetData.classActivityScore = null;
+      }
+
+      await db
+        .update(subjectScoresTable)
+        .set(resetData)
+        .where(and(
+          eq(subjectScoresTable.studentId, Number(studentId)),
+          eq(subjectScoresTable.subjectName, exam.subject),
+          eq(subjectScoresTable.schoolCode, schoolCodeStr),
+          eq(subjectScoresTable.term, currentTerm),
+          eq(subjectScoresTable.academicSession, currentAcademicSession),
+        ));
+    }
 
     res.json({
       success: true,
@@ -340,15 +366,30 @@ router.post("/admin/login", adminLoginLimiter, async (req: Request, res: Respons
   }
 });
 
-// Get all subject scores for a school
-router.get("/subject-scores", requireSchoolAdmin, async (req: Request, res: Response) => {
-  const schoolCode = String(req.params.schoolCode || "");
+// Get all subject scores for a school (filtered by current term/session)
+router.get("/:schoolCode/subject-scores", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { term, academicSession } = req.query;
 
   try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+
+    const filterTerm = (term as string) || school?.currentTerm || "First Term";
+    const filterSession = (academicSession as string) || school?.currentAcademicSession || "2025/2026";
+
     const scores = await db
       .select()
       .from(subjectScoresTable)
-      .where(eq(subjectScoresTable.schoolCode, schoolCode));
+      .where(and(
+        eq(subjectScoresTable.schoolCode, schoolCodeStr),
+        eq(subjectScoresTable.term, filterTerm),
+        eq(subjectScoresTable.academicSession, filterSession),
+      ));
 
     res.json(scores);
     return;
@@ -622,6 +663,40 @@ router.post("/:schoolCode/students/:studentId/subject-comment", requireSchoolSta
       .returning();
 
     res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Save one general teacher comment for the student (applied to all subject_scores this term)
+router.post("/:schoolCode/students/:studentId/general-comment", requireSchoolStaff, async (req: Request, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const studentIdNum = Number(String(studentId));
+  const { comment } = req.body;
+
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable).where(eq(schoolsTable.code, schoolCodeStr)).limit(1);
+
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    await db
+      .update(subjectScoresTable)
+      .set({ teacherComment: comment || null, updatedAt: new Date() })
+      .where(and(
+        eq(subjectScoresTable.studentId, studentIdNum),
+        eq(subjectScoresTable.schoolCode, schoolCodeStr),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ));
+
+    res.json({ success: true });
     return;
   } catch (err) {
     console.error(err);
@@ -953,10 +1028,22 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
 
     const studentIds = students.map(s => s.id);
 
+    // Get current term/session to filter scores
+    const [schoolRec] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable).where(eq(schoolsTable.code, schoolCode)).limit(1);
+    const filterTerm = (req.query.term as string) || schoolRec?.currentTerm || "First Term";
+    const filterSession = (req.query.academicSession as string) || schoolRec?.currentAcademicSession || "2025/2026";
+
     const scores = await db
       .select()
       .from(subjectScoresTable)
-      .where(and(eq(subjectScoresTable.schoolCode, schoolCode), inArray(subjectScoresTable.studentId, studentIds)));
+      .where(and(
+        eq(subjectScoresTable.schoolCode, schoolCode),
+        inArray(subjectScoresTable.studentId, studentIds),
+        eq(subjectScoresTable.term, filterTerm),
+        eq(subjectScoresTable.academicSession, filterSession),
+      ));
 
     // Build per-student row
     const scoreByStudent = new Map<number, Map<string, number | null>>();

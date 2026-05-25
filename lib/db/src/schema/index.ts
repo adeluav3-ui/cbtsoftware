@@ -6,6 +6,8 @@ export * from "./result_answers.js";
 export * from "./grading_schemes.js";
 export * from "./subject_scores.js";
 export * from "./subjects.js";
+export * from "./student_traits.js";
+export * from "./student_attendance.js";
 
 // Export grading schemes explicitly
 export { gradingSchemesTable, insertGradingSchemeSchema, type InsertGradingScheme, type GradingScheme } from "./grading_schemes.js";

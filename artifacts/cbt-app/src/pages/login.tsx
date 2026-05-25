@@ -137,7 +137,7 @@ export default function Login() {
           </Card>
         </motion.div>
       </div>
-      <footer className="mt-15 pt-17 border-t border-border text-center text-sm text-muted-foreground">
+      <footer className="mt-8 pt-6 border-t border-border text-center text-sm text-muted-foreground">
         Powered by{' '}
         <a
           href="https://luma-website-six.vercel.app/"

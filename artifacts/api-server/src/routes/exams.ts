@@ -9,6 +9,7 @@ import {
   usersTable,
   gradingSchemesTable,
   subjectScoresTable,
+  schoolsTable,
 } from "@workspace/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 
@@ -855,6 +856,16 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
 
     const scaledCbtScore = componentCbt > 0 ? (cbtPercentage / 100) * componentCbt : 0;
 
+    // Duplicate submission guard
+    const [existingResult] = await db
+      .select({ id: resultsTable.id })
+      .from(resultsTable)
+      .where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.studentId, parseInt(String(studentId), 10))))
+      .limit(1);
+    if (existingResult) {
+      return res.status(409).json({ error: "You have already submitted this exam." });
+    }
+
     const [student] = await db
       .select()
       .from(usersTable)
@@ -862,6 +873,15 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
       .limit(1);
 
     const studentClass = student?.class ?? "Unknown";
+
+    // Fetch school for current term/session
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .limit(1);
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
 
     const [result] = await db
       .insert(resultsTable)
@@ -896,30 +916,37 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
       );
     }
 
+    const roundedCbt = Math.round(scaledCbtScore);
     const scoreValues: any = {
       studentId: parseInt(String(studentId), 10),
       subjectName: exam.subject,
       className: studentClass,
       schoolCode: schoolCodeStr,
+      term: currentTerm,
+      academicSession: currentAcademicSession,
     };
     const scoreUpdate: any = { updatedAt: new Date() };
 
     if (exam.assessmentType === 'mid_term') {
-      scoreValues.midTermScore = Math.round(scaledCbtScore);
-      scoreUpdate.midTermScore = Math.round(scaledCbtScore);
+      scoreValues.midTermScore = roundedCbt;
+      scoreValues.midTermCbtScore = roundedCbt;
+      scoreUpdate.midTermScore = roundedCbt;
+      scoreUpdate.midTermCbtScore = roundedCbt;
     } else if (exam.assessmentType === 'exam') {
-      scoreValues.examScore = Math.round(scaledCbtScore);
-      scoreUpdate.examScore = Math.round(scaledCbtScore);
+      scoreValues.examScore = roundedCbt;
+      scoreValues.examCbtScore = roundedCbt;
+      scoreUpdate.examScore = roundedCbt;
+      scoreUpdate.examCbtScore = roundedCbt;
     } else if (exam.assessmentType === 'class_activity') {
-      scoreValues.classActivityScore = Math.round(scaledCbtScore);
-      scoreUpdate.classActivityScore = Math.round(scaledCbtScore);
+      scoreValues.classActivityScore = roundedCbt;
+      scoreUpdate.classActivityScore = roundedCbt;
     }
 
     await db
       .insert(subjectScoresTable)
       .values(scoreValues)
       .onConflictDoUpdate({
-        target: [subjectScoresTable.studentId, subjectScoresTable.subjectName],
+        target: [subjectScoresTable.studentId, subjectScoresTable.subjectName, subjectScoresTable.term, subjectScoresTable.academicSession],
         set: scoreUpdate,
       });
 
@@ -929,7 +956,7 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
       subject: exam.subject,
       assessmentType: exam.assessmentType,
       cbtScore: cbtScore,
-      scaledScore: Math.round(scaledCbtScore),
+      scaledScore: roundedCbt,
       totalPossible: componentTotal,
     });
     return;
@@ -955,79 +982,74 @@ router.post("/:examId/scores", requireSchoolStaff, async (req: Request<ExamParam
     const [exam] = await db
       .select()
       .from(examsTable)
-      .where(
-        and(
-          eq(examsTable.id, examIdNum),
-          eq(examsTable.schoolCode, schoolCodeStr)
-        )
-      )
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
       .limit(1);
 
     if (!exam) {
       return res.status(404).json({ error: "Exam not found" });
     }
 
-    const [gradingScheme] = await db
-      .select()
-      .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-      .limit(1);
+    const [[gradingScheme], [school]] = await Promise.all([
+      db.select().from(gradingSchemesTable).where(eq(gradingSchemesTable.schoolCode, schoolCodeStr)).limit(1),
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCodeStr)).limit(1),
+    ]);
 
     const defaultScheme = {
-      midTermTotal: 20,
-      midTermCbt: 10,
-      midTermTheory: 10,
-      examTotal: 60,
-      examCbt: 30,
-      examTheory: 30,
+      midTermTotal: 20, midTermCbt: 10, midTermTheory: 10,
+      examTotal: 60, examCbt: 30, examTheory: 30,
       classActivityTotal: 20,
-      gradeAMin: 70,
-      gradeBMin: 60,
-      gradeCMin: 50,
-      gradeDMin: 40,
-      gradeFMax: 39,
+      gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40, gradeFMax: 39,
     };
-
     const scheme = gradingScheme || defaultScheme;
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
 
     let componentTotal = 0;
-    if (exam.assessmentType === 'mid_term') {
-      componentTotal = scheme.midTermTotal;
-    } else if (exam.assessmentType === 'exam') {
-      componentTotal = scheme.examTotal;
-    } else {
-      componentTotal = scheme.classActivityTotal;
-    }
+    if (exam.assessmentType === 'mid_term') componentTotal = scheme.midTermTotal;
+    else if (exam.assessmentType === 'exam') componentTotal = scheme.examTotal;
+    else componentTotal = scheme.classActivityTotal;
 
     const [existing] = await db
       .select()
       .from(subjectScoresTable)
-      .where(
-        and(
-          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
-          eq(subjectScoresTable.subjectName, exam.subject)
-        )
-      )
+      .where(and(
+        eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
+        eq(subjectScoresTable.subjectName, exam.subject),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ))
       .limit(1);
 
     if (!existing) {
-      return res.status(404).json({ error: "Student score record not found" });
+      return res.status(404).json({ error: "Student score record not found. The student must take the CBT exam first." });
     }
 
-    if (exam.assessmentType === 'class_activity' && existing.classActivityScore !== null && existing.classActivityScore !== 0) {
+    // Lock class_activity if already entered (score is entirely teacher-entered, no CBT portion)
+    if (exam.assessmentType === 'class_activity' && existing.classActivityScore !== null) {
       return res.status(403).json({ error: "Class activity score already entered and cannot be changed. Contact admin if correction needed." });
     }
 
-    if (exam.assessmentType === 'mid_term' && existing.midTermScore !== null && existing.midTermScore !== 0) {
-      const cbtPortion = existing.midTermScore || 0;
-      if (cbtPortion > 0) {
+    // Lock theory if it was already added on top of the CBT score.
+    // midTermCbtScore tracks the CBT-only portion; if midTermScore > midTermCbtScore, theory was already added.
+    if (exam.assessmentType === 'mid_term') {
+      const cbtOnly = existing.midTermCbtScore;
+      const combined = existing.midTermScore;
+      if (cbtOnly !== null && combined !== null && combined !== cbtOnly) {
+        return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
+      }
+      if (cbtOnly === null && combined !== null && combined > 0) {
+        // Legacy record: no CBT tracking column — treat any non-zero score as locked
         return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
       }
     }
-
-    if (exam.assessmentType === 'exam' && existing.examScore !== null && existing.examScore !== 0) {
-      const cbtPortion = existing.examScore || 0;
-      if (cbtPortion > 0) {
+    if (exam.assessmentType === 'exam') {
+      const cbtOnly = existing.examCbtScore;
+      const combined = existing.examScore;
+      if (cbtOnly !== null && combined !== null && combined !== cbtOnly) {
+        return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
+      }
+      if (cbtOnly === null && combined !== null && combined > 0) {
         return res.status(403).json({ error: "Theory score already entered and cannot be changed. Contact admin if correction needed." });
       }
     }
@@ -1036,21 +1058,22 @@ router.post("/:examId/scores", requireSchoolStaff, async (req: Request<ExamParam
     let totalScore = 0;
 
     if (exam.assessmentType === 'class_activity') {
-      updateData.classActivityScore = classActivityScore || 0;
+      updateData.classActivityScore = classActivityScore ?? 0;
       totalScore = updateData.classActivityScore;
     } else if (exam.assessmentType === 'mid_term') {
-      const cbtPortion = existing.midTermScore || 0;
-      const theoryAdded = theoryScore || 0;
-      totalScore = cbtPortion + theoryAdded;
+      // Always use midTermCbtScore as the base so theory doesn't stack
+      const cbtBase = existing.midTermCbtScore ?? existing.midTermScore ?? 0;
+      const theory = theoryScore ?? 0;
+      totalScore = cbtBase + theory;
       updateData.midTermScore = totalScore;
     } else if (exam.assessmentType === 'exam') {
-      const cbtPortion = existing.examScore || 0;
-      const theoryAdded = theoryScore || 0;
-      totalScore = cbtPortion + theoryAdded;
+      const cbtBase = existing.examCbtScore ?? existing.examScore ?? 0;
+      const theory = theoryScore ?? 0;
+      totalScore = cbtBase + theory;
       updateData.examScore = totalScore;
     }
 
-    const percentage = (totalScore / componentTotal) * 100;
+    const percentage = componentTotal > 0 ? (totalScore / componentTotal) * 100 : 0;
     updateData.totalScore = totalScore;
     updateData.percentage = Math.round(percentage);
 
@@ -1059,19 +1082,18 @@ router.post("/:examId/scores", requireSchoolStaff, async (req: Request<ExamParam
     else if (percentage >= scheme.gradeBMin) grade = 'B';
     else if (percentage >= scheme.gradeCMin) grade = 'C';
     else if (percentage >= scheme.gradeDMin) grade = 'D';
-    else grade = 'F';
 
     updateData.grade = grade;
 
     const [updated] = await db
       .update(subjectScoresTable)
       .set(updateData)
-      .where(
-        and(
-          eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
-          eq(subjectScoresTable.subjectName, exam.subject)
-        )
-      )
+      .where(and(
+        eq(subjectScoresTable.studentId, parseInt(String(studentId), 10)),
+        eq(subjectScoresTable.subjectName, exam.subject),
+        eq(subjectScoresTable.term, currentTerm),
+        eq(subjectScoresTable.academicSession, currentAcademicSession),
+      ))
       .returning();
 
     res.json(updated);

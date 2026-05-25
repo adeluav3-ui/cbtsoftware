@@ -52,6 +52,30 @@ export default function ExamResults() {
         fetchResults();
     }, [examId]);
 
+    const handleExport = () => {
+        if (!data) return;
+        const { exam, results, gradingScheme } = data;
+        const headers = ["Student Name", "Class", "CBT Score", "CBT Total", "CBT %", `Scaled CBT (/${gradingScheme.componentCbt})`, exam.assessmentType === 'class_activity' ? "Activity Score" : "Theory Score", `Total (/${gradingScheme.componentTotal})`];
+        const rows = results.map(r => [
+            r.studentName,
+            r.studentClass,
+            r.cbtRawScore,
+            r.cbtTotal,
+            r.cbtPercentage.toFixed(1) + "%",
+            r.scaledCbtScore,
+            exam.assessmentType === 'class_activity' ? r.classActivityScore : r.theoryScore,
+            r.componentScore,
+        ]);
+        const csv = [headers, ...rows].map(row => row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${exam.title.replace(/\s+/g, "_")}_results.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const fetchResults = async () => {
         setIsLoading(true);
         try {
@@ -186,8 +210,8 @@ export default function ExamResults() {
                         className="pl-9"
                     />
                 </div>
-                <Button variant="outline">
-                    <Download className="w-4 h-4 mr-2" /> Export
+                <Button variant="outline" onClick={handleExport}>
+                    <Download className="w-4 h-4 mr-2" /> Export CSV
                 </Button>
             </div>
 
@@ -212,7 +236,7 @@ export default function ExamResults() {
                         <tbody>
                             {filteredResults.map((result) => {
                                 const isEditing = editingScores[result.studentId];
-                                const isTheoryLocked = result.theoryScore > 0 && result.theoryScore !== null;
+                                const isTheoryLocked = result.theoryScore !== null && result.theoryScore !== undefined;
                                 const isActivityLocked = result.classActivityScore > 0 && result.classActivityScore !== null;
 
                                 return (

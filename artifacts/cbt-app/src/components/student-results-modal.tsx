@@ -99,6 +99,7 @@ export function StudentResultsModal({
     const [isLoading, setIsLoading] = useState(true);
     const [overallAverage, setOverallAverage] = useState(0);
     const [completedSubjectsCount, setCompletedSubjectsCount] = useState(0);
+    const [scheme, setScheme] = useState({ midTermTotal: 20, classActivityTotal: 20, examTotal: 60, gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 });
     // key = "subjectName-component", value = current input value while editing
     const [editingScores, setEditingScores] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState<string | null>(null);
@@ -112,6 +113,10 @@ export function StudentResultsModal({
     useEffect(() => {
         if (isOpen && studentId) {
             fetchResults();
+            fetch(`${API_BASE_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
+                .then(r => r.ok ? r.json() : null)
+                .then(d => { if (d) setScheme({ midTermTotal: d.midTermTotal ?? 20, classActivityTotal: d.classActivityTotal ?? 20, examTotal: d.examTotal ?? 60, gradeAMin: d.gradeAMin ?? 70, gradeBMin: d.gradeBMin ?? 60, gradeCMin: d.gradeCMin ?? 50, gradeDMin: d.gradeDMin ?? 40 }); })
+                .catch(() => {});
         }
         if (!isOpen) {
             setEditingScores({});
@@ -132,37 +137,16 @@ export function StudentResultsModal({
             const data = await response.json();
             if (!Array.isArray(data)) return;
 
-            const processedSubjects: SubjectResult[] = data.map((subject: any) => {
-                const hasMidTerm = subject.midTermScore !== null && subject.midTermScore !== undefined;
-                const hasActivity = subject.classActivityScore !== null && subject.classActivityScore !== undefined;
-                const hasExam = subject.examScore !== null && subject.examScore !== undefined;
-                const allComponentsEntered = hasMidTerm && hasActivity && hasExam;
-
-                let totalScore = null;
-                let percentage = null;
-                let grade = null;
-
-                if (allComponentsEntered) {
-                    totalScore = (subject.midTermScore || 0) + (subject.classActivityScore || 0) + (subject.examScore || 0);
-                    percentage = totalScore;
-
-                    if (percentage >= 70) grade = 'A';
-                    else if (percentage >= 60) grade = 'B';
-                    else if (percentage >= 50) grade = 'C';
-                    else if (percentage >= 40) grade = 'D';
-                    else grade = 'F';
-                }
-
-                return {
-                    subjectName: subject.subjectName,
-                    midTermScore: hasMidTerm ? subject.midTermScore : null,
-                    classActivityScore: hasActivity ? subject.classActivityScore : null,
-                    examScore: hasExam ? subject.examScore : null,
-                    totalScore,
-                    percentage,
-                    grade,
-                };
-            });
+            // Use server-computed totalScore, percentage, and grade directly
+            const processedSubjects: SubjectResult[] = data.map((subject: any) => ({
+                subjectName: subject.subjectName,
+                midTermScore: subject.midTermScore ?? null,
+                classActivityScore: subject.classActivityScore ?? null,
+                examScore: subject.examScore ?? null,
+                totalScore: subject.totalScore ?? null,
+                percentage: subject.percentage ?? null,
+                grade: subject.grade ?? null,
+            }));
 
             setSubjects(processedSubjects);
             setEditingScores({});
@@ -304,9 +288,9 @@ export function StudentResultsModal({
                                     <thead className="sticky top-0 bg-background">
                                         <tr className="border-b border-border">
                                             <th className="px-3 py-3 font-semibold">Subject</th>
-                                            <th className="px-3 py-3 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
-                                            <th className="px-3 py-3 font-semibold text-center">Activity<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
-                                            <th className="px-3 py-3 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/60</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.midTermTotal}</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Activity<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.classActivityTotal}</span></th>
+                                            <th className="px-3 py-3 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.examTotal}</span></th>
                                             <th className="px-3 py-3 font-semibold text-center">Total<br /><span className="font-normal text-xs text-muted-foreground">/100</span></th>
                                             <th className="px-3 py-3 font-semibold text-center">Grade</th>
                                         </tr>
@@ -323,7 +307,7 @@ export function StudentResultsModal({
                                                             subjectName={subject.subjectName}
                                                             component="midterm"
                                                             currentScore={subject.midTermScore}
-                                                            maxScore={20}
+                                                            maxScore={scheme.midTermTotal}
                                                             label="Mid-Term"
                                                             editingScores={editingScores}
                                                             saving={saving}
@@ -337,7 +321,7 @@ export function StudentResultsModal({
                                                             subjectName={subject.subjectName}
                                                             component="activity"
                                                             currentScore={subject.classActivityScore}
-                                                            maxScore={20}
+                                                            maxScore={scheme.classActivityTotal}
                                                             label="Activity"
                                                             editingScores={editingScores}
                                                             saving={saving}
@@ -351,7 +335,7 @@ export function StudentResultsModal({
                                                             subjectName={subject.subjectName}
                                                             component="exam"
                                                             currentScore={subject.examScore}
-                                                            maxScore={60}
+                                                            maxScore={scheme.examTotal}
                                                             label="Exam"
                                                             editingScores={editingScores}
                                                             saving={saving}

@@ -22,6 +22,18 @@ interface SchoolInfo {
     academicSession: string;
 }
 
+interface GradingScheme {
+    midTermTotal: number;
+    classActivityTotal: number;
+    examTotal: number;
+    gradeAMin: number;
+    gradeBMin: number;
+    gradeCMin: number;
+    gradeDMin: number;
+}
+
+const DEFAULT_SCHEME: GradingScheme = { midTermTotal: 20, classActivityTotal: 20, examTotal: 60, gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 };
+
 export default function MyResults() {
     const { user } = useAuth();
     const [, setLocation] = useLocation();
@@ -35,11 +47,13 @@ export default function MyResults() {
         currentTerm: "First Term",
         academicSession: "2025/2026",
     });
+    const [scheme, setScheme] = useState<GradingScheme>(DEFAULT_SCHEME);
 
     useEffect(() => {
         if (!schoolCode || !user?.id) return;
         fetchSchoolInfo();
         fetchResults();
+        fetchScheme();
     }, [schoolCode, user?.id]);
 
     const fetchSchoolInfo = async () => {
@@ -55,6 +69,15 @@ export default function MyResults() {
                 currentTerm: data.currentTerm || "First Term",
                 academicSession: data.currentAcademicSession || "2025/2026",
             });
+        } catch (_) {}
+    };
+
+    const fetchScheme = async () => {
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data) setScheme({ midTermTotal: data.midTermTotal ?? 20, classActivityTotal: data.classActivityTotal ?? 20, examTotal: data.examTotal ?? 60, gradeAMin: data.gradeAMin ?? 70, gradeBMin: data.gradeBMin ?? 60, gradeCMin: data.gradeCMin ?? 50, gradeDMin: data.gradeDMin ?? 40 });
         } catch (_) {}
     };
 
@@ -80,7 +103,7 @@ export default function MyResults() {
     const overallAvg = completedSubjects.length > 0
         ? completedSubjects.reduce((acc, s) => acc + (s.percentage || 0), 0) / completedSubjects.length
         : 0;
-    const overallGrade = overallAvg >= 70 ? 'A' : overallAvg >= 60 ? 'B' : overallAvg >= 50 ? 'C' : overallAvg >= 40 ? 'D' : 'F';
+    const overallGrade = overallAvg >= scheme.gradeAMin ? 'A' : overallAvg >= scheme.gradeBMin ? 'B' : overallAvg >= scheme.gradeCMin ? 'C' : overallAvg >= scheme.gradeDMin ? 'D' : 'F';
 
     const getGradeColor = (grade?: string | null) => {
         if (!grade) return "text-muted-foreground";
@@ -159,9 +182,9 @@ export default function MyResults() {
                                 <thead>
                                     <tr className="border-b-2 border-border print:border-black">
                                         <th className="px-2 py-2 font-semibold">Subject</th>
-                                        <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs">(20)</span></th>
-                                        <th className="px-2 py-2 font-semibold text-center">Class Activity<br /><span className="font-normal text-xs">(20)</span></th>
-                                        <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs">(60)</span></th>
+                                        <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs">({scheme.midTermTotal})</span></th>
+                                        <th className="px-2 py-2 font-semibold text-center">Class Activity<br /><span className="font-normal text-xs">({scheme.classActivityTotal})</span></th>
+                                        <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs">({scheme.examTotal})</span></th>
                                         <th className="px-2 py-2 font-semibold text-center">Total<br /><span className="font-normal text-xs">(100)</span></th>
                                         <th className="px-2 py-2 font-semibold text-center">Grade</th>
                                     </tr>

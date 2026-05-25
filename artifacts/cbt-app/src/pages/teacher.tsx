@@ -282,7 +282,7 @@ export default function TeacherDashboard() {
                     <ArrowRightLeft size={14} />
                   </button>
                   <button
-                    onClick={() => deleteExam({ schoolCode, examId: exam.id })}
+                    onClick={() => { if (window.confirm(`Delete "${exam.title}"? This cannot be undone.`)) deleteExam({ schoolCode, examId: exam.id }); }}
                     className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                     title="Delete"
                   >
@@ -389,7 +389,7 @@ export default function TeacherDashboard() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteStudent({ schoolCode, studentId: s.id });
+                            if (window.confirm(`Remove ${s.fullName} from the student list? This cannot be undone.`)) deleteStudent({ schoolCode, studentId: s.id });
                           }}
                           className="p-1"
                         >
@@ -408,89 +408,70 @@ export default function TeacherDashboard() {
       {/* ── Results Tab ───────────────────────────────── */}
       {activeTab === "Results" && (
         <Card className="p-4 md:p-6">
-          <div className="mb-4">
-            <h3 className="text-base md:text-lg font-semibold">Student Results by Class</h3>
-            <p className="text-xs text-muted-foreground">Tap on any student to view their complete results</p>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 className="text-base md:text-lg font-semibold">Student Results — {classFilter}</h3>
+              <p className="text-xs text-muted-foreground">Tap on any student to view their complete results</p>
+            </div>
+            <select
+              value={classFilter}
+              onChange={e => setClassFilter(e.target.value)}
+              className="border border-border rounded-lg px-3 py-1.5 text-sm bg-background"
+            >
+              {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
 
-          <div className="space-y-6">
-            {CLASSES.map(className => {
-              const classStudents = students.filter((s) => s.class === className);
-              if (classStudents.length === 0) return null;
-
-              return (
-                <div key={className}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <h4 className="text-lg md:text-xl font-bold font-display text-primary">{className}</h4>
-                    <Badge variant="default" className="text-xs">{classStudents.length}</Badge>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-150 text-sm">
-                      <thead>
-                        <tr className="bg-muted/50 border-b border-border">
-                          <th className="px-3 py-2 font-semibold">Student</th>
-                          <th className="px-3 py-2 font-semibold">Username</th>
-                          <th className="px-3 py-2 font-semibold text-center">Subj</th>
-                          <th className="px-3 py-2 font-semibold text-center">Comp</th>
-                          <th className="px-3 py-2 font-semibold text-center">Avg %</th>
-                          <th className="px-3 py-2 font-semibold text-center">Status</th>
-                          <th className="px-3 py-2 font-semibold text-center">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {classStudents.map((student) => {
-                          const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
-                          const completedSubjects = studentSubjectScores.filter((s: any) => {
-                            return s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
-                          });
-                          let overallAvg = 0;
-                          if (completedSubjects.length > 0) {
-                            const totalPercentages = completedSubjects.reduce((acc: number, s: any) => {
-                              const totalScore = (s.midTermScore || 0) + (s.classActivityScore || 0) + (s.examScore || 0);
-                              return acc + totalScore;
-                            }, 0);
-                            overallAvg = totalPercentages / completedSubjects.length;
-                          }
-                          return (
-                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer">
-                              <td className="px-3 py-2 font-semibold text-primary" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
-                                {student.fullName}
-                              </td>
-                              <td className="px-3 py-2 text-muted-foreground text-xs" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
-                                {student.username}
-                              </td>
-                              <td className="px-3 py-2 text-center">{studentSubjectScores.length}</td>
-                              <td className="px-3 py-2 text-center">{completedSubjects.length}</td>
-                              <td className="px-3 py-2 text-center font-bold">
-                                {completedSubjects.length > 0 ? (
-                                  <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>
-                                    {overallAvg.toFixed(0)}%
-                                  </span>
-                                ) : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <Badge variant={overallAvg >= 70 ? "success" : completedSubjects.length > 0 ? "warning" : "default"} className="text-xs">
-                                  {overallAvg >= 70 ? "Pass" : completedSubjects.length > 0 ? "Progress" : "None"}
-                                </Badge>
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <Button variant="secondary" size="sm" className="p-1.5" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
-                                  <ClipboardList className="w-4 h-4" />
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-            {students.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">No students enrolled yet.</div>
-            )}
-          </div>
+          {studentsLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading students…</div>
+          ) : students.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">No students in {classFilter}.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-150 text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border">
+                    <th className="px-3 py-2 font-semibold">Student</th>
+                    <th className="px-3 py-2 font-semibold">Username</th>
+                    <th className="px-3 py-2 font-semibold text-center">Subj</th>
+                    <th className="px-3 py-2 font-semibold text-center">Comp</th>
+                    <th className="px-3 py-2 font-semibold text-center">Avg %</th>
+                    <th className="px-3 py-2 font-semibold text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student) => {
+                    const studentSubjectScores = subjectScores.filter((s: any) => s.studentId === student.id);
+                    const completedSubjects = studentSubjectScores.filter((s: any) =>
+                      s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null
+                    );
+                    const overallAvg = completedSubjects.length > 0
+                      ? completedSubjects.reduce((acc: number, s: any) => acc + ((s.totalScore ?? 0)), 0) / completedSubjects.length
+                      : 0;
+                    return (
+                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/20 cursor-pointer"
+                        onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
+                        <td className="px-3 py-2 font-semibold text-primary">{student.fullName}</td>
+                        <td className="px-3 py-2 text-muted-foreground text-xs">{student.username}</td>
+                        <td className="px-3 py-2 text-center">{studentSubjectScores.length}</td>
+                        <td className="px-3 py-2 text-center">{completedSubjects.length}</td>
+                        <td className="px-3 py-2 text-center font-bold">
+                          {completedSubjects.length > 0 ? (
+                            <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>{overallAvg.toFixed(0)}%</span>
+                          ) : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
+                          <Button variant="secondary" size="sm" className="p-1.5" onClick={() => { setSelectedStudentId(student.id); setSelectedStudentName(student.fullName || student.username); setSelectedStudentClass(student.class || ''); setStudentResultsModalOpen(true); }}>
+                            <ClipboardList className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       )}
 

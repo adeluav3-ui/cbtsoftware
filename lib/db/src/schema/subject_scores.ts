@@ -11,9 +11,11 @@ export const subjectScoresTable = pgTable("subject_scores", {
     academicSession: text("academic_session").default("2025/2026"),
 
     // Three components (null means not yet entered)
-    midTermScore: integer("mid_term_score"),
+    midTermScore: integer("mid_term_score"),       // final = cbt + theory
+    midTermCbtScore: integer("mid_term_cbt_score"), // cbt portion only
     classActivityScore: integer("class_activity_score"),
-    examScore: integer("exam_score"),
+    examScore: integer("exam_score"),              // final = cbt + theory
+    examCbtScore: integer("exam_cbt_score"),        // cbt portion only
 
     // Calculated fields
     totalScore: integer("total_score"),
@@ -24,7 +26,7 @@ export const subjectScoresTable = pgTable("subject_scores", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-    uniqueStudentSubject: unique().on(table.studentId, table.subjectName),
+    uniqueStudentSubjectTermSession: unique().on(table.studentId, table.subjectName, table.term, table.academicSession),
     studentIdIdx: index("subject_scores_student_id_idx").on(table.studentId),
     schoolCodeIdx: index("subject_scores_school_code_idx").on(table.schoolCode),
     schoolTermSessionIdx: index("subject_scores_school_term_session_idx").on(table.schoolCode, table.term, table.academicSession),
