@@ -11,6 +11,7 @@ export const schoolsTable = pgTable("schools", {
   currentAcademicSession: text("current_academic_session").default("2025/2026"),
   currentTerm: text("current_term").default("First Term"),
   availableTerms: text("available_terms").array().default(["First Term", "Second Term", "Third Term"]),
+  nextTermBegins: text("next_term_begins"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

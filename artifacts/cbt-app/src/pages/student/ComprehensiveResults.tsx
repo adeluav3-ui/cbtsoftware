@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { Card, Button, Textarea } from "@/components/ui-elements";
-import { ArrowLeft, Download, Printer, Save, User, School } from "lucide-react";
+import { ArrowLeft, Download, Printer, Save, User, School, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SubjectResult {
     subjectName: string;
@@ -29,21 +29,30 @@ interface SchoolInfo {
     logoUrl: string | null;
     currentTerm: string;
     academicSession: string;
+    nextTermBegins: string | null;
 }
 
 interface TraitRating {
-    traitCategory: 'affective' | 'psychomotor';
+    traitCategory: 'cognitive' | 'affective' | 'psychomotor';
     traitName: string;
     rating: number | null;
 }
 
 const DEFAULT_TRAITS: TraitRating[] = [
+    // Cognitive domain
+    { traitCategory: 'cognitive', traitName: 'Verbal Reasoning', rating: null },
+    { traitCategory: 'cognitive', traitName: 'Numerical Ability', rating: null },
+    { traitCategory: 'cognitive', traitName: 'Memory & Recall', rating: null },
+    { traitCategory: 'cognitive', traitName: 'Problem Solving', rating: null },
+    { traitCategory: 'cognitive', traitName: 'Creativity', rating: null },
+    // Affective domain
     { traitCategory: 'affective', traitName: 'Punctuality', rating: null },
     { traitCategory: 'affective', traitName: 'Neatness', rating: null },
     { traitCategory: 'affective', traitName: 'Politeness', rating: null },
     { traitCategory: 'affective', traitName: 'Honesty', rating: null },
     { traitCategory: 'affective', traitName: 'Obedience', rating: null },
     { traitCategory: 'affective', traitName: 'Perseverance', rating: null },
+    // Psychomotor domain
     { traitCategory: 'psychomotor', traitName: 'Handwriting', rating: null },
     { traitCategory: 'psychomotor', traitName: 'Drawing', rating: null },
     { traitCategory: 'psychomotor', traitName: 'Sports', rating: null },
@@ -52,6 +61,24 @@ const DEFAULT_TRAITS: TraitRating[] = [
 ];
 
 const RATING_LABELS: Record<number, string> = { 5: 'Excellent', 4: 'Very Good', 3: 'Good', 2: 'Fair', 1: 'Poor' };
+
+const AUTO_COMMENTS = [
+    "An excellent student with commendable academic performance. Keep it up!",
+    "A very good student. With more dedication, you can reach the top.",
+    "Good performance this term. Work harder for even better results next term.",
+    "A satisfactory performance. More effort is needed in the next term.",
+    "Your performance needs significant improvement. Please work harder.",
+    "This student is intelligent but needs to be more serious with studies.",
+    "A hardworking student who is making steady progress. Well done!",
+    "You have the potential to do better. Apply yourself more diligently.",
+    "An improvement in performance is observed. Keep working hard.",
+    "Outstanding academic performance! A role model for others.",
+    "Needs more focus and dedication. Please study harder next term.",
+    "A brilliant student who must work harder to maintain this standard.",
+    "Good conduct and academic performance. Sustain this effort.",
+    "Your results show you can do better. Do not relent in your studies.",
+    "A promising student. With consistency and hard work, you will excel.",
+];
 
 const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
@@ -72,9 +99,12 @@ export default function ComprehensiveResults() {
     const [isLoading, setIsLoading] = useState(false);
     const [comment, setComment] = useState("");
     const [isSavingComment, setIsSavingComment] = useState(false);
+    const [showAutoComments, setShowAutoComments] = useState(false);
     const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
-        name: "", logoUrl: null, currentTerm: "First Term", academicSession: "2025/2026"
+        name: "", logoUrl: null, currentTerm: "First Term", academicSession: "2025/2026", nextTermBegins: null
     });
+    const [nextTermBeginsEdit, setNextTermBeginsEdit] = useState("");
+    const [isSavingNextTerm, setIsSavingNextTerm] = useState(false);
     const [selectedClass, setSelectedClass] = useState("KG1");
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
@@ -112,7 +142,15 @@ export default function ComprehensiveResults() {
             const res = await fetch(`${API}/schools/${schoolCode}`, { credentials: "include" });
             if (!res.ok) return;
             const data = await res.json();
-            setSchoolInfo({ name: data.name || "School", logoUrl: data.logoUrl, currentTerm: data.currentTerm || "First Term", academicSession: data.currentAcademicSession || "2025/2026" });
+            const info: SchoolInfo = {
+                name: data.name || "School",
+                logoUrl: data.logoUrl,
+                currentTerm: data.currentTerm || "First Term",
+                academicSession: data.currentAcademicSession || "2025/2026",
+                nextTermBegins: data.nextTermBegins || null,
+            };
+            setSchoolInfo(info);
+            setNextTermBeginsEdit(info.nextTermBegins || "");
         } catch {}
     };
 
@@ -225,6 +263,23 @@ export default function ComprehensiveResults() {
         }
     };
 
+    const handleSaveNextTermBegins = async () => {
+        setIsSavingNextTerm(true);
+        try {
+            const res = await fetch(`${API}/schools/${schoolCode}/next-term-begins`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nextTermBegins: nextTermBeginsEdit || null }),
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error();
+            setSchoolInfo(prev => ({ ...prev, nextTermBegins: nextTermBeginsEdit || null }));
+        } catch {
+            alert("Failed to save next term date");
+        } finally {
+            setIsSavingNextTerm(false);
+        }
+    };
+
     const getGradeColor = (grade?: string | null) => {
         switch (grade) {
             case 'A': return "text-green-600 font-bold";
@@ -244,6 +299,7 @@ export default function ComprehensiveResults() {
     const overallGrade = overallAvg >= scheme.gradeAMin ? 'A' : overallAvg >= scheme.gradeBMin ? 'B' : overallAvg >= scheme.gradeCMin ? 'C' : overallAvg >= scheme.gradeDMin ? 'D' : 'F';
 
     const canEdit = user?.role === "teacher" || user?.role === "school_admin";
+    const cognitiveTraits = traits.filter(t => t.traitCategory === 'cognitive');
     const affectiveTraits = traits.filter(t => t.traitCategory === 'affective');
     const psychomotorTraits = traits.filter(t => t.traitCategory === 'psychomotor');
     const attendancePct = attendance.timesSchoolOpened > 0
@@ -255,10 +311,10 @@ export default function ComprehensiveResults() {
 
     const TraitTable = ({ list, label }: { list: TraitRating[]; label: string }) => (
         <div>
-            <h4 className="font-semibold text-xs mb-1 uppercase tracking-wide text-muted-foreground">{label}</h4>
+            <h4 className="font-semibold text-xs mb-1.5 uppercase tracking-wide text-muted-foreground border-b border-border pb-1">{label}</h4>
             <table className="w-full text-xs border-collapse">
                 <thead>
-                    <tr className="border-b border-border">
+                    <tr className="border-b border-border/50">
                         <th className="text-left py-1 font-semibold">Trait</th>
                         <th className="text-center py-1 font-semibold">Rating</th>
                         {canEdit && <th className="py-1 w-28"></th>}
@@ -293,6 +349,18 @@ export default function ComprehensiveResults() {
             </table>
         </div>
     );
+
+    // Format the "next term begins" date for display
+    const formatNextTermDate = (dateStr: string | null) => {
+        if (!dateStr) return null;
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr; // return raw if invalid
+            return d.toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } catch {
+            return dateStr;
+        }
+    };
 
     return (
         <DashboardLayout allowedRoles={["teacher", "school_admin"]}>
@@ -342,6 +410,34 @@ export default function ComprehensiveResults() {
                                         <span className="truncate">{student.fullName}</span>
                                     </button>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Next Term Begins — school-wide setting, editable by teachers */}
+                        {canEdit && (
+                            <div className="mt-4 pt-4 border-t border-border print:hidden">
+                                <h3 className="font-semibold mb-2 text-sm">Next Term Begins</h3>
+                                <input
+                                    type="date"
+                                    value={nextTermBeginsEdit}
+                                    onChange={e => setNextTermBeginsEdit(e.target.value)}
+                                    className="w-full border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:border-primary"
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full mt-2 text-xs"
+                                    onClick={handleSaveNextTermBegins}
+                                    isLoading={isSavingNextTerm}
+                                    disabled={nextTermBeginsEdit === (schoolInfo.nextTermBegins || "")}
+                                >
+                                    <Save className="w-3 h-3 mr-1" /> Save Date
+                                </Button>
+                                {schoolInfo.nextTermBegins && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Current: {formatNextTermDate(schoolInfo.nextTermBegins)}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </Card>
@@ -460,10 +556,16 @@ export default function ComprehensiveResults() {
                                         </table>
                                     </div>
 
-                                    {/* Affective & Psychomotor Domains */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <TraitTable list={affectiveTraits} label="Affective Domain" />
-                                        <TraitTable list={psychomotorTraits} label="Psychomotor Domain" />
+                                    {/* Cognitive, Affective & Psychomotor Domains */}
+                                    <div className="mb-4">
+                                        <h3 className="font-semibold text-sm mb-3 uppercase tracking-wide text-muted-foreground">
+                                            Cognitive, Affective &amp; Psychomotor Assessment
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <TraitTable list={cognitiveTraits} label="Cognitive Domain" />
+                                            <TraitTable list={affectiveTraits} label="Affective Domain" />
+                                            <TraitTable list={psychomotorTraits} label="Psychomotor Domain" />
+                                        </div>
                                     </div>
                                     {canEdit && (
                                         <div className="flex justify-end mb-4 print:hidden">
@@ -473,21 +575,64 @@ export default function ComprehensiveResults() {
                                         </div>
                                     )}
 
-                                    {/* Teacher's Comment */}
+                                    {/* Next Term Begins */}
+                                    <div className="mb-4 p-3 bg-muted/20 rounded-lg flex flex-wrap items-center gap-2 text-sm border border-border/40">
+                                        <span className="font-semibold text-muted-foreground">Next Term Begins:</span>
+                                        <span className="font-semibold text-foreground">
+                                            {schoolInfo.nextTermBegins
+                                                ? formatNextTermDate(schoolInfo.nextTermBegins)
+                                                : <span className="text-muted-foreground italic">Not yet set — use the sidebar to add a date</span>
+                                            }
+                                        </span>
+                                    </div>
+
+                                    {/* Teacher's / Principal's Comment */}
                                     <div className="pt-4 border-t border-border">
-                                        <h3 className="font-semibold text-sm mb-2">Teacher's Comment</h3>
+                                        <h3 className="font-semibold text-sm mb-2">Teacher's / Principal's Comment</h3>
                                         {canEdit && (
-                                            <div className="flex gap-2 mb-2 print:hidden">
-                                                <Textarea
-                                                    value={comment}
-                                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
-                                                    placeholder="Add a comment or remark for this student..."
-                                                    className="flex-1 text-sm"
-                                                    rows={2}
-                                                />
-                                                <Button onClick={handleSaveComment} isLoading={isSavingComment} size="sm">
-                                                    <Save className="w-4 h-4 mr-1" /> Save
-                                                </Button>
+                                            <div className="print:hidden space-y-2 mb-3">
+                                                {/* Auto-comment suggestions toggle */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAutoComments(prev => !prev)}
+                                                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                                >
+                                                    {showAutoComments ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                                    {showAutoComments ? "Hide suggestions" : "Choose from suggested comments"}
+                                                </button>
+
+                                                {showAutoComments && (
+                                                    <div className="border border-border rounded-xl overflow-hidden shadow-sm">
+                                                        <div className="bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border">
+                                                            Click any comment to use it (you can edit it after)
+                                                        </div>
+                                                        <div className="max-h-44 overflow-y-auto divide-y divide-border/30">
+                                                            {AUTO_COMMENTS.map((c, i) => (
+                                                                <button
+                                                                    key={i}
+                                                                    type="button"
+                                                                    onClick={() => { setComment(c); setShowAutoComments(false); }}
+                                                                    className="w-full text-left px-3 py-2 text-sm hover:bg-primary/5 hover:text-primary transition-colors"
+                                                                >
+                                                                    {c}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <Textarea
+                                                        value={comment}
+                                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
+                                                        placeholder="Type a comment or pick one from the list above…"
+                                                        className="flex-1 text-sm"
+                                                        rows={2}
+                                                    />
+                                                    <Button onClick={handleSaveComment} isLoading={isSavingComment} size="sm">
+                                                        <Save className="w-4 h-4 mr-1" /> Save
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
                                         <p className="text-sm italic text-muted-foreground border border-border/40 rounded px-3 py-2 min-h-8">
@@ -532,6 +677,7 @@ export default function ComprehensiveResults() {
           .print\\:hidden { display: none !important; }
           select { display: none !important; }
           input[type="number"] { border: none; background: transparent; }
+          input[type="date"] { display: none !important; }
         }
       `}</style>
         </DashboardLayout>

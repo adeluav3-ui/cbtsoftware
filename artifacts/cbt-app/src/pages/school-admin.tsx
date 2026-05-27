@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession } from "@workspace/api-client-react";
+import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, Settings } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -523,6 +523,14 @@ export default function SchoolAdminDashboard() {
     setGradingModalOpen(true);
   };
 
+  // All-exams state (for admin publish/unpublish)
+  const { data: allExams = [], isLoading: isLoadingExams } = useListExams(schoolCode);
+  const { mutate: toggleExamStatus } = useToggleExamStatus({
+    mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListExamsQueryKey(schoolCode) }) }
+  });
+  const [examSearchQuery, setExamSearchQuery] = useState("");
+  const [examClassFilter, setExamClassFilter] = useState("All");
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -602,7 +610,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -972,6 +980,108 @@ export default function SchoolAdminDashboard() {
           </Modal>
         </Card>
       )}
+
+      {/* ── Exams Tab (publish/unpublish teacher exams) ── */}
+      {activeTab === "Exams" && (() => {
+        const filteredExams = allExams.filter(exam => {
+          const matchesClass = examClassFilter === "All" || exam.class === examClassFilter;
+          const matchesSearch = !examSearchQuery ||
+            exam.title.toLowerCase().includes(examSearchQuery.toLowerCase()) ||
+            exam.subject.toLowerCase().includes(examSearchQuery.toLowerCase());
+          return matchesClass && matchesSearch;
+        });
+
+        const teacherMap = new Map(teachers.map(t => [t.id, t.fullName || t.username]));
+        const publishedCount = filteredExams.filter(e => e.isActive).length;
+        const draftCount = filteredExams.filter(e => !e.isActive).length;
+
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2"><BookOpen className="w-5 h-5" /> Manage Exams</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Publish or unpublish exams set by teachers.
+                  <span className="ml-2 text-green-600 font-semibold">{publishedCount} Published</span>
+                  <span className="mx-1 text-muted-foreground">·</span>
+                  <span className="text-yellow-600 font-semibold">{draftCount} Draft</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                placeholder="Search by title or subject…"
+                value={examSearchQuery}
+                onChange={e => setExamSearchQuery(e.target.value)}
+                className="sm:max-w-xs"
+              />
+              <Select value={examClassFilter} onChange={e => setExamClassFilter(e.target.value)} className="sm:max-w-xs">
+                <option value="All">All Classes</option>
+                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            </div>
+
+            <Card className="p-0 overflow-hidden">
+              {isLoadingExams ? (
+                <div className="py-12 text-center text-muted-foreground">Loading exams…</div>
+              ) : filteredExams.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                  <p>No exams found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border text-muted-foreground">
+                        <th className="px-4 py-3 font-semibold">Exam Title</th>
+                        <th className="px-4 py-3 font-semibold">Subject</th>
+                        <th className="px-4 py-3 font-semibold">Class</th>
+                        <th className="px-4 py-3 font-semibold">Teacher</th>
+                        <th className="px-4 py-3 font-semibold text-center">Questions</th>
+                        <th className="px-4 py-3 font-semibold text-center">Status</th>
+                        <th className="px-4 py-3 font-semibold text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExams.map(exam => (
+                        <tr key={exam.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-3 font-semibold">{exam.title}</td>
+                          <td className="px-4 py-3 text-primary font-medium">{exam.subject}</td>
+                          <td className="px-4 py-3"><Badge className="text-xs">{exam.class}</Badge></td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">{teacherMap.get(exam.teacherId) || `Teacher #${exam.teacherId}`}</td>
+                          <td className="px-4 py-3 text-center text-muted-foreground">{(exam as any).questionCount ?? 0}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant={exam.isActive ? "success" : "default"} className="text-xs">
+                              {exam.isActive ? "Published" : "Draft"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Button
+                              size="sm"
+                              variant={exam.isActive ? "outline" : "secondary"}
+                              className={`text-xs px-3 py-1 ${exam.isActive ? "text-destructive hover:bg-destructive/10 border-destructive/30" : ""}`}
+                              onClick={() => toggleExamStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
+                            >
+                              {exam.isActive ? (
+                                <><PowerOff className="w-3 h-3 mr-1" /> Unpublish</>
+                              ) : (
+                                <><Power className="w-3 h-3 mr-1" /> Publish</>
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* ── Broadsheet Tab ───────────────────────────── */}
       {activeTab === "Broadsheet" && (

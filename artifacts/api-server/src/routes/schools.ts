@@ -434,8 +434,8 @@ router.post("/:schoolCode/subjects", requireSchoolAdmin, async (req: Request, re
   const schoolCodeStr = String(schoolCode);
   const { name, level } = req.body;
 
-  if (!name || !level || !['junior', 'senior'].includes(level)) {
-    return res.status(400).json({ error: "Subject name and valid level (junior/senior) required" });
+  if (!name || !level || !['kg', 'nursery', 'primary', 'junior', 'senior'].includes(level)) {
+    return res.status(400).json({ error: "Subject name and valid level (kg/nursery/primary/junior/senior) required" });
   }
 
   try {
@@ -720,6 +720,7 @@ router.get("/:schoolCode", async (req: Request, res: Response) => {
         currentTerm: schoolsTable.currentTerm,
         currentAcademicSession: schoolsTable.currentAcademicSession,
         availableTerms: schoolsTable.availableTerms,
+        nextTermBegins: schoolsTable.nextTermBegins,
       })
       .from(schoolsTable)
       .where(eq(schoolsTable.code, schoolCodeStr))
@@ -790,6 +791,32 @@ router.post("/:schoolCode/update-academic-session", requireSchoolAdmin, async (r
     }
 
     res.json({ success: true, currentAcademicSession: updated.currentAcademicSession });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Update next term begins date
+router.post("/:schoolCode/next-term-begins", requireSchoolStaff, async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { nextTermBegins } = req.body;
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ nextTermBegins: nextTermBegins || null })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({ success: true, nextTermBegins: updated.nextTermBegins });
     return;
   } catch (err) {
     console.error(err);
