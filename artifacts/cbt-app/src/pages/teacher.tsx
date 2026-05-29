@@ -30,7 +30,8 @@ export default function TeacherDashboard() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("My Exams");
-  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const REGULAR_CLASSES = CLASSES.filter(c => c !== "Entrance Exam" && c !== "Staff Interview");
 
   // ── Exams ────────────────────────────────────────
   const { data: exams = [], isLoading } = useListExams(schoolCode);
@@ -323,7 +324,7 @@ export default function TeacherDashboard() {
                 <span className="text-sm font-semibold text-muted-foreground">Class:</span>
                 <div className="overflow-x-auto pb-1">
                   <div className="flex gap-1">
-                    {CLASSES.map(c => (
+                    {REGULAR_CLASSES.map(c => (
                       <button
                         key={c}
                         onClick={() => setClassFilter(c)}

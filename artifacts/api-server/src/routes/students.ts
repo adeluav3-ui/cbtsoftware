@@ -87,9 +87,9 @@ router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Res
     return res.status(400).json({ error: "Username, password, full name and class required" });
   }
 
-  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   if (!validClasses.includes(studentClass)) {
-    return res.status(400).json({ error: "Invalid class. Must be one of: KG1, KG2, Nursery 1, Nursery 2, Pry 1-5, JSS1-3, or SSS1-3" });
+    return res.status(400).json({ error: "Invalid class" });
   }
 
   try {
@@ -132,6 +132,34 @@ router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Res
       });
 
     res.status(201).json(student);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Move student to a different class
+router.patch("/:studentId/class", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { class: newClass } = req.body;
+
+  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  if (!newClass || !validClasses.includes(newClass)) {
+    return res.status(400).json({ error: "Valid class required" });
+  }
+
+  try {
+    const id = parseInt(studentId);
+    const [updated] = await db
+      .update(usersTable)
+      .set({ class: newClass })
+      .where(and(eq(usersTable.id, id), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "student")))
+      .returning({ id: usersTable.id, fullName: usersTable.fullName, class: usersTable.class, username: usersTable.username });
+
+    if (!updated) return res.status(404).json({ error: "Student not found" });
+    res.json(updated);
     return;
   } catch (err) {
     console.error(err);

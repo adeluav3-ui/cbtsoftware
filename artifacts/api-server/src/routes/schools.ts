@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { rateLimit } from "express-rate-limit";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, desc, count, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 
 const adminLoginLimiter = rateLimit({
@@ -1111,6 +1111,94 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
     const result = rows.map(r => ({ ...r, position: positionMap.get(r.id) ?? null }));
 
     res.json({ students: result, subjects });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Special results: Entrance Exam or Staff Interview
+// GET /:schoolCode/special-results?type=entrance|interview
+router.get("/:schoolCode/special-results", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { type } = req.query;
+
+  const examClass = type === "interview" ? "Staff Interview" : "Entrance Exam";
+
+  try {
+    // Fetch grading scheme for grade computation
+    const [scheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
+      .limit(1);
+
+    const gradeAMin = scheme?.gradeAMin ?? 70;
+    const gradeBMin = scheme?.gradeBMin ?? 60;
+    const gradeCMin = scheme?.gradeCMin ?? 50;
+    const gradeDMin = scheme?.gradeDMin ?? 40;
+
+    const computeGrade = (pct: number) => {
+      if (pct >= gradeAMin) return "A";
+      if (pct >= gradeBMin) return "B";
+      if (pct >= gradeCMin) return "C";
+      if (pct >= gradeDMin) return "D";
+      return "F";
+    };
+
+    // All results for exams in the special class, joined with exam info
+    const rows = await db
+      .select({
+        resultId: resultsTable.id,
+        studentId: resultsTable.studentId,
+        fullName: resultsTable.fullName,
+        examId: resultsTable.examId,
+        examTitle: examsTable.title,
+        subject: examsTable.subject,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+        percentage: resultsTable.percentage,
+        submittedAt: resultsTable.submittedAt,
+        term: resultsTable.term,
+      })
+      .from(resultsTable)
+      .innerJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(
+        and(
+          eq(resultsTable.schoolCode, schoolCodeStr),
+          eq(examsTable.class, examClass),
+        )
+      )
+      .orderBy(desc(resultsTable.percentage));
+
+    const results = rows.map((r, idx) => ({
+      ...r,
+      grade: computeGrade(r.percentage),
+      passed: r.percentage >= gradeDMin,
+      rank: idx + 1,
+    }));
+
+    // Also fetch all registered candidates (users) in this class
+    const candidates = await db
+      .select({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        username: usersTable.username,
+      })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.schoolCode, schoolCodeStr),
+          eq(usersTable.role, "student"),
+          eq(usersTable.class, examClass),
+        )
+      )
+      .orderBy(usersTable.fullName);
+
+    res.json({ results, candidates, examClass });
     return;
   } catch (err) {
     console.error(err);

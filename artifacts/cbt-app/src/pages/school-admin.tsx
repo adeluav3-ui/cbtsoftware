@@ -5,7 +5,7 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, Settings } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -19,7 +19,8 @@ export default function SchoolAdminDashboard() {
   const queryClient = useQueryClient();
 
   const [classFilter, setClassFilter] = useState("KG1");
-  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const REGULAR_CLASSES = CLASSES.filter(c => c !== "Entrance Exam" && c !== "Staff Interview");
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
@@ -531,6 +532,66 @@ export default function SchoolAdminDashboard() {
   const [examSearchQuery, setExamSearchQuery] = useState("");
   const [examClassFilter, setExamClassFilter] = useState("All");
 
+  // Student move-class state
+  const [moveStudentModalOpen, setMoveStudentModalOpen] = useState(false);
+  const [moveStudentTarget, setMoveStudentTarget] = useState<{ id: number; fullName: string; currentClass: string } | null>(null);
+  const [moveTargetClass, setMoveTargetClass] = useState("KG1");
+  const [isMovingStudent, setIsMovingStudent] = useState(false);
+  const [moveStudentError, setMoveStudentError] = useState("");
+
+  const handleMoveStudent = async () => {
+    if (!moveStudentTarget) return;
+    setIsMovingStudent(true);
+    setMoveStudentError("");
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/${moveStudentTarget.id}/class`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class: moveTargetClass }),
+          credentials: "include",
+        }
+      );
+      if (!res.ok) {
+        const d = await res.json();
+        setMoveStudentError(d.error || "Failed to move student");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
+      CLASSES.forEach(cls => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, cls) }));
+      setMoveStudentModalOpen(false);
+      setMoveStudentTarget(null);
+    } catch {
+      setMoveStudentError("Network error. Please try again.");
+    } finally {
+      setIsMovingStudent(false);
+    }
+  };
+
+  // Special results state (Entrance Exam & Staff Interview)
+  const [specialResultsType, setSpecialResultsType] = useState<"entrance" | "interview">("entrance");
+  const [specialResultsData, setSpecialResultsData] = useState<{ results: any[]; candidates: any[] } | null>(null);
+  const [isLoadingSpecial, setIsLoadingSpecial] = useState(false);
+
+  const fetchSpecialResults = async (type: "entrance" | "interview") => {
+    setIsLoadingSpecial(true);
+    setSpecialResultsData(null);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/special-results?type=${type}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setSpecialResultsData(data);
+    } catch (err) {
+      console.error("Failed to fetch special results", err);
+    } finally {
+      setIsLoadingSpecial(false);
+    }
+  };
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -610,7 +671,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -671,7 +732,7 @@ export default function SchoolAdminDashboard() {
               <p className="text-sm font-semibold text-muted-foreground mb-2">Filter by Class:</p>
               <div className="overflow-x-auto pb-2 -mx-1 px-1">
                 <div className="flex gap-1.5 min-w-max">
-                  {CLASSES.map(c => (
+                  {REGULAR_CLASSES.map(c => (
                     <button
                       key={c}
                       onClick={() => setClassFilter(c)}
@@ -729,6 +790,21 @@ export default function SchoolAdminDashboard() {
                       <td className="px-4 py-3"><Badge className="text-xs">{s.class}</Badge></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Move to another class"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setMoveStudentTarget({ id: s.id, fullName: s.fullName || s.username, currentClass: s.class || "" });
+                              setMoveTargetClass(s.class || "KG1");
+                              setMoveStudentError("");
+                              setMoveStudentModalOpen(true);
+                            }}
+                            className="p-1.5"
+                          >
+                            <ArrowRightLeft className="w-4 h-4 text-primary" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1083,6 +1159,137 @@ export default function SchoolAdminDashboard() {
         );
       })()}
 
+      {/* ── Entrance Exam Tab ─────────────────────────── */}
+      {(activeTab === "Entrance Exam" || activeTab === "Staff Interview") && (() => {
+        const isEntrance = activeTab === "Entrance Exam";
+        const type = isEntrance ? "entrance" : "interview";
+        const icon = isEntrance ? <GraduationCap className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />;
+        const label = isEntrance ? "Entrance Exam" : "Staff Interview / Appraisal";
+        const desc = isEntrance
+          ? "Candidates who sat the entrance exam and their results."
+          : "Staff interview & appraisal candidates and their scores.";
+
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">{icon} {label}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+              </div>
+              <Button onClick={() => fetchSpecialResults(type)} isLoading={isLoadingSpecial}>
+                Load Results
+              </Button>
+            </div>
+
+            {/* Registered candidates */}
+            {specialResultsData && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Candidates list */}
+                <Card className="p-4 lg:col-span-1">
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    Registered Candidates ({specialResultsData.candidates.length})
+                  </h3>
+                  {specialResultsData.candidates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">
+                      No candidates yet. Add students with class "{activeTab}" from the Students tab.
+                    </p>
+                  ) : (
+                    <div className="space-y-1 max-h-80 overflow-y-auto">
+                      {specialResultsData.candidates.map((c: any) => (
+                        <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-muted/30 text-sm">
+                          <span className="font-medium truncate">{c.fullName}</span>
+                          <span className="text-xs text-muted-foreground font-mono ml-2 shrink-0">{c.username}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+
+                {/* Results table */}
+                <Card className="p-0 overflow-hidden lg:col-span-2">
+                  <div className="p-3 border-b border-border/50 bg-muted/20 flex items-center justify-between">
+                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                      <Medal className="w-4 h-4 text-primary" />
+                      Results & Rankings ({specialResultsData.results.length} submissions)
+                    </h3>
+                    {specialResultsData.results.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => window.print()} className="text-xs">
+                        <Printer className="w-3 h-3 mr-1" /> Print
+                      </Button>
+                    )}
+                  </div>
+                  {specialResultsData.results.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <Medal className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                      <p className="text-sm">No results yet. Candidates need to take and submit the exam first.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
+                            <th className="px-3 py-2 font-semibold">Rank</th>
+                            <th className="px-3 py-2 font-semibold">Name</th>
+                            <th className="px-3 py-2 font-semibold">Exam</th>
+                            <th className="px-3 py-2 font-semibold text-center">Score</th>
+                            <th className="px-3 py-2 font-semibold text-center">%</th>
+                            <th className="px-3 py-2 font-semibold text-center">Grade</th>
+                            <th className="px-3 py-2 font-semibold text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {specialResultsData.results.map((r: any) => (
+                            <tr key={r.resultId} className={`border-b border-border/40 transition-colors ${r.passed ? "hover:bg-green-50/30" : "hover:bg-red-50/30"}`}>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`font-bold text-xs ${r.rank === 1 ? "text-yellow-600" : r.rank === 2 ? "text-slate-500" : r.rank === 3 ? "text-orange-600" : "text-muted-foreground"}`}>
+                                  #{r.rank}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 font-semibold">{r.fullName}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground max-w-32">
+                                <span className="truncate block" title={r.examTitle}>{r.examTitle}</span>
+                              </td>
+                              <td className="px-3 py-2 text-center font-medium">{r.score}/{r.totalQuestions}</td>
+                              <td className="px-3 py-2 text-center font-bold">
+                                <span className={r.percentage >= 70 ? "text-green-600" : r.percentage >= 50 ? "text-yellow-600" : "text-destructive"}>
+                                  {r.percentage.toFixed(1)}%
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`font-bold text-sm ${r.grade === "A" ? "text-green-600" : r.grade === "B" ? "text-blue-600" : r.grade === "C" ? "text-yellow-600" : r.grade === "D" ? "text-orange-600" : "text-destructive"}`}>
+                                  {r.grade}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <Badge variant={r.passed ? "success" : "destructive"} className="text-xs">
+                                  {r.passed ? "Pass" : "Fail"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+
+            {!specialResultsData && !isLoadingSpecial && (
+              <Card className="py-12 text-center text-muted-foreground">
+                {icon}
+                <p className="mt-3 font-semibold">Click "Load Results" to fetch {isEntrance ? "entrance exam" : "interview"} data</p>
+                <p className="text-xs mt-1">
+                  To add candidates: go to the <strong>Students</strong> tab → Add Student → set class to <strong>"{activeTab}"</strong>.<br />
+                  To create the exam: teachers set the class to <strong>"{activeTab}"</strong> when creating an exam.
+                </p>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Broadsheet Tab ───────────────────────────── */}
       {activeTab === "Broadsheet" && (
         <div>
@@ -1093,7 +1300,7 @@ export default function SchoolAdminDashboard() {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={broadsheetClass} onChange={e => setBroadsheetClass(e.target.value)} className="w-40">
-                {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                {REGULAR_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
               <Button onClick={() => fetchBroadsheet(broadsheetClass)} isLoading={isLoadingBroadsheet}>
                 Generate
@@ -1194,6 +1401,38 @@ export default function SchoolAdminDashboard() {
           </div>
           <Button type="submit" className="w-full mt-2" isLoading={isCSPending}>Create Student</Button>
         </form>
+      </Modal>
+
+      {/* Move Student Modal */}
+      <Modal isOpen={moveStudentModalOpen} onClose={() => { setMoveStudentModalOpen(false); setMoveStudentError(""); }} title="Move Student to Another Class">
+        {moveStudentTarget && (
+          <div className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-3 text-sm">
+              <p className="font-semibold">{moveStudentTarget.fullName}</p>
+              <p className="text-muted-foreground text-xs mt-0.5">Current class: <strong>{moveStudentTarget.currentClass}</strong></p>
+            </div>
+            <div>
+              <Label>Move to Class</Label>
+              <Select value={moveTargetClass} onChange={e => setMoveTargetClass(e.target.value)}>
+                {CLASSES.filter(c => c !== moveStudentTarget.currentClass).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </Select>
+            </div>
+            {moveStudentError && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-lg text-sm">{moveStudentError}</div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              This only changes the student's class going forward. Past exam results remain unchanged.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => { setMoveStudentModalOpen(false); setMoveStudentError(""); }} className="flex-1">Cancel</Button>
+              <Button onClick={handleMoveStudent} isLoading={isMovingStudent} className="flex-1">
+                <ArrowRightLeft className="w-4 h-4 mr-2" /> Move Student
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* New Session Modal */}
