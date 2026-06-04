@@ -98,6 +98,14 @@ export interface Result {
     subject?: string;
 }
 
+export interface StudentCredential {
+    id: number;
+    fullName: string;
+    username: string;
+    class: string;
+    generatedPassword: string | null;
+}
+
 // ─── API Client ──────────────────────────────────────────────────────────────
 
 export const api = {
@@ -109,7 +117,10 @@ export const api = {
                 body: JSON.stringify({ username, password, schoolCode }),
                 credentials: 'include',
             });
-            if (!response.ok) throw new Error('Login failed');
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({ error: 'Login failed. Please check your credentials.' }));
+                throw data;
+            }
             return response.json();
         },
 
@@ -232,6 +243,14 @@ export const api = {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/detail`, {
                 credentials: 'include',
             });
+            return response.json();
+        },
+
+        credentials: async (schoolCode: string): Promise<StudentCredential[]> => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/credentials`, {
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to fetch credentials');
             return response.json();
         },
     },
@@ -519,6 +538,14 @@ export function useStudentDetail(schoolCode: string, studentId: number | null) {
         queryKey: ['student', schoolCode, studentId],
         queryFn: () => api.students.getDetail(schoolCode, studentId!),
         enabled: !!schoolCode && !!studentId,
+    });
+}
+
+export function useStudentCredentials(schoolCode: string) {
+    return useQuery({
+        queryKey: ['students', 'credentials', schoolCode],
+        queryFn: () => api.students.credentials(schoolCode),
+        enabled: !!schoolCode,
     });
 }
 

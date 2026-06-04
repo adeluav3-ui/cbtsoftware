@@ -713,6 +713,35 @@ router.get("/subject-scores", requireSchoolStaff, async (req: Request<SchoolPara
   }
 });
 
+// Get all students with login credentials (school admin only)
+router.get("/credentials", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+
+  try {
+    const students = await db
+      .select({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        username: usersTable.username,
+        class: usersTable.class,
+        generatedPassword: usersTable.generatedPassword,
+      })
+      .from(usersTable)
+      .where(and(
+        eq(usersTable.schoolCode, schoolCode),
+        eq(usersTable.role, "student")
+      ))
+      .orderBy(usersTable.class, usersTable.fullName);
+
+    res.json(students);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Update student profile picture
 router.post("/:studentId/profile-picture", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;

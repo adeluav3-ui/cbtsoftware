@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey } from "@workspace/api-client-react";
+import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -592,6 +592,11 @@ export default function SchoolAdminDashboard() {
     }
   };
 
+  // Credentials tab state
+  const [credentialsClass, setCredentialsClass] = useState("KG1");
+  const { data: allCredentials = [], isLoading: credentialsLoading } = useStudentCredentials(schoolCode);
+  const credentialsPrintRef = useRef<HTMLDivElement>(null);
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -671,7 +676,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -1378,6 +1383,98 @@ export default function SchoolAdminDashboard() {
           )}
         </div>
       )}
+
+      {/* ── Credentials Tab ───────────────────────────── */}
+      {activeTab === "Credentials" && (() => {
+        const classStudents = allCredentials.filter(s => s.class === credentialsClass);
+
+        const handlePrintCredentials = () => {
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (!win) return;
+          const rows = classStudents.map((s, i) => `
+            <tr style="border-bottom:1px solid #e5e7eb;">
+              <td style="padding:8px 12px;text-align:center;">${i + 1}</td>
+              <td style="padding:8px 12px;font-weight:600;">${s.fullName}</td>
+              <td style="padding:8px 12px;font-family:monospace;">${s.username}</td>
+              <td style="padding:8px 12px;font-family:monospace;">${s.generatedPassword ?? '—'}</td>
+            </tr>`).join('');
+          win.document.write(`<!DOCTYPE html><html><head><title>Credentials – ${credentialsClass}</title>
+            <style>
+              body{font-family:Arial,sans-serif;margin:24px;color:#111;}
+              h2{margin-bottom:4px;}p{margin-bottom:16px;color:#555;font-size:13px;}
+              table{width:100%;border-collapse:collapse;font-size:13px;}
+              thead tr{background:#f3f4f6;}th{padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #d1d5db;}
+              tr:nth-child(even){background:#f9fafb;}
+              @media print{body{margin:12px;}}
+            </style></head><body>
+            <h2>Student Login Credentials — ${credentialsClass}</h2>
+            <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${classStudents.length} student${classStudents.length !== 1 ? 's' : ''}</p>
+            <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
+            <tbody>${rows}</tbody></table>
+            <script>window.onload=function(){window.print();}<\/script>
+            </body></html>`);
+          win.document.close();
+        };
+
+        return (
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2"><KeyRound className="w-5 h-5" /> Student Login Credentials</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">View and export student usernames and passwords by class.</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={credentialsClass} onChange={e => setCredentialsClass(e.target.value)} className="w-44">
+                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </Select>
+                {classStudents.length > 0 && (
+                  <Button variant="outline" onClick={handlePrintCredentials}>
+                    <Printer className="w-4 h-4 mr-2" /> Export PDF
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {credentialsLoading && (
+              <Card className="py-12 text-center text-muted-foreground">Loading credentials…</Card>
+            )}
+
+            {!credentialsLoading && classStudents.length === 0 && (
+              <Card className="py-12 text-center text-muted-foreground">
+                <KeyRound className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="font-semibold">No students found in {credentialsClass}</p>
+              </Card>
+            )}
+
+            {!credentialsLoading && classStudents.length > 0 && (
+              <Card className="p-0 overflow-hidden" ref={credentialsPrintRef}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border">
+                        <th className="px-4 py-3 font-semibold w-10">#</th>
+                        <th className="px-4 py-3 font-semibold">Full Name</th>
+                        <th className="px-4 py-3 font-semibold">Username</th>
+                        <th className="px-4 py-3 font-semibold">Password</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classStudents.map((student, idx) => (
+                        <tr key={student.id} className="border-b border-border/50 hover:bg-muted/10">
+                          <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
+                          <td className="px-4 py-3 font-semibold">{student.fullName}</td>
+                          <td className="px-4 py-3 font-mono text-sm">{student.username}</td>
+                          <td className="px-4 py-3 font-mono text-sm">{student.generatedPassword ?? <span className="text-muted-foreground italic">not available</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">

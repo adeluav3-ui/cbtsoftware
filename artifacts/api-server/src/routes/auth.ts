@@ -5,10 +5,17 @@ import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
+// Rate limit per username+schoolCode, not per IP.
+// Schools share one NAT IP — IP-based limiting would block all students after just 15 attempts.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 15,
-  message: { error: "Too many login attempts. Please try again in 15 minutes." },
+  max: 10,
+  keyGenerator: (req) => {
+    const username = String(req.body?.username || '').toLowerCase().trim();
+    const schoolCode = String(req.body?.schoolCode || 'super').toUpperCase().trim();
+    return `login:${schoolCode}:${username}`;
+  },
+  message: { error: "Too many login attempts for this account. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
 });
