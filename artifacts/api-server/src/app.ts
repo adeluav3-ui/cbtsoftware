@@ -45,11 +45,21 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
-const redisClient = createClient({ url: process.env.REDIS_URL });
-redisClient.connect().catch(console.error);
+// Use Redis when REDIS_URL is configured; otherwise fall back to the
+// built-in MemoryStore. Without REDIS_URL, sessions reset on server
+// restart (known Render free-tier limitation) but at least they work
+// within a single server lifetime instead of silently failing.
+let sessionStore: session.Store | undefined;
+if (process.env.REDIS_URL) {
+  const redisClient = createClient({ url: process.env.REDIS_URL });
+  redisClient.connect().catch(err => console.error("Redis connection failed:", err));
+  sessionStore = new RedisStore({ client: redisClient });
+} else {
+  console.warn("REDIS_URL not set — using MemoryStore (sessions reset on restart)");
+}
 
 app.use(session({
-  store: new RedisStore({ client: redisClient }),
+  store: sessionStore,
   name: "session_id",
   secret: process.env.SESSION_SECRET || "dev-secret-change-in-production",
   resave: false,
