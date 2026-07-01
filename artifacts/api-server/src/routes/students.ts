@@ -1,15 +1,6 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { rateLimit } from "express-rate-limit";
 import { requireAuth, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
-
-const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 20,
-  message: { error: "Too many password reset requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -298,7 +289,7 @@ router.get("/:studentId/detail", requireSchoolAdmin, async (req: Request<Student
 });
 
 // Reset student password
-router.post("/:studentId/reset-password", requireSchoolAdmin, passwordResetLimiter, async (req: Request<StudentParams>, res: Response) => {
+router.post("/:studentId/reset-password", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const { newPassword } = req.body;
 

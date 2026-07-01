@@ -26,6 +26,7 @@ export interface User {
     fullName: string | null;
     class: string | null;
     profilePicture?: string | null;
+    isDisabled?: boolean;
 }
 
 export interface School {
@@ -33,6 +34,7 @@ export interface School {
     code: string;
     name: string | null;
     createdAt: string;
+    isDisabled?: boolean;
 }
 
 export interface Exam {

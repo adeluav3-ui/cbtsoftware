@@ -1,8 +1,8 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation, Link } from "wouter";
-import { useLogout } from "@workspace/api-client-react";
-import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Upload, Camera, ClipboardList } from "lucide-react";
+import { useLogout, useCurrentUser } from "@workspace/api-client-react";
+import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Camera, ClipboardList, ShieldOff } from "lucide-react";
 import { cn } from "./ui-elements";
 
 const API = import.meta.env.VITE_API_URL as string;
@@ -32,6 +32,7 @@ function OfflineBanner() {
 
 export function DashboardLayout({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) {
   const { user, isLoading, refetch, setUser } = useAuth();
+  const { data: serverUser } = useCurrentUser();
   const [, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -331,6 +332,24 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         </footer>
       </main>
       <OfflineBanner />
+
+      {/* School suspended overlay — blocks all interaction for non-super-admin users */}
+      {serverUser?.isDisabled && user?.role !== 'super_admin' && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-sm">
+          <div className="max-w-md w-full mx-4 bg-card border border-destructive/30 rounded-2xl shadow-2xl p-8 text-center">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-5">
+              <ShieldOff className="w-8 h-8 text-destructive" />
+            </div>
+            <h2 className="text-2xl font-bold font-display text-foreground mb-2">Access Suspended</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+              Your school's access to this platform has been temporarily suspended. All features are unavailable until access is restored.
+            </p>
+            <div className="bg-muted/50 rounded-xl px-4 py-3 text-xs text-muted-foreground border border-border">
+              Please contact the platform administrator to resolve this.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

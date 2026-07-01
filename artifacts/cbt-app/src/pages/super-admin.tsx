@@ -5,7 +5,7 @@ import { Card, Button, Modal, Input, Label, Badge } from "@/components/ui-elemen
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X } from "lucide-react";
+import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -21,6 +21,7 @@ interface School {
   code: string;
   name: string | null;
   createdAt: string | null;
+  isDisabled?: boolean;
 }
 
 export default function SuperAdminDashboard() {
@@ -57,6 +58,9 @@ export default function SuperAdminDashboard() {
   const [deleteInput, setDeleteInput] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Disable/enable school
+  const [togglingCode, setTogglingCode] = useState<string | null>(null);
 
   const { mutate: updateName, isPending } = useUpdateSchoolName({
     mutation: {
@@ -193,6 +197,23 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const handleToggleDisabled = async (school: School) => {
+    const newDisabled = !school.isDisabled;
+    setTogglingCode(school.code);
+    try {
+      const res = await fetch(`${API}/schools/${school.code}/set-disabled`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ disabled: newDisabled }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
+      }
+    } catch {}
+    setTogglingCode(null);
+  };
+
   const overview = detailSchool ? overviewCache[detailSchool.code] : null;
 
   return (
@@ -217,6 +238,7 @@ export default function SuperAdminDashboard() {
                 <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
                   <th className="px-6 py-4 font-semibold">School Code</th>
                   <th className="px-6 py-4 font-semibold">School Name</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
                   <th className="px-6 py-4 font-semibold">Created</th>
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
@@ -227,6 +249,11 @@ export default function SuperAdminDashboard() {
                     <td className="px-6 py-4 font-mono font-medium text-primary">{school.code}</td>
                     <td className="px-6 py-4 font-semibold">
                       {school.name ? school.name : <Badge variant="warning">Not Assigned</Badge>}
+                    </td>
+                    <td className="px-6 py-4">
+                      {school.isDisabled
+                        ? <Badge variant="destructive">Suspended</Badge>
+                        : <Badge variant="success">Active</Badge>}
                     </td>
                     <td className="px-6 py-4 text-muted-foreground text-sm">
                       {school.createdAt ? format(new Date(school.createdAt), "MMM d, yyyy") : "-"}
@@ -239,12 +266,23 @@ export default function SuperAdminDashboard() {
                         <Edit2 className="w-4 h-4 mr-2" />
                         {school.name ? "Edit Name" : "Assign Name"}
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        isLoading={togglingCode === school.code}
+                        className={school.isDisabled ? "border-green-500/40 text-green-600 hover:bg-green-500 hover:text-white" : "border-destructive/40 text-destructive hover:bg-destructive hover:text-white"}
+                        onClick={() => handleToggleDisabled(school)}
+                      >
+                        {school.isDisabled
+                          ? <><ShieldCheck className="w-4 h-4 mr-2" /> Enable</>
+                          : <><ShieldOff className="w-4 h-4 mr-2" /> Disable</>}
+                      </Button>
                     </td>
                   </tr>
                 ))}
                 {schools.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                       <Building className="w-12 h-12 mx-auto mb-4 opacity-20" />
                       No schools found in the system.
                     </td>

@@ -1,34 +1,9 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { rateLimit } from "express-rate-limit";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
-
-const adminLoginLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 15,
-  message: { error: "Too many login attempts. Please try again in 15 minutes." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const retakeLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 20,
-  message: { error: "Too many retake requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 20,
-  message: { error: "Too many password reset requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 interface SchoolParams {
   schoolCode: string;
@@ -195,7 +170,7 @@ router.post("/:schoolCode/retake-passcode", requireSchoolAdmin, async (req: Requ
 });
 
 // Submit exam retake with passcode verification
-router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, async (req: Request, res: Response) => {
+router.post("/:schoolCode/exams/:examId/retake", requireAuth, async (req: Request, res: Response) => {
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = String(schoolCode);
   const examIdNum = Number(examId);
@@ -295,7 +270,7 @@ router.post("/:schoolCode/exams/:examId/retake", requireAuth, retakeLimiter, asy
 });
 
 // School admin login (also uses /auth/login, kept for compatibility)
-router.post("/admin/login", adminLoginLimiter, async (req: Request, res: Response) => {
+router.post("/admin/login", async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password || !schoolCode) {
@@ -932,7 +907,7 @@ router.get("/:schoolCode/overview", requireSuperAdmin, async (req: Request, res:
 });
 
 // Reset school admin password (super admin)
-router.post("/:schoolCode/reset-admin-password", requireSuperAdmin, passwordResetLimiter, async (req: Request, res: Response) => {
+router.post("/:schoolCode/reset-admin-password", requireSuperAdmin, async (req: Request, res: Response) => {
   const schoolCodeStr = String(req.params.schoolCode);
   const { newPassword } = req.body;
 
@@ -1008,6 +983,35 @@ router.delete("/:schoolCode", requireSuperAdmin, async (req: Request, res: Respo
       res.status(404).json({ error: "School not found" });
       return;
     }
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Enable or disable a school (super admin only)
+router.post("/:schoolCode/set-disabled", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  const { disabled } = req.body;
+
+  if (typeof disabled !== "boolean") {
+    return res.status(400).json({ error: "disabled must be a boolean" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ isDisabled: disabled })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning({ code: schoolsTable.code, isDisabled: schoolsTable.isDisabled });
+
+    if (!updated) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    res.json({ code: updated.code, isDisabled: updated.isDisabled });
+    return;
+  } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
     return;

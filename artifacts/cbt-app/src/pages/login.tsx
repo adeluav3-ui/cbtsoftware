@@ -37,7 +37,14 @@ export default function Login() {
           else setLocation("/student");
         },
         onError: (err: any) => {
-          setErrorMsg(err.error || "Login failed. Please check your credentials.");
+          if (!err.status) {
+            setErrorMsg("Could not reach the server. Please check your internet connection and try again.");
+          } else if (err.status >= 500) {
+            setErrorMsg("The server encountered an error. Please try again in a moment.");
+          } else {
+            const msg = (err.data as any)?.error;
+            setErrorMsg(msg || "Invalid username or password.");
+          }
         }
       }
     );

@@ -1,29 +1,12 @@
 import { Router, Request, Response } from "express";
-import { rateLimit } from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
-// Rate limit per username+schoolCode, not per IP.
-// Schools share one NAT IP — IP-based limiting would block all students after just 15 attempts.
-const loginLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  keyGenerator: (req) => {
-    const username = String(req.body?.username || '').toLowerCase().trim();
-    const schoolCode = String(req.body?.schoolCode || 'super').toUpperCase().trim();
-    return `login:${schoolCode}:${username}`;
-  },
-  message: { error: "Too many login attempts for this account. Please try again in 15 minutes." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const router = Router();
 
-const router =
-  Router();
-
-router.post("/login", loginLimiter, async (req: Request, res: Response) => {
+router.post("/login", async (req: Request, res: Response) => {
   const { username, password, schoolCode } = req.body;
 
   if (!username || !password) {
@@ -73,6 +56,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     let schoolName: string | null = null;
+    let isDisabled = false;
     if (user.schoolCode) {
       const [school] = await db
         .select()
@@ -80,6 +64,10 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
         .where(eq(schoolsTable.code, user.schoolCode))
         .limit(1);
       schoolName = school?.name ?? null;
+      isDisabled = school?.isDisabled ?? false;
+      if (isDisabled) {
+        return res.status(403).json({ error: "This school's access has been suspended. Please contact the platform administrator." });
+      }
     }
 
     // Regenerate session ID on login to prevent session fixation attacks
@@ -100,6 +88,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       fullName: user.fullName,
       class: user.class,
       profilePicture: user.profilePicture,
+      isDisabled: false,
     });
     return;
   } catch (err) {
@@ -144,6 +133,7 @@ router.get("/me", async (req: Request, res: Response) => {
     }
 
     let schoolName: string | null = null;
+    let isDisabled = false;
     if (user.schoolCode) {
       const [school] = await db
         .select()
@@ -151,6 +141,7 @@ router.get("/me", async (req: Request, res: Response) => {
         .where(eq(schoolsTable.code, user.schoolCode))
         .limit(1);
       schoolName = school?.name ?? null;
+      isDisabled = school?.isDisabled ?? false;
     }
 
     res.json({
@@ -162,6 +153,7 @@ router.get("/me", async (req: Request, res: Response) => {
       fullName: user.fullName,
       class: user.class,
       profilePicture: user.profilePicture,
+      isDisabled,
     });
     return;
   } catch (err) {
