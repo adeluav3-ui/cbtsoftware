@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useLogin } from "@workspace/api-client-react";
+import { useLogin, getCurrentUserQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CustomTabs, Input, Label, PasswordInput } from "@/components/ui-elements";
 import { BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
@@ -14,6 +15,7 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
   const [, setLocation] = useLocation();
   const { refetch, setUser } = useAuth();
+  const queryClient = useQueryClient();
 
   const { mutate: login, isPending } = useLogin();
 
@@ -30,7 +32,10 @@ export default function Login() {
       {
         // In onSuccess:
         onSuccess: (data) => {
-          setUser(data);  // set immediately, no refetch needed
+          // Write into the RQ cache first so serverUser is non-null before
+          // the session-expiry effect in AuthProvider can observe a null state.
+          queryClient.setQueryData(getCurrentUserQueryKey(), data);
+          setUser(data);
           if (data.role === 'super_admin') setLocation("/super-admin");
           else if (data.role === 'school_admin') setLocation("/school-admin");
           else if (data.role === 'teacher') setLocation("/teacher");
