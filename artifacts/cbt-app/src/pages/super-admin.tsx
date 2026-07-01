@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useListSchools, useUpdateSchoolName } from "@workspace/api-client-react";
-import { Card, Button, Modal, Input, Label, Badge } from "@/components/ui-elements";
+import { Card, Button, Modal, Input, Label, Badge, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
@@ -357,8 +357,7 @@ export default function SuperAdminDashboard() {
               </div>
               <div>
                 <Label>Admin Password</Label>
-                <Input
-                  type="password"
+                <PasswordInput
                   value={newAdminPassword}
                   onChange={e => setNewAdminPassword(e.target.value)}
                   placeholder="Enter admin password"
@@ -430,8 +429,7 @@ export default function SuperAdminDashboard() {
               <form onSubmit={handleResetAdminPassword} className="space-y-3">
                 <Label>Reset Admin Password</Label>
                 <div className="flex gap-2">
-                  <Input
-                    type="password"
+                  <PasswordInput
                     value={resetPassword}
                     onChange={e => { setResetPassword(e.target.value); setResetError(""); setResetSuccess(""); }}
                     placeholder="New password (min 6 chars)"

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
-import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select } from "@/components/ui-elements";
+import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound } from "lucide-react";
@@ -1481,7 +1481,7 @@ export default function SchoolAdminDashboard() {
         <form onSubmit={e => { e.preventDefault(); createTeacher({ schoolCode, data: { username: tUsername, password: tPassword, fullName: tFullName } }); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={tFullName} onChange={e => setTFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={tUsername} onChange={e => setTUsername(e.target.value)} required /></div>
-          <div><Label>Password</Label><Input type="password" value={tPassword} onChange={e => setTPassword(e.target.value)} required /></div>
+          <div><Label>Password</Label><PasswordInput value={tPassword} onChange={e => setTPassword(e.target.value)} required /></div>
           <Button type="submit" className="w-full mt-2" isLoading={isCTPending}>Create Teacher</Button>
         </form>
       </Modal>
@@ -1491,7 +1491,7 @@ export default function SchoolAdminDashboard() {
         <form onSubmit={e => { e.preventDefault(); createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass } }); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} required /></div>
-          <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
+          <div><Label>Password</Label><PasswordInput value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
           <div><Label>Class</Label><Select value={sClass} onChange={e => setSClass(e.target.value)}>
             {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
           </Select>

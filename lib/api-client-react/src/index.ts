@@ -148,6 +148,10 @@ export const api = {
             const response = await fetch(`${API_BASE_URL}/schools`, {
                 credentials: 'include',
             });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw Object.assign(new Error(data.error || 'Failed to load schools'), { status: response.status, data });
+            }
             return response.json();
         },
 

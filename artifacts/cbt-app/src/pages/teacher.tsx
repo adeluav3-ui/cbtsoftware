@@ -6,7 +6,7 @@ import {
   useListExams, useCreateExam, useDeleteExam, useToggleExamStatus,
   useListStudents, useCreateStudent, useDeleteStudent,
 } from "@workspace/api-client-react";
-import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge } from "@/components/ui-elements";
+import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap, ArrowRightLeft } from "lucide-react";
@@ -560,7 +560,7 @@ export default function TeacherDashboard() {
         <form onSubmit={e => { e.preventDefault(); createStudent({ schoolCode, data: { username: sUsername, password: sPassword, fullName: sFullName, class: sClass } }); }} className="space-y-4">
           <div><Label>Full Name</Label><Input value={sFullName} onChange={e => setSFullName(e.target.value)} required /></div>
           <div><Label>Username</Label><Input value={sUsername} onChange={e => setSUsername(e.target.value)} required /></div>
-          <div><Label>Password</Label><Input type="password" value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
+          <div><Label>Password</Label><PasswordInput value={sPassword} onChange={e => setSPassword(e.target.value)} required /></div>
           <div><Label>Class</Label><Select value={sClass} onChange={e => setSClass(e.target.value)}>
             {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
           </Select></div>

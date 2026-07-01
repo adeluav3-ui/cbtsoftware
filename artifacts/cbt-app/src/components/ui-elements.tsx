@@ -2,7 +2,7 @@ import React, { InputHTMLAttributes, SelectHTMLAttributes, useState, forwardRef,
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { X } from "lucide-react";
+import { X, Eye, EyeOff } from "lucide-react";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -79,6 +79,31 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
       )}
       {...props}
     />
+  );
+}
+
+export function PasswordInput({ className, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className={cn("relative", className)}>
+      <input
+        {...props}
+        type={show ? "text" : "password"}
+        className={cn(
+          "w-full px-4 py-3 pr-11 rounded-xl bg-background border-2 border-border text-foreground placeholder:text-muted-foreground",
+          "focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all duration-200",
+        )}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={show ? "Hide password" : "Show password"}
+        onClick={() => setShow(s => !s)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
   );
 }
 

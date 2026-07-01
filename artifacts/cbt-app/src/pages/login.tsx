@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { Button, Card, CustomTabs, Input, Label } from "@/components/ui-elements";
+import { Button, Card, CustomTabs, Input, Label, PasswordInput } from "@/components/ui-elements";
 import { BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -128,8 +128,7 @@ export default function Login() {
 
               <div>
                 <Label>Password</Label>
-                <Input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
