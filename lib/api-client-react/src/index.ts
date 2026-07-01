@@ -121,7 +121,10 @@ export const api = {
             });
             if (!response.ok) {
                 const data = await response.json().catch(() => ({ error: 'Login failed. Please check your credentials.' }));
-                throw data;
+                const err: any = new Error(data.error || 'Login failed');
+                err.status = response.status;
+                err.data = data;
+                throw err;
             }
             return response.json();
         },
