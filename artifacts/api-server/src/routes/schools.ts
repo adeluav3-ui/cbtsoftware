@@ -7,7 +7,7 @@ import { eq, and, desc, count, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 
 const adminLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 1 * 60 * 1000,
   max: 15,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
   standardHeaders: true,
