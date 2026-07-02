@@ -40,20 +40,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/cbtsoftware\.onrender\.com\/api\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24,
-              },
-              networkTimeoutSeconds: 10,
-            },
-          },
-        ],
+        // No runtimeCaching rules for API routes — requests that don't match
+        // any rule bypass the service worker entirely. This lets the browser
+        // handle credentials (session cookies) correctly for cross-origin
+        // API calls. Workbox's fetch handler does not reliably forward
+        // cross-origin cookies, causing /me and /schools to return 401.
+        runtimeCaching: [],
       },
     }),
   ],
