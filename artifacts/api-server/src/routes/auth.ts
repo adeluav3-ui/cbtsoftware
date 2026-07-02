@@ -79,6 +79,13 @@ router.post("/login", async (req: Request, res: Response) => {
     req.session.role = user.role;
     req.session.schoolCode = user.schoolCode;
 
+    // Explicitly save before responding — Redis writes are async and the
+    // response can flush before the auto-save hook completes, causing the
+    // very next /me request to return 401.
+    await new Promise<void>((resolve, reject) => {
+      req.session.save(err => err ? reject(err) : resolve());
+    });
+
     res.json({
       id: user.id,
       username: user.username,
