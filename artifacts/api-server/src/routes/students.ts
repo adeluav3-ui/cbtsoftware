@@ -70,7 +70,7 @@ router.get("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Resp
 });
 
 // Create a student
-router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+router.post("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
   const { username, password, fullName, class: studentClass } = req.body;
 
@@ -160,7 +160,7 @@ router.patch("/:studentId/class", requireSchoolAdmin, async (req: Request<Studen
 });
 
 // Delete a student
-router.delete("/:studentId", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
+router.delete("/:studentId", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
 
   try {
