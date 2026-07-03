@@ -201,11 +201,23 @@ router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Respon
       return res.status(404).json({ error: "Exam not found" });
     }
 
+    // Order by the effective position of each question/group in the overall
+    // list. For standalone questions this is their own id. For grouped
+    // questions this is the minimum id of any question in that group —
+    // i.e. when the group was first "used". This preserves the creation
+    // order regardless of whether group_id (which is a small integer) is
+    // numerically less than standalone question ids (which grow large).
+    // Without this, ORDER BY group_id would put all groups before all
+    // standalone questions because NULL sorts last in Postgres ASC order.
     const questions = await db
       .select()
       .from(questionsTable)
       .where(eq(questionsTable.examId, examIdNum))
-      .orderBy(questionsTable.groupId, questionsTable.groupOrder, questionsTable.id);
+      .orderBy(
+        sql`CASE WHEN questions.group_id IS NULL THEN questions.id ELSE (SELECT MIN(q2.id) FROM questions q2 WHERE q2.group_id = questions.group_id AND q2.exam_id = ${examIdNum}) END`,
+        questionsTable.groupOrder,
+        questionsTable.id
+      );
 
     const groupedResult: any[] = [];
     let currentGroup: any = null;
