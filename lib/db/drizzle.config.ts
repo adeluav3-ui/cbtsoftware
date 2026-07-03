@@ -17,7 +17,6 @@ export default defineConfig({
     "./src/schema/grading_schemes.ts",
     "./src/schema/subject_scores.ts",
     "./src/schema/subjects.ts",
-    "./src/schema/student_scores.ts",
     "./src/schema/student_traits.ts",
     "./src/schema/student_attendance.ts",
   ],

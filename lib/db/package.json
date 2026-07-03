@@ -11,14 +11,20 @@
     "./schema": {
       "import": "./dist/schema/index.js",
       "types": "./dist/schema/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
     }
   },
   "scripts": {
     "build": "tsc",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "push:sqlite": "drizzle-kit push --config ./drizzle.sqlite.config.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",
@@ -26,6 +32,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "catalog:",
     "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.9"
