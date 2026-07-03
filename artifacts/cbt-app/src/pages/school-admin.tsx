@@ -597,6 +597,24 @@ export default function SchoolAdminDashboard() {
   const { data: allCredentials = [], isLoading: credentialsLoading } = useStudentCredentials(schoolCode);
   const credentialsPrintRef = useRef<HTMLDivElement>(null);
 
+  // Local server — connected devices (polled every 30 s when tab is open)
+  const [localDevices, setLocalDevices] = useState<Array<{
+    deviceId: string; lastSeen: string; fullName: string | null;
+    username: string | null; role: string | null; schoolCode: string | null; ipAddress: string;
+  }>>([]);
+  useEffect(() => {
+    if (activeTab !== "Local Server") return;
+    const LAPI = import.meta.env.VITE_API_URL as string;
+    const poll = () =>
+      fetch(`${LAPI}/devices`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : [])
+        .then(setLocalDevices)
+        .catch(() => null);
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => clearInterval(id);
+  }, [activeTab]);
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -1536,6 +1554,48 @@ export default function SchoolAdminDashboard() {
                 </span>
                 <input type="file" accept=".json" className="hidden" onChange={handleResultsUpload} />
               </label>
+            </Card>
+
+            <Card className="p-5 space-y-3">
+              <h3 className="font-semibold">Connected Devices</h3>
+              <p className="text-sm text-muted-foreground">
+                Devices that have loaded the app in the last 30 minutes. Refreshes every 30 seconds.
+              </p>
+              {localDevices.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No devices seen yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="py-2 pr-4 font-semibold">User</th>
+                        <th className="py-2 pr-4 font-semibold">Role</th>
+                        <th className="py-2 pr-4 font-semibold">IP</th>
+                        <th className="py-2 font-semibold">Last Seen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {localDevices.map(d => {
+                        const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
+                        const dot = secAgo < 90 ? "bg-green-500" : secAgo < 300 ? "bg-yellow-400" : "bg-gray-400";
+                        return (
+                          <tr key={d.deviceId} className="border-b border-border/30">
+                            <td className="py-1.5 pr-4 font-medium flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+                              {d.fullName ?? d.username ?? <span className="italic text-muted-foreground">guest</span>}
+                            </td>
+                            <td className="py-1.5 pr-4 text-muted-foreground capitalize">{d.role ?? "—"}</td>
+                            <td className="py-1.5 pr-4 font-mono text-muted-foreground">{d.ipAddress || "—"}</td>
+                            <td className="py-1.5 text-muted-foreground">
+                              {secAgo < 60 ? `${Math.round(secAgo)}s ago` : `${Math.round(secAgo / 60)}m ago`}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </div>
         );

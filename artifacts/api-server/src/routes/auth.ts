@@ -78,6 +78,8 @@ router.post("/login", async (req: Request, res: Response) => {
     req.session.userId = user.id;
     req.session.role = user.role;
     req.session.schoolCode = user.schoolCode;
+    req.session.username = user.username;
+    req.session.fullName = user.fullName;
 
     // Explicitly save before responding — Redis writes are async and the
     // response can flush before the auto-save hook completes, causing the

@@ -49,6 +49,14 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     }
   });
 
+  // Heartbeat — keeps the server's device registry current while the user is active
+  useEffect(() => {
+    const ping = () => fetch(`${API}/heartbeat`, { method: "POST", credentials: "include" }).catch(() => null);
+    ping();
+    const id = setInterval(ping, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Update profile picture when user changes
   useEffect(() => {
     if (user?.profilePicture) {

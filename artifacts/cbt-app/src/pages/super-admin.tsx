@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useListSchools, useUpdateSchoolName } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Badge, PasswordInput } from "@/components/ui-elements";
@@ -8,6 +8,19 @@ import { format } from "date-fns";
 import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL as string;
+
+interface DeviceInfo {
+  deviceId: string;
+  firstSeen: string;
+  lastSeen: string;
+  ipAddress: string;
+  userAgent: string;
+  userId: number | null;
+  username: string | null;
+  fullName: string | null;
+  role: string | null;
+  schoolCode: string | null;
+}
 
 interface SchoolOverview {
   teachers: number;
@@ -61,6 +74,19 @@ export default function SuperAdminDashboard() {
 
   // Disable/enable school
   const [togglingCode, setTogglingCode] = useState<string | null>(null);
+
+  // Connected devices
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  useEffect(() => {
+    const fetchDevices = () =>
+      fetch(`${API}/devices`, { credentials: "include" })
+        .then((r) => r.ok ? r.json() : [])
+        .then(setDevices)
+        .catch(() => null);
+    fetchDevices();
+    const id = setInterval(fetchDevices, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const { mutate: updateName, isPending } = useUpdateSchoolName({
     mutation: {
@@ -293,6 +319,60 @@ export default function SuperAdminDashboard() {
           </div>
         )}
       </Card>
+
+      {/* Connected Devices */}
+      <div className="mt-10">
+        <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
+          <Users className="w-5 h-5" /> Connected Devices
+          <span className="ml-2 text-sm font-normal text-muted-foreground">(active in last 30 min)</span>
+        </h2>
+        {devices.length === 0 ? (
+          <Card className="py-10 text-center text-muted-foreground text-sm">
+            No devices seen recently. Devices appear here once they load the app.
+          </Card>
+        ) : (
+          <Card className="p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">User</th>
+                    <th className="px-4 py-3 font-semibold">Role</th>
+                    <th className="px-4 py-3 font-semibold">School</th>
+                    <th className="px-4 py-3 font-semibold">IP</th>
+                    <th className="px-4 py-3 font-semibold">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((d) => {
+                    const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
+                    const status = secAgo < 90 ? "active" : secAgo < 300 ? "idle" : "offline";
+                    const statusColor = status === "active" ? "bg-green-500" : status === "idle" ? "bg-yellow-400" : "bg-gray-400";
+                    return (
+                      <tr key={d.deviceId} className="border-b border-border/50 hover:bg-muted/10">
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${statusColor}`} />
+                            <span className="capitalize text-xs text-muted-foreground">{status}</span>
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium">{d.fullName ?? d.username ?? <span className="text-muted-foreground italic">not logged in</span>}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{d.role ?? "—"}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{d.schoolCode ?? "—"}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{d.ipAddress || "—"}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {secAgo < 60 ? `${Math.round(secAgo)}s ago` : `${Math.round(secAgo / 60)}m ago`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Edit School Name Modal */}
       <Modal isOpen={isAssignOpen} onClose={() => setIsAssignOpen(false)} title="Edit School Name">

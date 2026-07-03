@@ -9,6 +9,7 @@ import resultsRouter from "./results.js";
 import uploadRouter from "./upload.js";
 import joinInfoRouter from "./join-info.js";
 import syncRouter from "./sync.js";
+import devicesRouter from "./devices.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/schools/:schoolCode/students", studentsRouter);
 router.use("/schools/:schoolCode/exams", examsRouter);
 router.use("/schools/:schoolCode/results", resultsRouter);
 router.use("/schools/:schoolCode/sync", syncRouter);
+router.use(devicesRouter);
 
 export default router;
