@@ -1,12 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { generateDeviceId } from "../device-tracker.js";
 
-declare module "express" {
-  interface Request {
-    deviceId: string;
-  }
-}
-
 export function deviceIdMiddleware(req: Request, res: Response, next: NextFunction): void {
   const isLocal = process.env.DEPLOY_MODE === "local";
   let deviceId = req.cookies?.cbt_device_id as string | undefined;
