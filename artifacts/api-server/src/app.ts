@@ -7,6 +7,7 @@ import { createClient } from "redis";
 import RedisStore from "connect-redis";
 import helmet from "helmet";
 import router from "./routes/index.js";
+import { getUploadsDir } from "./storage.js";
 
 declare module "express-session" {
   interface SessionData {
@@ -73,6 +74,11 @@ app.use(session({
 }));
 
 app.use("/api", router);
+
+// In local mode, serve uploaded images from disk instead of Supabase
+if (process.env.DEPLOY_MODE === "local") {
+  app.use("/uploads", express.static(getUploadsDir()));
+}
 
 // Sentry error handler — must come after routes, before any other error middleware
 Sentry.setupExpressErrorHandler(app);
