@@ -55,9 +55,10 @@ export function Button({
   );
 }
 
-export function Card({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
+export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => (
     <div
+      ref={ref}
       className={cn(
         "bg-card rounded-2xl p-6 shadow-xl shadow-black/5 border border-border/50 transition-all duration-300",
         className
@@ -66,8 +67,9 @@ export function Card({ className, children, ...props }: React.HTMLAttributes<HTM
     >
       {children}
     </div>
-  );
-}
+  )
+);
+Card.displayName = "Card";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (

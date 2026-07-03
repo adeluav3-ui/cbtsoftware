@@ -45,9 +45,9 @@ app.use(cors(
     : { origin: "https://cbtsoftware-cbt-app.vercel.app", credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], allowedHeaders: ["Content-Type", "Authorization"] }
 ));
 
-// Cap request body at 2 MB to prevent payload abuse
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+// 10 MB limit to accommodate local→cloud results sync payloads (answers can be large)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Use Redis when REDIS_URL is configured; otherwise fall back to the

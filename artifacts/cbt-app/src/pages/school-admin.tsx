@@ -676,7 +676,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -1472,6 +1472,71 @@ export default function SchoolAdminDashboard() {
                 </div>
               </Card>
             )}
+          </div>
+        );
+      })()}
+
+      {/* ── Local Server Tab ──────────────────────────── */}
+      {activeTab === "Local Server" && (() => {
+        const API = import.meta.env.VITE_API_URL as string;
+
+        const handleDownloadSchoolData = () => {
+          window.open(`${API}/schools/${schoolCode}/sync/local-export`, "_blank");
+        };
+
+        const handleResultsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const payload = JSON.parse(text);
+            const r = await fetch(`${API}/schools/${schoolCode}/sync/results-import`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(payload),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error ?? "Upload failed");
+            alert(`Sync complete: ${data.inserted} new results added, ${data.skipped} already existed, ${data.answersInserted} answers saved.`);
+          } catch (err: any) {
+            alert(`Error: ${err.message}`);
+          }
+          e.target.value = "";
+        };
+
+        return (
+          <div className="max-w-xl space-y-6">
+            <div>
+              <h2 className="text-lg font-bold mb-1">Local Server Setup</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Use these tools to set up an offline local server for areas with no internet, then sync results back to cloud after the exam session.
+              </p>
+            </div>
+
+            <Card className="p-5 space-y-3">
+              <h3 className="font-semibold">Step 1 — Download School Data</h3>
+              <p className="text-sm text-muted-foreground">
+                Download a JSON file containing all teachers, students, exams, and questions for your school. Use this to populate the local server before the exam.
+              </p>
+              <Button variant="outline" onClick={handleDownloadSchoolData}>
+                Download School Data
+              </Button>
+            </Card>
+
+            <Card className="p-5 space-y-3">
+              <h3 className="font-semibold">Step 2 — Upload Results from Local Server</h3>
+              <p className="text-sm text-muted-foreground">
+                After the local exam session, export results from the local server and upload the file here. Duplicate results are automatically skipped.
+              </p>
+              <label className="inline-block cursor-pointer">
+                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+                  <Upload className="w-4 h-4" />
+                  Upload Results File
+                </span>
+                <input type="file" accept=".json" className="hidden" onChange={handleResultsUpload} />
+              </label>
+            </Card>
           </div>
         );
       })()}
