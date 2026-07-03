@@ -6,6 +6,7 @@ import session from "express-session";
 import { createClient } from "redis";
 import RedisStore from "connect-redis";
 import helmet from "helmet";
+import path from "node:path";
 import router from "./routes/index.js";
 import { getUploadsDir } from "./storage.js";
 
@@ -24,22 +25,25 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   process.exit(1);
 }
 
+const isLocal = process.env.DEPLOY_MODE === "local";
+
 const app: Express = express();
 
 app.set("trust proxy", 1);
 
-// Security headers for every response
+// Security headers — in local mode HTML is served so keep helmet lenient
 app.use(helmet({
-  contentSecurityPolicy: false, // API-only server, no HTML served
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
 
-app.use(cors({
-  origin: "https://cbtsoftware-cbt-app.vercel.app",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+// In local mode the frontend is on the same origin, so reflect any LAN origin.
+// In cloud mode, only allow the Vercel frontend.
+app.use(cors(
+  isLocal
+    ? { origin: true, credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], allowedHeaders: ["Content-Type", "Authorization"] }
+    : { origin: "https://cbtsoftware-cbt-app.vercel.app", credentials: true, methods: ["GET", "POST", "PUT", "DELETE", "PATCH"], allowedHeaders: ["Content-Type", "Authorization"] }
+));
 
 // Cap request body at 2 MB to prevent payload abuse
 app.use(express.json({ limit: "2mb" }));
@@ -66,7 +70,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,
+    secure: !isLocal, // local server is HTTP, not HTTPS
     httpOnly: true,
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -75,9 +79,18 @@ app.use(session({
 
 app.use("/api", router);
 
-// In local mode, serve uploaded images from disk instead of Supabase
-if (process.env.DEPLOY_MODE === "local") {
+// In local mode, serve uploaded images and the built React frontend from disk
+if (isLocal) {
   app.use("/uploads", express.static(getUploadsDir()));
+
+  const frontendDir = process.env.FRONTEND_DIR ?? path.join(process.cwd(), "public");
+  app.use(express.static(frontendDir));
+
+  // SPA fallback — Wouter handles routing client-side, so all non-API paths
+  // must return index.html
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
 }
 
 // Sentry error handler — must come after routes, before any other error middleware
