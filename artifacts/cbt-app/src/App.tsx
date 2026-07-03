@@ -16,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import ExamResults from "@/pages/teacher/ExamResults";
 import ComprehensiveResults from "@/pages/student/ComprehensiveResults";
 import MyResults from "@/pages/student/MyResults";
+import LocalServerInfo from "@/pages/local-server-info";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/comprehensive-results" component={ComprehensiveResults} />
       <Route path="/student/results" component={MyResults} />
 
+      <Route path="/local-info" component={LocalServerInfo} />
       <Route path="/" component={RootRedirect} />
       <Route component={NotFound} />
     </Switch>

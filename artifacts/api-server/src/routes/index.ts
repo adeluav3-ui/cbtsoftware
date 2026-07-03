@@ -7,12 +7,14 @@ import studentsRouter from "./students.js";
 import examsRouter from "./exams.js";
 import resultsRouter from "./results.js";
 import uploadRouter from "./upload.js";
+import joinInfoRouter from "./join-info.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
 router.use("/upload", uploadRouter);
+router.use(joinInfoRouter);
 router.use("/schools", schoolsRouter);
 router.use("/schools/:schoolCode/teachers", teachersRouter);
 router.use("/schools/:schoolCode/students", studentsRouter);
