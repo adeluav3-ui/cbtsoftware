@@ -337,6 +337,16 @@ export const api = {
             return response.json();
         },
 
+        updateQuestion: async (schoolCode: string, examId: number, questionId: number, data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null }) => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/${questionId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                credentials: 'include',
+            });
+            return response.json();
+        },
+
         deleteQuestion: async (schoolCode: string, examId: number, questionId: number) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/${questionId}`, {
                 method: 'DELETE',
@@ -647,6 +657,19 @@ export function useAddQuestion(options?: MutationOptions) {
                 text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null;
             }
         }) => api.exams.addQuestion(schoolCode, examId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
+            options?.mutation?.onSuccess?.();
+        },
+        onError: options?.mutation?.onError,
+    });
+}
+
+export function useUpdateQuestion(options?: MutationOptions) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ schoolCode, examId, questionId, data }: { schoolCode: string; examId: number; questionId: number; data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null } }) =>
+            api.exams.updateQuestion(schoolCode, examId, questionId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });
             options?.mutation?.onSuccess?.();

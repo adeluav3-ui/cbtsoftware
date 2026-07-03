@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useAddQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions, type GroupedQuestion } from "@workspace/api-client-react";
+import { useGetExam, useAddQuestion, useUpdateQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions, type GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
-import { ArrowLeft, Plus, Trash2, HelpCircle, Radio, EyeOff, Upload, Layers, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, HelpCircle, Radio, EyeOff, Upload, Layers, Eye } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
 import { ExamPreviewModal } from "@/components/exam-preview-modal";
 
@@ -52,6 +52,18 @@ export default function TeacherExamDetails() {
 
   // Preview modal state
   const [isPreviewOpen, setPreviewOpen] = useState(false);
+
+  // Edit question modal state
+  const [isEditModalOpen, setEditModalOpen] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
+  const [editQText, setEditQText] = useState("");
+  const [editOptA, setEditOptA] = useState("");
+  const [editOptB, setEditOptB] = useState("");
+  const [editOptC, setEditOptC] = useState("");
+  const [editOptD, setEditOptD] = useState("");
+  const [editCorrectOpt, setEditCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
+  const [editImageUrl, setEditImageUrl] = useState("");
+  const [isEditUploading, setIsEditUploading] = useState(false);
 
   // Extract available groups from exam data
   const getAvailableGroups = (): GroupMeta[] => {
@@ -221,6 +233,50 @@ export default function TeacherExamDetails() {
     }
   });
 
+  const { mutate: updateQuestion, isPending: isUpdatePending } = useUpdateQuestion({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
+        setEditModalOpen(false);
+        setEditingQuestionId(null);
+      }
+    }
+  });
+
+  const openEditModal = (q: { id: number; text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null }) => {
+    setEditingQuestionId(q.id);
+    setEditQText(q.text);
+    setEditOptA(q.optionA);
+    setEditOptB(q.optionB);
+    setEditOptC(q.optionC);
+    setEditOptD(q.optionD);
+    setEditCorrectOpt(q.correctOption as "A" | "B" | "C" | "D");
+    setEditImageUrl(q.imageUrl || "");
+    setEditModalOpen(true);
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsEditUploading(true);
+    try {
+      setEditImageUrl(await uploadToBackend(file));
+    } catch {
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setIsEditUploading(false);
+    }
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingQuestionId) return;
+    updateQuestion({
+      schoolCode, examId, questionId: editingQuestionId,
+      data: { text: editQText, optionA: editOptA, optionB: editOptB, optionC: editOptC, optionD: editOptD, correctOption: editCorrectOpt, imageUrl: editImageUrl || null }
+    });
+  };
+
   const { mutate: toggleStatus, isPending: isToggling } = useToggleExamStatus({
     mutation: {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) })
@@ -276,7 +332,7 @@ export default function TeacherExamDetails() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {exam.isActive ? (
             <Button
               variant="outline"
@@ -349,25 +405,37 @@ export default function TeacherExamDetails() {
                   {item.questions.map((q) => {
                     const globalNum = (questionIndexMap[q.id] ?? 0) + 1;
                     return (
-                      <div key={q.id} className="relative group bg-background rounded-xl p-4 border border-border">
-                        <button
-                          onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
-                          className="absolute top-2 right-2 p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      <div key={q.id} className="bg-background rounded-xl p-4 border border-border">
                         <div className="flex items-start gap-3">
-                          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+                          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0 mt-0.5">
                             {globalNum}
                           </span>
-                          <div className="flex-1 pr-6">
-                            <p className="font-medium">{q.text}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium flex-1">{q.text}</p>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => openEditModal(q)}
+                                  className="p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded transition-colors"
+                                  title="Edit question"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
+                                  className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
+                                  title="Delete question"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
                             {q.imageUrl && (
                               <img src={q.imageUrl} alt="Question" className="mt-2 h-32 object-contain rounded border" />
                             )}
                             <div className="grid grid-cols-2 gap-2 mt-3">
                               {['A', 'B', 'C', 'D'].map(opt => (
-                                <div key={opt} className={`text-sm p-2 rounded border ${q.correctOption === opt ? 'bg-green-100 border-green-400' : 'bg-muted/20'}`}>
+                                <div key={opt} className={`text-sm p-2 rounded border ${q.correctOption === opt ? 'bg-green-100 border-green-400 dark:bg-green-900/30 dark:border-green-600' : 'bg-muted/20'}`}>
                                   <span className="font-bold">{opt}.</span> {q[`option${opt}` as keyof typeof q] as string}
                                 </div>
                               ))}
@@ -387,19 +455,31 @@ export default function TeacherExamDetails() {
             const q = item.question;
             const globalNum = (questionIndexMap[q.id] ?? 0) + 1;
             return (
-              <Card key={q.id} className="p-6 relative group">
-                <button
-                  onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
-                  className="absolute top-4 right-4 p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-                <div className="flex items-start mb-4 pr-10">
-                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold mr-4 shrink-0">
+              <Card key={q.id} className="p-4 sm:p-6">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold shrink-0 mt-0.5">
                     {globalNum}
                   </span>
-                  <div className="flex-1">
-                    <p className="text-lg font-semibold text-foreground">{q.text}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-base sm:text-lg font-semibold text-foreground flex-1">{q.text}</p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => openEditModal(q)}
+                          className="p-2 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg transition-colors"
+                          title="Edit question"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
+                          className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
+                          title="Delete question"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
                     {q.imageUrl && (
                       <div className="mt-3">
                         <img src={q.imageUrl} alt="Question illustration" className="max-h-48 object-contain rounded-lg border border-border" loading="lazy" />
@@ -407,7 +487,7 @@ export default function TeacherExamDetails() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
                   {['A', 'B', 'C', 'D'].map(optKey => {
                     const optVal = q[`option${optKey}` as keyof typeof q];
                     const isCorrect = q.correctOption === optKey;
@@ -562,6 +642,52 @@ export default function TeacherExamDetails() {
         })}
         isPending={isBulkPending}
       />
+
+      {/* Edit Question Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} title="Edit Question">
+        <form onSubmit={handleEditSubmit} className="space-y-4">
+          <div>
+            <Label>Question Text</Label>
+            <textarea
+              value={editQText}
+              onChange={e => setEditQText(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-25"
+              required
+            />
+          </div>
+          <div>
+            <Label>Question Image (Optional)</Label>
+            <div className="mt-1 flex items-center gap-4">
+              <label className={`cursor-pointer px-4 py-2 rounded-lg border-2 border-dashed border-border hover:border-primary transition-colors ${isEditUploading ? 'opacity-50' : ''}`}>
+                <span className="text-sm">{editImageUrl ? 'Replace Image' : 'Choose Image'}</span>
+                <input type="file" accept="image/*" onChange={handleEditImageUpload} disabled={isEditUploading} className="hidden" />
+              </label>
+              {editImageUrl && (
+                <div className="relative">
+                  <img src={editImageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
+                  <button type="button" onClick={() => setEditImageUrl("")} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">×</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Option A</Label><Input value={editOptA} onChange={e => setEditOptA(e.target.value)} required /></div>
+            <div><Label>Option B</Label><Input value={editOptB} onChange={e => setEditOptB(e.target.value)} required /></div>
+            <div><Label>Option C</Label><Input value={editOptC} onChange={e => setEditOptC(e.target.value)} required /></div>
+            <div><Label>Option D</Label><Input value={editOptD} onChange={e => setEditOptD(e.target.value)} required /></div>
+          </div>
+          <div>
+            <Label>Correct Option</Label>
+            <Select value={editCorrectOpt} onChange={e => setEditCorrectOpt(e.target.value as "A" | "B" | "C" | "D")}>
+              <option value="A">Option A</option>
+              <option value="B">Option B</option>
+              <option value="C">Option C</option>
+              <option value="D">Option D</option>
+            </Select>
+          </div>
+          <Button type="submit" className="w-full mt-4" isLoading={isUpdatePending}>Save Changes</Button>
+        </form>
+      </Modal>
 
       {/* Exam preview — full-screen student view with correct answers shown */}
       <ExamPreviewModal

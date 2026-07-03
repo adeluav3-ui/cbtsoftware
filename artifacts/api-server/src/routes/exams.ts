@@ -577,6 +577,36 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
 });
 
 // Delete question
+router.patch("/:examId/questions/:questionId", requireSchoolStaff, async (req: Request<QuestionParams>, res: Response) => {
+  const { examId, questionId } = req.params;
+  const examIdNum = toNumber(examId);
+  const questionIdNum = toNumber(questionId);
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl } = req.body;
+
+  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
+    return res.status(400).json({ error: "All question fields are required" });
+  }
+  if (!["A", "B", "C", "D"].includes(correctOption)) {
+    return res.status(400).json({ error: "correctOption must be A, B, C, or D" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(questionsTable)
+      .set({ text, optionA, optionB, optionC, optionD, correctOption, imageUrl: imageUrl || null })
+      .where(and(eq(questionsTable.id, questionIdNum), eq(questionsTable.examId, examIdNum)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Question not found" });
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 router.delete("/:examId/questions/:questionId", requireSchoolStaff, async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
   const examIdNum = toNumber(examId);
