@@ -75,13 +75,44 @@ export default function SuperAdminDashboard() {
   // Disable/enable school
   const [togglingCode, setTogglingCode] = useState<string | null>(null);
 
+  // Change password modal
+  const [isChangePwOpen, setIsChangePwOpen] = useState(false);
+  const [cpCurrent, setCpCurrent] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpError, setCpError] = useState("");
+  const [cpSuccess, setCpSuccess] = useState("");
+  const [cpLoading, setCpLoading] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCpError(""); setCpSuccess("");
+    if (cpNew.length < 8) { setCpError("New password must be at least 8 characters"); return; }
+    setCpLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword: cpCurrent, newPassword: cpNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCpError(data.error || "Failed to change password"); }
+      else { setCpSuccess("Password changed successfully."); setCpCurrent(""); setCpNew(""); }
+    } catch { setCpError("Network error"); }
+    finally { setCpLoading(false); }
+  };
+
   // Connected devices
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [deviceStats, setDeviceStats] = useState({ totalEverSeen: 0, activeNow: 0 });
   useEffect(() => {
     const fetchDevices = () =>
       fetch(`${API}/devices`, { credentials: "include" })
-        .then((r) => r.ok ? r.json() : [])
-        .then(setDevices)
+        .then((r) => r.ok ? r.json() : { devices: [], totalEverSeen: 0, activeNow: 0 })
+        .then((data) => {
+          setDevices(data.devices ?? []);
+          setDeviceStats({ totalEverSeen: data.totalEverSeen ?? 0, activeNow: data.activeNow ?? 0 });
+        })
         .catch(() => null);
     fetchDevices();
     const id = setInterval(fetchDevices, 30_000);
@@ -249,9 +280,14 @@ export default function SuperAdminDashboard() {
           <h1 className="text-3xl font-display font-bold">Registered Schools</h1>
           <p className="text-muted-foreground mt-1">Manage schools, admins, and platform access.</p>
         </div>
-        <Button onClick={() => { setAddError(""); setIsAddOpen(true); }}>
-          <Plus className="w-4 h-4 mr-2" /> Add New School
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setCpError(""); setCpSuccess(""); setCpCurrent(""); setCpNew(""); setIsChangePwOpen(true); }}>
+            <Key className="w-4 h-4 mr-2" /> Change Password
+          </Button>
+          <Button onClick={() => { setAddError(""); setIsAddOpen(true); }}>
+            <Plus className="w-4 h-4 mr-2" /> Add New School
+          </Button>
+        </div>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -322,10 +358,19 @@ export default function SuperAdminDashboard() {
 
       {/* Connected Devices */}
       <div className="mt-10">
-        <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5" /> Connected Devices
-          <span className="ml-2 text-sm font-normal text-muted-foreground">(active in last 30 min)</span>
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-display font-bold flex items-center gap-2">
+            <Users className="w-5 h-5" /> Connected Devices
+          </h2>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span><span className="font-semibold text-foreground">{deviceStats.activeNow}</span> active now</span>
+            <span><span className="font-semibold text-foreground">{deviceStats.totalEverSeen}</span> ever seen</span>
+            <span className="text-xs">(active = last 30 min)</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Devices from offline (local) servers appear here after a results sync, showing their last sync time.
+        </p>
         {devices.length === 0 ? (
           <Card className="py-10 text-center text-muted-foreground text-sm">
             No devices seen recently. Devices appear here once they load the app.
@@ -593,6 +638,26 @@ export default function SuperAdminDashboard() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Change Password modal */}
+      <Modal isOpen={isChangePwOpen} onClose={() => setIsChangePwOpen(false)} title="Change Super Admin Password">
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div>
+            <Label htmlFor="cp-current">Current Password</Label>
+            <PasswordInput id="cp-current" value={cpCurrent} onChange={e => setCpCurrent(e.target.value)} required autoComplete="current-password" />
+          </div>
+          <div>
+            <Label htmlFor="cp-new">New Password <span className="text-muted-foreground text-xs">(min 8 characters)</span></Label>
+            <PasswordInput id="cp-new" value={cpNew} onChange={e => setCpNew(e.target.value)} required autoComplete="new-password" />
+          </div>
+          {cpError && <p className="text-sm text-destructive">{cpError}</p>}
+          {cpSuccess && <p className="text-sm text-green-600 font-semibold">{cpSuccess}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setIsChangePwOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={cpLoading}>{cpLoading ? "Saving…" : "Change Password"}</Button>
+          </div>
+        </form>
       </Modal>
     </DashboardLayout>
   );

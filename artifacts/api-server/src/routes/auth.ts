@@ -107,6 +107,52 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/change-password", async (req: Request, res: Response) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "currentPassword and newPassword are required" });
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  }
+
+  try {
+    const [user] = await db
+      .select({ id: usersTable.id, password: usersTable.password })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.session.userId))
+      .limit(1);
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const isHashed = user.password.startsWith("$2");
+    const match = isHashed
+      ? await bcrypt.compare(currentPassword, user.password)
+      : currentPassword === user.password;
+
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db.update(usersTable).set({ password: hashed }).where(eq(usersTable.id, user.id));
+
+    res.json({ ok: true });
+    return;
+  } catch (err) {
+    console.error("change-password error");
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 router.post("/logout", (req: Request, res: Response) => {
   req.session.destroy((err) => {
     if (err) console.error(err);
