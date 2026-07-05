@@ -2,6 +2,10 @@
 
 # compiled output
 dist
+artifacts/api-server/dist-local/
+
+# build-local node runtime cache (~83 MB exe — never commit)
+scripts/.node-cache/
 tmp
 out-tsc
 *.tsbuildinfo
@@ -47,3 +51,8 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment files — NEVER commit credentials
+.env
+.env.*
+!.env.example
