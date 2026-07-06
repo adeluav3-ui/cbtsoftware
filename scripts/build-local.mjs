@@ -49,13 +49,13 @@ async function copyDir(src, dest) {
 
 // ── 1. Clean ─────────────────────────────────────────────────────────────────
 
-console.log("[ 1/6 ] Cleaning dist-local …");
+console.log("[ 1/7 ] Cleaning dist-local …");
 await rmrf(OUT_DIR);
 await fs.mkdir(OUT_DIR, { recursive: true });
 
 // ── 2. Build frontend ─────────────────────────────────────────────────────────
 
-console.log("[ 2/6 ] Building frontend …");
+console.log("[ 2/7 ] Building frontend …");
 // VITE_API_URL must point to the local server root (same host, port 8080).
 // At runtime the browser is already on http://<lan-ip>:8080, so we use a
 // relative path.  Vite replaces the string at build time.
@@ -70,7 +70,7 @@ execSync("pnpm run build", {
 
 // ── 3. Bundle server ──────────────────────────────────────────────────────────
 
-console.log("[ 3/6 ] Bundling server …");
+console.log("[ 3/7 ] Bundling server …");
 await build({
   entryPoints: [path.join(SERVER_DIR, "src", "index.local.ts")],
   bundle: true,
@@ -78,6 +78,11 @@ await build({
   target: "node20",
   format: "esm",
   outfile: path.join(OUT_DIR, "server.mjs"),
+  // CJS packages (e.g. dotenv) bundled into an ESM output call require() for
+  // Node built-ins. esbuild's CJS stub can't handle that — provide a real one.
+  banner: {
+    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+  },
   // Alias workspace db packages → the SQLite local implementation
   alias: {
     "@workspace/db": path.join(SERVER_DIR, "src", "db-local.ts"),
@@ -99,7 +104,7 @@ await build({
 
 // ── 4. Copy native addons ─────────────────────────────────────────────────────
 
-console.log("[ 4/6 ] Copying native addons …");
+console.log("[ 4/7 ] Copying native addons …");
 
 // Resolve better-sqlite3 from the api-server's node_modules
 const require = createRequire(import.meta.url);
@@ -109,17 +114,19 @@ const sqlite3Pkg = path.dirname(
   })
 );
 
-// The prebuilt .node file lives in better-sqlite3/build/Release/
-const addonSrc = path.join(sqlite3Pkg, "build", "Release");
-const addonDest = path.join(OUT_DIR, "node_modules", "better-sqlite3", "build", "Release");
-await copyDir(addonSrc, addonDest);
+// Copy the entire package so Node can resolve lib/index.js, package.json, and
+// the native .node binary under build/Release/ — all are required at runtime.
+await copyDir(sqlite3Pkg, path.join(OUT_DIR, "node_modules", "better-sqlite3"));
 
-// Also need the package.json so Node resolves the addon correctly
-await fs.mkdir(path.join(OUT_DIR, "node_modules", "better-sqlite3"), { recursive: true });
-await fs.copyFile(
-  path.join(sqlite3Pkg, "package.json"),
-  path.join(OUT_DIR, "node_modules", "better-sqlite3", "package.json")
-);
+// In pnpm's isolated linker, transitive deps are siblings in the virtual store.
+// better-sqlite3 → bindings → file-uri-to-path (all needed at runtime).
+const sqlite3PnpmDir = path.dirname(sqlite3Pkg); // .../@better-sqlite3@x/node_modules/
+const bindingsSrc = path.join(sqlite3PnpmDir, "bindings");
+await copyDir(bindingsSrc, path.join(OUT_DIR, "node_modules", "bindings"));
+
+const requireFromBindings = createRequire(path.join(bindingsSrc, "package.json"));
+const fileUriSrc = path.dirname(requireFromBindings.resolve("file-uri-to-path/package.json"));
+await copyDir(fileUriSrc, path.join(OUT_DIR, "node_modules", "file-uri-to-path"));
 
 // Copy bonjour-service (pure JS, but has sub-deps — easiest to copy the whole tree)
 try {
@@ -143,28 +150,77 @@ try {
 
 // ── 5. Copy frontend dist ─────────────────────────────────────────────────────
 
-console.log("[ 5/6 ] Copying frontend dist …");
-const frontendDist = path.join(FRONTEND_DIR, "dist");
+console.log("[ 5/7 ] Copying frontend dist …");
+// Vite outputs to dist/public/ (not dist/ directly — see vite.config.ts build.outDir)
+const frontendDist = path.join(FRONTEND_DIR, "dist", "public");
 await copyDir(frontendDist, path.join(OUT_DIR, "public"));
 
-// ── 6. Write launchers + README ───────────────────────────────────────────────
+// ── 6. Download portable Node.js runtime (Windows) ───────────────────────────
 
-console.log("[ 6/6 ] Writing launchers …");
+console.log("[ 6/7 ] Bundling Node.js runtime …");
 
+// We bundle the exact same Node.js version that ran this build script.
+// This guarantees ABI compatibility with the prebuilt better-sqlite3 native
+// addon (which was compiled against this running Node.js's ABI).
+const NODE_VERSION = process.version; // e.g. "v22.14.0"
+const NODE_CACHE_DIR = path.join(__dirname, ".node-cache");
+const NODE_CACHE_FILE = path.join(NODE_CACHE_DIR, `node-${NODE_VERSION}-win-x64.exe`);
+const NODE_RUNTIME_DIR = path.join(OUT_DIR, "node-runtime");
+const NODE_RUNTIME_EXE = path.join(NODE_RUNTIME_DIR, "node.exe");
+
+await fs.mkdir(NODE_RUNTIME_DIR, { recursive: true });
+
+let cacheHit = false;
+try {
+  await fs.access(NODE_CACHE_FILE);
+  cacheHit = true;
+} catch { /* not cached yet */ }
+
+if (cacheHit) {
+  console.log(`  Cache hit — using ${NODE_CACHE_FILE}`);
+} else {
+  const url = `https://nodejs.org/dist/${NODE_VERSION}/win-x64/node.exe`;
+  console.log(`  Downloading Node.js ${NODE_VERSION} from nodejs.org …`);
+  console.log(`  (This is a one-time ~83 MB download; subsequent builds use the cache)`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText} — ${url}`);
+  const buf = await res.arrayBuffer();
+  await fs.mkdir(NODE_CACHE_DIR, { recursive: true });
+  await fs.writeFile(NODE_CACHE_FILE, Buffer.from(buf));
+  console.log(`  Cached to ${NODE_CACHE_FILE}`);
+}
+
+await fs.copyFile(NODE_CACHE_FILE, NODE_RUNTIME_EXE);
+console.log(`  node.exe ready at dist-local/node-runtime/node.exe`);
+
+// ── 7. Write launchers + README ───────────────────────────────────────────────
+
+console.log("[ 7/7 ] Writing launchers …");
+
+// %~dp0 expands to the directory of the .bat file itself (with trailing \),
+// so this works regardless of where the user launches it from.
 await fs.writeFile(
   path.join(OUT_DIR, "start.bat"),
   `@echo off
 title CBT Local Server
-node server.mjs
+cd /d "%~dp0"
+node-runtime\\node.exe server.mjs
 pause
 `,
   "utf8"
 );
 
+// On Linux/Mac we don't bundle a native binary, so fall back to system node.
+// The node-runtime/ directory only contains the Windows node.exe.
 await fs.writeFile(
   path.join(OUT_DIR, "start.sh"),
   `#!/bin/sh
-node server.mjs
+DIR="$(cd "$(dirname "$0")" && pwd)"
+NODE="$DIR/node-runtime/node.exe"
+if [ ! -f "$NODE" ]; then
+  NODE=node
+fi
+"$NODE" "$DIR/server.mjs"
 `,
   "utf8"
 );
@@ -174,31 +230,45 @@ await fs.writeFile(
   `CBT LOCAL SERVER
 ================
 
-Requirements
-------------
-- Node.js 20 or later  (https://nodejs.org)
-- All devices must be on the SAME Wi-Fi network
-
 Starting the server
 -------------------
-Windows : double-click  start.bat
-Mac/Linux: run          ./start.sh
+Windows : double-click  start.bat  (no Node.js installation required)
+Mac/Linux: run          ./start.sh  (requires Node.js 20+ installed)
 
 A QR code will appear in the terminal.
 Students open that URL (or scan the QR) in any browser.
+All devices must be on the SAME Wi-Fi network.
 
-The database is stored in  cbt-local.db  next to this folder.
+The database is stored in  cbt-local.db  in this folder.
 To reset all data, delete that file and restart the server.
 
 First-time setup
 ----------------
-On first run a default Super Admin account is created:
-  Username : Phenomenal
-  Password : REDACTED
-Log in, create your school, add teachers and students.
+1. Log in to your cloud admin panel.
+2. Go to your school -> Export for Offline Use and download the .json file.
+3. Start this local server and open the URL shown in the terminal.
+4. Log in with the Super Admin credentials you use on the cloud.
+5. Go to Settings -> Import School Data and upload the .json file.
+   Your school's exams and student accounts will be available immediately.
+
+After a session, export results from this server and upload them back
+to the cloud via Settings -> Upload Results.
 `,
   "utf8"
 );
+
+// Safety: strip any database files left in dist-local from a prior test run.
+// They must never be distributed — the server creates a fresh cbt-local.db on
+// first start.
+for (const ext of [".db", ".db-shm", ".db-wal"]) {
+  const dbFile = path.join(OUT_DIR, `cbt-local${ext}`);
+  try {
+    await fs.unlink(dbFile);
+    console.log(`  Removed leftover database file: cbt-local${ext}`);
+  } catch {
+    // file doesn't exist — that's fine
+  }
+}
 
 console.log(`\nDone! Local server output: ${OUT_DIR}`);
 console.log("Run:  node dist-local/server.mjs");
