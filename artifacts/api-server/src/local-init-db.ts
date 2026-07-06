@@ -189,5 +189,47 @@ export function initDb(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS student_attendance_student_id_idx ON student_attendance(student_id);
     CREATE INDEX IF NOT EXISTS student_attendance_school_code_idx ON student_attendance(school_code);
+
+    CREATE TABLE IF NOT EXISTS device_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      device_id TEXT NOT NULL UNIQUE,
+      school_code TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      user_id INTEGER,
+      username TEXT,
+      full_name TEXT,
+      role TEXT,
+      first_seen INTEGER NOT NULL,
+      last_seen INTEGER NOT NULL
+    );
   `);
+
+  // ── ID-range separation ───────────────────────────────────────────────────
+  // Locally-created rows must never collide with cloud-exported rows that
+  // arrive via import-school (which preserves cloud integer PKs).  Cloud
+  // Postgres auto-increments from 1; we push the local counter to
+  // 1,999,999,999 so the first locally-assigned ID is 2,000,000,000.
+  //
+  // Mechanism: sqlite_sequence is the counter table used by AUTOINCREMENT.
+  // Each table only gains a row in sqlite_sequence after its first INSERT,
+  // so we use INSERT OR IGNORE to create the row on a fresh DB, then UPDATE
+  // with MAX() to respect any higher value already established by an import.
+  // This runs on every startup and is fully idempotent.
+  const LOCAL_ID_FLOOR = 1_999_999_999;
+  const seqTables = [
+    "users", "exams", "questions", "subjects", "grading_schemes",
+    "results", "result_answers", "subject_scores",
+    "student_traits", "student_attendance",
+  ];
+  const insertSeq = db.prepare(
+    "INSERT OR IGNORE INTO sqlite_sequence (name, seq) VALUES (?, ?)"
+  );
+  const bumpSeq = db.prepare(
+    "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?"
+  );
+  for (const table of seqTables) {
+    insertSeq.run(table, LOCAL_ID_FLOOR);
+    bumpSeq.run(LOCAL_ID_FLOOR, table);
+  }
 }

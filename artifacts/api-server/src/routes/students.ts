@@ -71,10 +71,6 @@ router.get("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Resp
 
 // Create a student
 router.post("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
-  if (process.env.DEPLOY_MODE === "local") {
-    res.status(403).json({ error: "Students must be added in the cloud and imported. Student creation is disabled in local mode." });
-    return;
-  }
   const { schoolCode } = req.params;
   const { username, password, fullName, class: studentClass } = req.body;
 

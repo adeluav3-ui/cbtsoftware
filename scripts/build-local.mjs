@@ -30,10 +30,6 @@ const OUT_DIR = path.join(SERVER_DIR, "dist-local");
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function rmrf(dir) {
-  await fs.rm(dir, { recursive: true, force: true });
-}
-
 async function copyDir(src, dest) {
   await fs.mkdir(dest, { recursive: true });
   for (const entry of await fs.readdir(src, { withFileTypes: true })) {
@@ -50,8 +46,13 @@ async function copyDir(src, dest) {
 // ── 1. Clean ─────────────────────────────────────────────────────────────────
 
 console.log("[ 1/7 ] Cleaning dist-local …");
-await rmrf(OUT_DIR);
+// Empty the directory rather than deleting it: file-watchers (e.g. VS Code
+// explorer) hold the top-level directory open on Windows, causing rmdir to
+// fail with EBUSY even after all children are removed.
 await fs.mkdir(OUT_DIR, { recursive: true });
+for (const entry of await fs.readdir(OUT_DIR)) {
+  await fs.rm(path.join(OUT_DIR, entry), { recursive: true, force: true });
+}
 
 // ── 2. Build frontend ─────────────────────────────────────────────────────────
 

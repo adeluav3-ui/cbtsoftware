@@ -105,10 +105,6 @@ router.get("/", requireAuth, async (req: RequestWithSession, res: Response) => {
 
 // Create exam
 router.post("/", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
-  if (process.env.DEPLOY_MODE === "local") {
-    res.status(403).json({ error: "Exams must be created in the cloud and imported. Exam creation is disabled in local mode." });
-    return;
-  }
   const { schoolCode } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const session = req.session;
@@ -152,10 +148,6 @@ router.post("/", requireSchoolStaff, async (req: RequestWithSession, res: Respon
 
 // Create a new group for an exam
 router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
-  if (process.env.DEPLOY_MODE === "local") {
-    res.status(403).json({ error: "Question group creation is disabled in local mode." });
-    return;
-  }
   const { examId } = req.params;
   const examIdNum = toNumber(examId);
   const { groupImageUrl, groupTitle, groupText } = req.body;
@@ -474,10 +466,6 @@ router.post("/:examId/toggle", requireSchoolStaff, async (req: RequestWithSessio
 
 // Bulk add questions (with optional group)
 router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
-  if (process.env.DEPLOY_MODE === "local") {
-    res.status(403).json({ error: "Question creation is disabled in local mode." });
-    return;
-  }
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
@@ -547,10 +535,6 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
 
 // Add question to exam (with optional group)
 router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
-  if (process.env.DEPLOY_MODE === "local") {
-    res.status(403).json({ error: "Question creation is disabled in local mode." });
-    return;
-  }
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
