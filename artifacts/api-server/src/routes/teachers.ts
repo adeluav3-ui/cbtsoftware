@@ -48,6 +48,10 @@ router.get("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Resp
 
 // Create a teacher
 router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+  if (process.env.DEPLOY_MODE === "local") {
+    res.status(403).json({ error: "Teachers must be added in the cloud and imported. Teacher creation is disabled in local mode." });
+    return;
+  }
   const { schoolCode } = req.params;
   const { username, password, fullName } = req.body;
 

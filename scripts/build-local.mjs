@@ -244,15 +244,15 @@ To reset all data, delete that file and restart the server.
 
 First-time setup
 ----------------
-1. Log in to your cloud admin panel.
-2. Go to your school -> Export for Offline Use and download the .json file.
-3. Start this local server and open the URL shown in the terminal.
-4. Log in with the Super Admin credentials you use on the cloud.
-5. Go to Settings -> Import School Data and upload the .json file.
-   Your school's exams and student accounts will be available immediately.
+1. On the cloud admin panel, go to your school and download the
+   "Export for Offline Use" .json file.
+2. Start this server (double-click start.bat).
+3. Open the URL shown in the terminal in any browser.
+4. The setup screen will appear — upload the .json file.
+5. Log in with your school admin username and password.
 
-After a session, export results from this server and upload them back
-to the cloud via Settings -> Upload Results.
+After the session, export results from the browser and upload them
+back to the cloud (Settings -> Upload Results).
 `,
   "utf8"
 );

@@ -8,7 +8,22 @@ export function requireAuth(req: Request<any, any, any, any>, res: Response, nex
   next();
 }
 
+// Blocks any request in local (offline) mode with 403. Use on routes that
+// must never exist in local deployments (super_admin management, cloud-only ops).
+export function denyInLocalMode(_req: Request, res: Response, next: NextFunction): void {
+  if (process.env.DEPLOY_MODE === "local") {
+    res.status(403).json({ error: "Not available in local mode" });
+    return;
+  }
+  next();
+}
+
 export function requireSuperAdmin(req: Request<any, any, any, any>, res: Response, next: NextFunction): void {
+  // There is no super_admin account in local mode — block unconditionally.
+  if (process.env.DEPLOY_MODE === "local") {
+    res.status(403).json({ error: "Not available in local mode" });
+    return;
+  }
   if (!req.session?.userId) {
     res.status(401).json({ error: "Not authenticated" });
     return;
