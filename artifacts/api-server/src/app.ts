@@ -91,8 +91,8 @@ if (isLocal) {
   app.use(express.static(frontendDir));
 
   // SPA fallback — Wouter handles routing client-side, so all non-API paths
-  // must return index.html
-  app.get("*", (_req, res) => {
+  // must return index.html (app.use with no path = catch-all, required in Express 5)
+  app.use((_req, res) => {
     res.sendFile(path.join(frontendDir, "index.html"));
   });
 }

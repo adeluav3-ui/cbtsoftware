@@ -30,6 +30,7 @@ export const {
   subjectsTable,
   studentTraitsTable,
   studentAttendanceTable,
+  deviceSessionsTable,
 } = sqliteSchema;
 
 // Zod schemas from the Postgres schema — validation logic is dialect-agnostic
@@ -60,4 +61,5 @@ export type {
   InsertSubject, Subject,
   InsertStudentTrait, StudentTrait,
   InsertStudentAttendance, StudentAttendance,
+  InsertDeviceSession, DeviceSession,
 } from "../../../lib/db/src/schema/index.js";

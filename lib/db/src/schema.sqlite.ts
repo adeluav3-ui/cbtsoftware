@@ -222,3 +222,18 @@ export const studentAttendanceTable = sqliteTable("student_attendance", {
   studentIdIdx: index("student_attendance_student_id_idx").on(table.studentId),
   schoolCodeIdx: index("student_attendance_school_code_idx").on(table.schoolCode),
 }));
+
+// ── device_sessions ───────────────────────────────────────────────────────────
+export const deviceSessionsTable = sqliteTable("device_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  deviceId: text("device_id").notNull().unique(),
+  schoolCode: text("school_code"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId: integer("user_id"),
+  username: text("username"),
+  fullName: text("full_name"),
+  role: text("role"),
+  firstSeen: integer("first_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  lastSeen: integer("last_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
