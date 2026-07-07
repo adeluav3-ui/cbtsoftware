@@ -1496,10 +1496,25 @@ export default function SchoolAdminDashboard() {
 
       {/* ── Local Server Tab ──────────────────────────── */}
       {activeTab === "Local Server" && (() => {
-        const API = import.meta.env.VITE_API_URL as string;
+        const API = (import.meta.env.VITE_API_URL as string) || "https://cbtsoftware.onrender.com/api";
 
-        const handleDownloadSchoolData = () => {
-          window.open(`${API}/schools/${schoolCode}/sync/local-export`, "_blank");
+        const handleDownloadSchoolData = async () => {
+          try {
+            const res = await fetch(`${API}/schools/${schoolCode}/sync/local-export`, {
+              credentials: "include",
+            });
+            if (!res.ok) throw new Error(`Export failed (${res.status})`);
+            const blob = await res.blob();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `cbt-school-${schoolCode}-export.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+          } catch (err: any) {
+            alert(`Download failed: ${err.message}`);
+          }
         };
 
         const handleResultsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
