@@ -7,8 +7,11 @@ import { Button, Card, CustomTabs, Input, Label, PasswordInput } from "@/compone
 import { BookOpen, Upload, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
-const API = import.meta.env.VITE_API_URL as string;
-const IS_LOCAL = API.startsWith("/");
+const API = (import.meta.env.VITE_API_URL as string) || "https://cbtsoftware.onrender.com/api";
+// IS_LOCAL must be an explicit opt-in build flag (set only by build-local.mjs).
+// Never derive it from the API URL shape — Vercel's proxy rewrite also uses
+// relative /api paths, so URL shape is not a reliable cloud vs local signal.
+const IS_LOCAL = import.meta.env.VITE_LOCAL_MODE === "true";
 
 export default function Login() {
   const [activeTab, setActiveTab] = useState("Student");
@@ -37,7 +40,11 @@ export default function Login() {
         setHasSchool(data.hasSchool);
         setSetupChecked(true);
       })
-      .catch(() => setSetupChecked(true));
+      .catch(() => {
+        // Network error — safe default: show login form, never setup screen
+        setHasSchool(true);
+        setSetupChecked(true);
+      });
   }, []);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

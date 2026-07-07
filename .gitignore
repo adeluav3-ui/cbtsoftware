@@ -56,6 +56,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+# .env.production is safe to commit: contains only public API URLs, no secrets
+!.env.production
 
 # Local server builds and uploads — never commit
 artifacts/api-server/uploads/

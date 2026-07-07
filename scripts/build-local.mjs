@@ -66,6 +66,7 @@ execSync("pnpm run build", {
   env: {
     ...process.env,
     VITE_API_URL: "/api",
+    VITE_LOCAL_MODE: "true",  // explicit opt-in; never set in Vercel builds
   },
 });
 
