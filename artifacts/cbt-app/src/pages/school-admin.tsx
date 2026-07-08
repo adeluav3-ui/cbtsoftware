@@ -1612,6 +1612,30 @@ export default function SchoolAdminDashboard() {
                 </div>
               )}
             </Card>
+
+            <Card className="p-5 space-y-3 border-amber-200 bg-amber-50/40">
+              <h3 className="font-semibold text-amber-900">App Display Issues?</h3>
+              <p className="text-sm text-amber-800">
+                If the app looks wrong — missing fonts, broken layout, or stuck on an old version — clear the cached app files and reload. This does not affect exam data or results.
+              </p>
+              <Button
+                variant="outline"
+                className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                onClick={async () => {
+                  if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                  }
+                  if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(k => caches.delete(k)));
+                  }
+                  window.location.reload();
+                }}
+              >
+                Clear Cache &amp; Reload
+              </Button>
+            </Card>
           </div>
         );
       })()}

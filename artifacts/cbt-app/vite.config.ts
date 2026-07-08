@@ -39,6 +39,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // woff2 covers the self-hosted Inter/Outfit fonts — precached on first install
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [],
         // Take control of all tabs immediately on activation so users never
@@ -49,6 +50,11 @@ export default defineConfig({
         // Remove caches from previous SW versions on activation to prevent
         // stale assets being served after a deploy.
         cleanupOutdatedCaches: true,
+        // Serve precached index.html for all navigation requests so the SPA
+        // works offline and after a connection drop mid-session.
+        // Exclude /api/* so backend requests are never served from cache.
+        navigateFallback: "index.html",
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
