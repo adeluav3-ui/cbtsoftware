@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import {
   schoolsTable, usersTable, examsTable, questionsTable,
   resultsTable, resultAnswersTable, gradingSchemesTable, subjectsTable,
-  subjectScoresTable, deviceSessionsTable,
+  subjectScoresTable, deviceSessionsTable, serverConfigTable,
 } from "@workspace/db/schema";
 import { eq, and, inArray, sql, count } from "drizzle-orm";
 
@@ -114,6 +114,11 @@ router.post("/import-school", async (req, res) => {
   if (gradingSchemes.length) await db.insert(gradingSchemesTable).values(gradingSchemes.map(parseDates) as any).onConflictDoNothing();
   if (exams.length)          await db.insert(examsTable).values(exams.map(parseDates) as any).onConflictDoNothing();
   if (questions.length)      await db.insert(questionsTable).values(questions.map(parseDates) as any).onConflictDoNothing();
+
+  // Record which school this local server is for — enables license check and time-sync
+  await (db.insert(serverConfigTable as any)
+    .values({ key: "school_code", value: schoolCode })
+    .onConflictDoUpdate({ target: (serverConfigTable as any).key, set: { value: schoolCode } }) as unknown as Promise<void>);
 
   res.json({
     ok: true,

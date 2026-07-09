@@ -10,6 +10,7 @@ import path from "node:path";
 import router from "./routes/index.js";
 import { getUploadsDir } from "./storage.js";
 import { deviceIdMiddleware } from "./middlewares/device-id.js";
+import { startTimeSync } from "./time-sync.js";
 
 declare module "express-session" {
   interface SessionData {
@@ -82,6 +83,10 @@ app.use(session({
 
 app.use(deviceIdMiddleware);
 app.use("/api", router);
+
+if (isLocal) {
+  startTimeSync();
+}
 
 // In local mode, serve uploaded images and the built React frontend from disk
 if (isLocal) {

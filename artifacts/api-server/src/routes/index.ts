@@ -10,18 +10,23 @@ import uploadRouter from "./upload.js";
 import joinInfoRouter from "./join-info.js";
 import syncRouter from "./sync.js";
 import devicesRouter from "./devices.js";
+import timeCheckRouter from "./time-check.js";
+import { requireAuth } from "../middlewares/auth.js";
+import { checkLocalLicense } from "../middlewares/license.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/auth", authRouter);
+router.use(timeCheckRouter);
 router.use("/upload", uploadRouter);
 router.use(joinInfoRouter);
-router.use("/schools", schoolsRouter);
-router.use("/schools/:schoolCode/teachers", teachersRouter);
-router.use("/schools/:schoolCode/students", studentsRouter);
-router.use("/schools/:schoolCode/exams", examsRouter);
-router.use("/schools/:schoolCode/results", resultsRouter);
+router.use("/schools", requireAuth, checkLocalLicense, schoolsRouter);
+router.use("/schools/:schoolCode/teachers", requireAuth, checkLocalLicense, teachersRouter);
+router.use("/schools/:schoolCode/students", requireAuth, checkLocalLicense, studentsRouter);
+router.use("/schools/:schoolCode/exams", requireAuth, checkLocalLicense, examsRouter);
+router.use("/schools/:schoolCode/results", requireAuth, checkLocalLicense, resultsRouter);
+// sync manages its own auth — import-school is public for first-time server setup
 router.use("/schools/:schoolCode/sync", syncRouter);
 router.use(devicesRouter);
 

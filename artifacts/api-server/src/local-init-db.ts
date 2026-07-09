@@ -232,4 +232,15 @@ export function initDb(db: Database): void {
     insertSeq.run(table, LOCAL_ID_FLOOR);
     bumpSeq.run(LOCAL_ID_FLOOR, table);
   }
+
+  // ── Schema migrations (idempotent) ─────────────────────────────────────────
+  // SQLite does not support ADD COLUMN IF NOT EXISTS — wrap in try/catch.
+  try { db.exec("ALTER TABLE schools ADD COLUMN license_valid_until INTEGER"); } catch {}
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS server_config (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
 }

@@ -1,5 +1,8 @@
 export * from "./schools.js";
 export * from "./users.js";
+// SQLite-only operational table used in local mode — exported here so
+// local-mode imports compile cleanly against the shared schema path.
+export { serverConfigTable } from "../schema.sqlite.js";
 export * from "./exams.js";
 export * from "./results.js";
 export * from "./result_answers.js";

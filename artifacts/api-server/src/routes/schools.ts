@@ -48,9 +48,12 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
 
     // Wrap school + admin creation in a transaction so partial failures roll back
     const school = await db.transaction(async (tx) => {
+      const licenseValidUntil = new Date();
+      licenseValidUntil.setMonth(licenseValidUntil.getMonth() + 3);
+
       const [newSchool] = await tx
         .insert(schoolsTable)
-        .values({ code: upperCode, name })
+        .values({ code: upperCode, name, licenseValidUntil })
         .returning();
 
       await tx.insert(usersTable).values({
@@ -1203,6 +1206,53 @@ router.get("/:schoolCode/special-results", requireSchoolAdmin, async (req: Reque
       .orderBy(usersTable.fullName);
 
     res.json({ results, candidates, examClass });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// View license — super admin can see any school, school admin can see their own
+router.get("/:schoolCode/license", requireAuth, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  if (req.session.role !== "super_admin" && req.session.schoolCode !== schoolCodeStr) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  try {
+    const [school] = await db
+      .select({ code: schoolsTable.code, name: schoolsTable.name, licenseValidUntil: schoolsTable.licenseValidUntil })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCodeStr));
+    if (!school) return res.status(404).json({ error: "School not found" });
+    res.json({ code: school.code, name: school.name, licenseValidUntil: school.licenseValidUntil?.toISOString() ?? null });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+router.patch("/:schoolCode/license", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  const { licenseValidUntil } = req.body;
+
+  const parsed = licenseValidUntil ? new Date(licenseValidUntil) : null;
+  if (!parsed || isNaN(parsed.getTime())) {
+    return res.status(400).json({ error: "licenseValidUntil must be a valid ISO date string" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ licenseValidUntil: parsed })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning({ code: schoolsTable.code, licenseValidUntil: schoolsTable.licenseValidUntil });
+
+    if (!updated) return res.status(404).json({ error: "School not found" });
+    res.json({ code: updated.code, licenseValidUntil: updated.licenseValidUntil?.toISOString() ?? null });
     return;
   } catch (err) {
     console.error(err);

@@ -29,6 +29,7 @@ export const schoolsTable = sqliteTable("schools", {
   availableTerms: textArray("available_terms").default(["First Term", "Second Term", "Third Term"]),
   nextTermBegins: text("next_term_begins"),
   isDisabled: integer("is_disabled", { mode: "boolean" }).notNull().default(false),
+  licenseValidUntil: integer("license_valid_until", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -236,4 +237,12 @@ export const deviceSessionsTable = sqliteTable("device_sessions", {
   role: text("role"),
   firstSeen: integer("first_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   lastSeen: integer("last_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+// ── server_config ─────────────────────────────────────────────────────────────
+// Key-value store for local-server operational state.
+// Keys: "trusted_time_floor" (ms epoch string), "school_code"
+export const serverConfigTable = sqliteTable("server_config", {
+  key: text("key").primaryKey(),
+  value: text("value"),
 });

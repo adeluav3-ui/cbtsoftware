@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ApiTypes } from "@workspace/api-zod";
 import { db } from "@workspace/db";
 import { schoolsTable } from "@workspace/db/schema";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -25,6 +25,25 @@ router.get("/setup-status", async (_req, res) => {
   } catch {
     res.json({ hasSchool: false });
   }
+});
+
+// Public — called by local servers every 20 min to get a trusted timestamp
+// and verify the school's license. No auth required by design.
+router.get("/time-check", async (req, res) => {
+  const schoolCode = req.query.schoolCode as string | undefined;
+  let licenseValidUntil: string | null = null;
+
+  if (schoolCode) {
+    try {
+      const [school] = await db
+        .select({ licenseValidUntil: schoolsTable.licenseValidUntil })
+        .from(schoolsTable)
+        .where(eq(schoolsTable.code, schoolCode.toUpperCase()));
+      licenseValidUntil = school?.licenseValidUntil?.toISOString() ?? null;
+    } catch {}
+  }
+
+  res.json({ serverTime: new Date().toISOString(), licenseValidUntil });
 });
 
 export default router;

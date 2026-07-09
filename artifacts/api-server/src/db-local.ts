@@ -7,7 +7,7 @@ import * as sqliteSchema from "../../../lib/db/src/schema.sqlite.js";
 import { initDb } from "./local-init-db.js";
 
 const dbPath = process.env.SQLITE_PATH ?? "./cbt-local.db";
-const sqlite = new Database(dbPath);
+export const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
@@ -31,6 +31,7 @@ export const {
   studentTraitsTable,
   studentAttendanceTable,
   deviceSessionsTable,
+  serverConfigTable,
 } = sqliteSchema;
 
 // Zod schemas from the Postgres schema — validation logic is dialect-agnostic
