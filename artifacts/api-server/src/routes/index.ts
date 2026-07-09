@@ -21,13 +21,15 @@ router.use("/auth", authRouter);
 router.use(timeCheckRouter);
 router.use("/upload", uploadRouter);
 router.use(joinInfoRouter);
+// sync manages its own auth — must be mounted BEFORE the requireAuth-gated
+// /schools prefix so that import-school is reachable without a session
+// (first-time setup) while still protecting re-imports internally.
+router.use("/schools/:schoolCode/sync", syncRouter);
 router.use("/schools", requireAuth, checkLocalLicense, schoolsRouter);
 router.use("/schools/:schoolCode/teachers", requireAuth, checkLocalLicense, teachersRouter);
 router.use("/schools/:schoolCode/students", requireAuth, checkLocalLicense, studentsRouter);
 router.use("/schools/:schoolCode/exams", requireAuth, checkLocalLicense, examsRouter);
 router.use("/schools/:schoolCode/results", requireAuth, checkLocalLicense, resultsRouter);
-// sync manages its own auth — import-school is public for first-time server setup
-router.use("/schools/:schoolCode/sync", syncRouter);
 router.use(devicesRouter);
 
 export default router;
