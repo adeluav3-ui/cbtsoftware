@@ -35,6 +35,7 @@ interface School {
   name: string | null;
   createdAt: string | null;
   isDisabled?: boolean;
+  licenseValidUntil?: string | null;
 }
 
 export default function SuperAdminDashboard() {
@@ -74,6 +75,34 @@ export default function SuperAdminDashboard() {
 
   // Disable/enable school
   const [togglingCode, setTogglingCode] = useState<string | null>(null);
+
+  // Extend license
+  const [licenseDate, setLicenseDate] = useState("");
+  const [isExtendingLicense, setIsExtendingLicense] = useState(false);
+  const [licenseError, setLicenseError] = useState("");
+  const [licenseSuccess, setLicenseSuccess] = useState("");
+
+  const handleExtendLicense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailSchool || !licenseDate) return;
+    setIsExtendingLicense(true);
+    setLicenseError(""); setLicenseSuccess("");
+    try {
+      const res = await fetch(`${API}/schools/${detailSchool.code}/license`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ licenseValidUntil: new Date(licenseDate).toISOString() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setLicenseError(data.error || "Failed to update license"); }
+      else {
+        setLicenseSuccess(`License updated to ${format(new Date(data.licenseValidUntil), "MMM d, yyyy")}.`);
+        queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
+      }
+    } catch { setLicenseError("Network error"); }
+    finally { setIsExtendingLicense(false); }
+  };
 
   // Change password modal
   const [isChangePwOpen, setIsChangePwOpen] = useState(false);
@@ -175,6 +204,9 @@ export default function SuperAdminDashboard() {
     setResetPassword("");
     setResetError("");
     setResetSuccess("");
+    setLicenseDate("");
+    setLicenseError("");
+    setLicenseSuccess("");
     if (!overviewCache[school.code]) {
       setOverviewLoading(true);
       try {
@@ -301,6 +333,7 @@ export default function SuperAdminDashboard() {
                   <th className="px-6 py-4 font-semibold">School Code</th>
                   <th className="px-6 py-4 font-semibold">School Name</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
+                  <th className="px-6 py-4 font-semibold">License</th>
                   <th className="px-6 py-4 font-semibold">Created</th>
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
@@ -316,6 +349,17 @@ export default function SuperAdminDashboard() {
                       {school.isDisabled
                         ? <Badge variant="destructive">Suspended</Badge>
                         : <Badge variant="success">Active</Badge>}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {school.licenseValidUntil ? (() => {
+                        const d = new Date(school.licenseValidUntil!);
+                        const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86_400_000);
+                        return daysLeft <= 0
+                          ? <Badge variant="destructive">Expired</Badge>
+                          : daysLeft <= 14
+                            ? <Badge variant="warning">{format(d, "MMM d, yyyy")}</Badge>
+                            : <span className="text-muted-foreground">{format(d, "MMM d, yyyy")}</span>;
+                      })() : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-6 py-4 text-muted-foreground text-sm">
                       {school.createdAt ? format(new Date(school.createdAt), "MMM d, yyyy") : "-"}
@@ -344,7 +388,7 @@ export default function SuperAdminDashboard() {
                 ))}
                 {schools.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                       <Building className="w-12 h-12 mx-auto mb-4 opacity-20" />
                       No schools found in the system.
                     </td>
@@ -566,6 +610,38 @@ export default function SuperAdminDashboard() {
                 </div>
                 {resetError && <p className="text-sm text-destructive font-medium">{resetError}</p>}
                 {resetSuccess && <p className="text-sm text-green-600 font-medium">{resetSuccess}</p>}
+              </form>
+            </div>
+
+            {/* License */}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">License</p>
+              {detailSchool.licenseValidUntil ? (
+                <p className="text-sm text-muted-foreground mb-3">
+                  Currently valid until{" "}
+                  <span className="font-semibold text-foreground">
+                    {format(new Date(detailSchool.licenseValidUntil), "MMMM d, yyyy")}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-3">No license date set.</p>
+              )}
+              <form onSubmit={handleExtendLicense} className="space-y-3">
+                <Label>Set new expiry date</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={licenseDate}
+                    onChange={e => { setLicenseDate(e.target.value); setLicenseError(""); setLicenseSuccess(""); }}
+                    className="flex-1 border border-input rounded-xl px-3 py-2 text-sm bg-background"
+                    min={new Date().toISOString().slice(0, 10)}
+                  />
+                  <Button type="submit" variant="outline" size="sm" isLoading={isExtendingLicense} disabled={!licenseDate}>
+                    Save
+                  </Button>
+                </div>
+                {licenseError && <p className="text-sm text-destructive font-medium">{licenseError}</p>}
+                {licenseSuccess && <p className="text-sm text-green-600 font-medium">{licenseSuccess}</p>}
               </form>
             </div>
 

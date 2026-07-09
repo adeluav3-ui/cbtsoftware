@@ -1,10 +1,15 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { useState, useEffect } from "react";
+import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider } from "@/lib/auth";
+import { LicenseLock } from "@/components/LicenseLock";
+
+const IS_LOCAL = import.meta.env.VITE_LOCAL_MODE === "true";
 
 // Pages
+import Home from "@/pages/home";
 import Login from "@/pages/login";
 import SuperAdminDashboard from "@/pages/super-admin";
 import SchoolAdminDashboard from "@/pages/school-admin";
@@ -27,17 +32,6 @@ const queryClient = new QueryClient({
   }
 });
 
-function RootRedirect() {
-  const { user, isLoading } = useAuth();
-  if (isLoading) return null;
-  if (!user) return <Redirect to="/login" />;
-
-  if (user.role === 'super_admin') return <Redirect to="/super-admin" />;
-  if (user.role === 'school_admin') return <Redirect to="/school-admin" />;
-  if (user.role === 'teacher') return <Redirect to="/teacher" />;
-  return <Redirect to="/student" />;
-}
-
 function Router() {
   return (
     <Switch>
@@ -55,15 +49,39 @@ function Router() {
       <Route path="/student/results" component={MyResults} />
 
       <Route path="/local-info" component={LocalServerInfo} />
-      <Route path="/" component={RootRedirect} />
+      <Route path="/" component={Home} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function App() {
+  const [licenseLock, setLicenseLock] = useState<{
+    error: "CLOCK_TAMPER" | "LICENSE_EXPIRED";
+    licenseValidUntil?: string | null;
+  } | null>(null);
+
+  // Intercept all 423 responses and show the lock screen (local mode only)
+  useEffect(() => {
+    if (!IS_LOCAL) return;
+    const orig = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const res = await orig(...args);
+      if (res.status === 423) {
+        res.clone().json().then((data: { error?: string; licenseValidUntil?: string | null }) => {
+          if (data.error === "CLOCK_TAMPER" || data.error === "LICENSE_EXPIRED") {
+            setLicenseLock({ error: data.error, licenseValidUntil: data.licenseValidUntil });
+          }
+        }).catch(() => {});
+      }
+      return res;
+    };
+    return () => { window.fetch = orig; };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
+      {licenseLock && <LicenseLock error={licenseLock.error} licenseValidUntil={licenseLock.licenseValidUntil} />}
       <AuthProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

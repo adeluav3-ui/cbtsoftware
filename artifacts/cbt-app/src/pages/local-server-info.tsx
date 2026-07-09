@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -56,6 +57,43 @@ function ImportSchoolSection({ schoolCode }: { schoolCode: string }) {
         <p className={`text-sm ${status.startsWith("Error") ? "text-red-500" : "text-green-600"}`}>
           {status}
         </p>
+      )}
+    </div>
+  );
+}
+
+function LicenseStatusSection({ schoolCode }: { schoolCode: string }) {
+  const { data, isLoading } = useQuery<{ licenseValidUntil: string | null } | null>({
+    queryKey: ["license", schoolCode],
+    queryFn: () =>
+      fetch(`${API}/schools/${schoolCode}/license`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null),
+    enabled: !!schoolCode,
+    refetchInterval: 60_000,
+  });
+
+  if (isLoading || !data?.licenseValidUntil) return null;
+
+  const expires = new Date(data.licenseValidUntil);
+  const daysLeft = Math.ceil((expires.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const isExpired = daysLeft <= 0;
+  const isWarning = daysLeft > 0 && daysLeft <= 14;
+
+  return (
+    <div className={`bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm space-y-2 border-2 ${isExpired ? "border-red-400" : isWarning ? "border-orange-400" : "border-transparent"}`}>
+      <h2 className="font-bold text-gray-800">License Status</h2>
+      <p className="text-sm text-gray-600">
+        Valid until:{" "}
+        <span className="font-semibold">{format(expires, "MMMM d, yyyy")}</span>
+      </p>
+      {isExpired ? (
+        <p className="text-sm text-red-600 font-semibold">License has expired. Contact support to renew.</p>
+      ) : isWarning ? (
+        <p className="text-sm text-orange-600 font-semibold">
+          Expires in {daysLeft} day{daysLeft === 1 ? "" : "s"} — contact support to renew.
+        </p>
+      ) : (
+        <p className="text-sm text-green-600 font-medium">{daysLeft} days remaining</p>
       )}
     </div>
   );
@@ -157,6 +195,7 @@ export default function LocalServerInfo() {
 
       {schoolCode.length >= 3 && (
         <>
+          <LicenseStatusSection schoolCode={schoolCode} />
           <ImportSchoolSection schoolCode={schoolCode} />
           <ExportResultsSection schoolCode={schoolCode} />
         </>
