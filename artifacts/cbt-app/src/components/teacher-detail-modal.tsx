@@ -159,11 +159,7 @@ export function TeacherDetailModal({ teacherId, teacherName, schoolCode, onClose
                             <td className="px-3 py-2.5 text-muted-foreground">{r.examTitle}</td>
                             <td className="px-3 py-2.5 text-center font-bold">{r.score}/{r.totalQuestions}</td>
                             <td className="px-3 py-2.5 text-center font-semibold">{pct.toFixed(1)}%</td>
-                            <td className="px-3 py-2.5 text-center">
-                              <Badge variant={pct >= 70 ? "success" : "destructive"}>
-                                {pct >= 70 ? "Pass" : "Fail"}
-                              </Badge>
-                            </td>
+                            <td className="px-3 py-2.5 text-center text-muted-foreground">—</td>
                           </tr>
                         );
                       })}

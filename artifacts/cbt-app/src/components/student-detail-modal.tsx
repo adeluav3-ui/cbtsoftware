@@ -312,22 +312,10 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
                   <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">Exams Taken</p>
                 </div>
                 <div className="flex-1 min-w-27.5 rounded-xl border border-border bg-muted/30 p-4 text-center">
-                  <p className={`text-3xl font-bold ${avgPct >= 70 ? "text-green-600" : "text-destructive"}`}>
+                  <p className="text-3xl font-bold text-primary">
                     {avgPct.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">Avg Score</p>
-                </div>
-                <div className="flex-1 min-w-27.5 rounded-xl border border-border bg-muted/30 p-4 text-center">
-                  <p className="text-3xl font-bold text-green-600">
-                    {results.filter((r: any) => (r.percentage ?? 0) >= 70).length}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">Passes</p>
-                </div>
-                <div className="flex-1 min-w-27.5 rounded-xl border border-border bg-muted/30 p-4 text-center">
-                  <p className="text-3xl font-bold text-destructive">
-                    {results.filter((r: any) => (r.percentage ?? 0) < 70).length}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">Fails</p>
+                  <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wide">Avg CBT Score</p>
                 </div>
               </div>
 
@@ -357,13 +345,10 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
                           <div className="flex items-center gap-3 shrink-0">
                             <div className="text-right">
                               <p className="font-bold text-base">{result.score}/{result.totalQuestions}</p>
-                              <p className={`text-xs font-semibold ${pct >= 70 ? "text-green-600" : "text-destructive"}`}>
+                              <p className="text-xs font-semibold text-muted-foreground">
                                 {pct.toFixed(1)}%
                               </p>
                             </div>
-                            <Badge variant={pct >= 70 ? "success" : "destructive"}>
-                              {pct >= 70 ? "Pass" : "Fail"}
-                            </Badge>
                             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           </div>
                         </button>

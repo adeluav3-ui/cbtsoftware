@@ -880,11 +880,7 @@ export default function SchoolAdminDashboard() {
                     <td className="px-6 py-4 font-medium">{r.examTitle || r.subject}</td>
                     <td className="px-6 py-4 font-bold">{r.score} / {r.totalQuestions}</td>
                     <td className="px-6 py-4 font-semibold">{pct.toFixed(1)}%</td>
-                    <td className="px-6 py-4 text-center">
-                      <Badge variant={pct >= gradingScheme.gradeAMin ? "success" : "destructive"}>
-                        {pct >= gradingScheme.gradeAMin ? "Pass" : "Fail"}
-                      </Badge>
-                    </td>
+                    <td className="px-6 py-4 text-center text-muted-foreground">—</td>
                     <td className="px-6 py-4 text-muted-foreground text-sm">
                       {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
                     </td>
@@ -1258,12 +1254,11 @@ export default function SchoolAdminDashboard() {
                             <th className="px-3 py-2 font-semibold text-center">Score</th>
                             <th className="px-3 py-2 font-semibold text-center">%</th>
                             <th className="px-3 py-2 font-semibold text-center">Grade</th>
-                            <th className="px-3 py-2 font-semibold text-center">Status</th>
                           </tr>
                         </thead>
                         <tbody>
                           {specialResultsData.results.map((r: any) => (
-                            <tr key={r.resultId} className={`border-b border-border/40 transition-colors ${r.passed ? "hover:bg-green-50/30" : "hover:bg-red-50/30"}`}>
+                            <tr key={r.resultId} className="border-b border-border/40 transition-colors hover:bg-muted/20">
                               <td className="px-3 py-2 text-center">
                                 <span className={`font-bold text-xs ${r.rank === 1 ? "text-yellow-600" : r.rank === 2 ? "text-slate-500" : r.rank === 3 ? "text-orange-600" : "text-muted-foreground"}`}>
                                   #{r.rank}
@@ -1283,11 +1278,6 @@ export default function SchoolAdminDashboard() {
                                 <span className={`font-bold text-sm ${r.grade === "A" ? "text-green-600" : r.grade === "B" ? "text-blue-600" : r.grade === "C" ? "text-yellow-600" : r.grade === "D" ? "text-orange-600" : "text-destructive"}`}>
                                   {r.grade}
                                 </span>
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <Badge variant={r.passed ? "success" : "destructive"} className="text-xs">
-                                  {r.passed ? "Pass" : "Fail"}
-                                </Badge>
                               </td>
                             </tr>
                           ))}
