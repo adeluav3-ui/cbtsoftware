@@ -22,6 +22,7 @@ import ExamResults from "@/pages/teacher/ExamResults";
 import ComprehensiveResults from "@/pages/student/ComprehensiveResults";
 import MyResults from "@/pages/student/MyResults";
 import LocalServerInfo from "@/pages/local-server-info";
+import { LocalStatusBar } from "@/components/LocalStatusBar";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +84,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       {licenseLock && <LicenseLock error={licenseLock.error} licenseValidUntil={licenseLock.licenseValidUntil} />}
       <AuthProvider>
+        <LocalStatusBar />
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />

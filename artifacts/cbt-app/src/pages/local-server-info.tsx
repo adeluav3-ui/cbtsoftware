@@ -7,7 +7,9 @@ const API = import.meta.env.VITE_API_URL as string;
 interface JoinInfo {
   ip: string;
   port: number;
+  localHostname: string;
   joinUrl: string;
+  joinUrlFallback: string;
   qrDataUrl: string;
 }
 
@@ -150,7 +152,7 @@ export default function LocalServerInfo() {
         {data && (
           <>
             <p className="text-sm text-gray-500">
-              Scan the QR code or open the URL below on student devices connected to the same Wi-Fi network.
+              Scan the QR code or open the URL below on student devices connected to the same Wi‑Fi network.
             </p>
 
             <img
@@ -159,21 +161,35 @@ export default function LocalServerInfo() {
               className="mx-auto w-56 h-56 rounded-lg border border-gray-200"
             />
 
-            <div className="bg-gray-100 rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-500 mb-1">Server URL</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-left">
+              <p className="text-xs text-blue-500 font-semibold uppercase tracking-wide mb-1">Primary (recommended)</p>
               <a
                 href={data.joinUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 font-mono text-sm break-all hover:underline"
+                className="text-blue-700 font-mono text-sm break-all hover:underline font-bold"
               >
                 {data.joinUrl}
               </a>
             </div>
 
-            <p className="text-xs text-gray-400">
-              IP: {data.ip} &nbsp;|&nbsp; Port: {data.port}
-            </p>
+            <div className="bg-gray-100 rounded-lg px-4 py-3 text-left">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Fallback — if primary doesn't resolve</p>
+              <a
+                href={data.joinUrlFallback}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 font-mono text-sm break-all hover:underline"
+              >
+                {data.joinUrlFallback}
+              </a>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-left">
+              <p className="text-xs text-amber-800 leading-relaxed">
+                <span className="font-semibold">If the network changes during an exam</span>, students already connected may need to reload their page. Exam data is always saved on this computer — only the connection needs refreshing. The .local address usually self-heals on reconnect, but tell students to reload if their page stops responding.
+              </p>
+            </div>
           </>
         )}
       </div>

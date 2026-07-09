@@ -280,8 +280,12 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     </>
   );
 
+  const hasStatusBar = IS_LOCAL && (user.role === "school_admin" || user.role === "teacher");
+
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+    <div
+      className={`flex bg-background text-foreground overflow-hidden ${hasStatusBar ? "h-[calc(100vh-44px)] mt-11" : "h-screen"}`}
+    >
       {/* Mobile Menu Button */}
       <div className="md:hidden fixed top-3 left-3 z-50">
         <button
