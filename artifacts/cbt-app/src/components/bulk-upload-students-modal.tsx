@@ -70,9 +70,10 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                 const parts = line.split(',');
                 fullName = parts[0].trim();
                 if (parts[1] && parts[1].trim()) {
-                    const customClass = parts[1].trim().toUpperCase();
-                    if (CLASSES.includes(customClass)) {
-                        studentClass = customClass;
+                    const raw = parts[1].trim();
+                    const matched = CLASSES.find(c => c.toLowerCase() === raw.toLowerCase());
+                    if (matched) {
+                        studentClass = matched;
                     }
                 }
             }
