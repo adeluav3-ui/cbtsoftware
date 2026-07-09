@@ -8,7 +8,7 @@ export const subjectsTable = pgTable("subjects", {
     schoolCode: text("school_code").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
-    uniqueSubject: unique().on(table.name, table.schoolCode, table.level),
+    uniqueSubject: unique("subjects_name_school_code_level_unique").on(table.name, table.level, table.schoolCode),
 }));
 
 export const insertSubjectSchema = createInsertSchema(subjectsTable).omit({ id: true, createdAt: true });

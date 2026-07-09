@@ -13,7 +13,7 @@ export const studentAttendanceTable = pgTable("student_attendance", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-    uniqueStudentTermSession: unique().on(table.studentId, table.term, table.academicSession),
+    uniqueStudentTermSession: unique("student_attendance_student_id_term_academic_session_unique").on(table.studentId, table.term, table.academicSession),
     studentIdIdx: index("student_attendance_student_id_idx").on(table.studentId),
     schoolCodeIdx: index("student_attendance_school_code_idx").on(table.schoolCode),
 }));

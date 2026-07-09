@@ -2,7 +2,7 @@ import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
 
 export const deviceSessionsTable = pgTable("device_sessions", {
   id: serial("id").primaryKey(),
-  deviceId: text("device_id").notNull().unique(),
+  deviceId: text("device_id").notNull().unique("device_sessions_device_id_key"),
   schoolCode: text("school_code"),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),

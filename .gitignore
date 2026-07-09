@@ -63,3 +63,11 @@ Thumbs.db
 artifacts/api-server/uploads/
 artifacts/api-server/*.zip
 _zipcheck/
+
+# drizzle-kit pull output — project uses push mode, not migrate mode
+lib/db/drizzle/
+
+# Local SQLite DB files
+*.db
+*.db-shm
+*.db-wal

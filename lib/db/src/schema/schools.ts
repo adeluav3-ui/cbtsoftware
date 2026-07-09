@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const schoolsTable = pgTable("schools", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull().unique("schools_code_key"),
   name: text("name"),
   logoUrl: text("logo_url"),
   retakePasscode: text("retake_passcode").default("1234"),
@@ -13,6 +13,7 @@ export const schoolsTable = pgTable("schools", {
   availableTerms: text("available_terms").array().default(["First Term", "Second Term", "Third Term"]),
   nextTermBegins: text("next_term_begins"),
   isDisabled: boolean("is_disabled").notNull().default(false),
+  licenseValidUntil: timestamp("license_valid_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
