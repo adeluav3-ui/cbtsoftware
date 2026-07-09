@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
-import { resultsTable, examsTable, resultAnswersTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { resultsTable, examsTable, resultAnswersTable, subjectScoresTable, gradingSchemesTable } from "@workspace/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -121,7 +121,35 @@ router.get("/:resultId/detail", requireAuth, async (req: Request<ResultParams>, 
       .where(eq(resultAnswersTable.resultId, parseInt(resultId)))
       .orderBy(resultAnswersTable.id);
 
-    res.json({ ...result, answers });
+    // Fetch the student's cumulative subject score for this subject
+    // (most recent term — covers the case where term/session data shifted)
+    const [subjectScore] = result.subject
+      ? await db
+          .select({
+            midTermScore: subjectScoresTable.midTermScore,
+            classActivityScore: subjectScoresTable.classActivityScore,
+            examScore: subjectScoresTable.examScore,
+            grade: subjectScoresTable.grade,
+          })
+          .from(subjectScoresTable)
+          .where(
+            and(
+              eq(subjectScoresTable.studentId, result.studentId),
+              eq(subjectScoresTable.subjectName, result.subject),
+              eq(subjectScoresTable.schoolCode, schoolCode)
+            )
+          )
+          .orderBy(desc(subjectScoresTable.updatedAt))
+          .limit(1)
+      : [];
+
+    const isComplete =
+      subjectScore != null &&
+      subjectScore.midTermScore !== null &&
+      subjectScore.classActivityScore !== null &&
+      subjectScore.examScore !== null;
+
+    res.json({ ...result, answers, grade: isComplete ? (subjectScore?.grade ?? null) : null });
     return;
   } catch (err) {
     console.error(err);

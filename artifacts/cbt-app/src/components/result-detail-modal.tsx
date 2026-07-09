@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Modal, Badge } from "@/components/ui-elements";
+import { Modal } from "@/components/ui-elements";
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
 
 interface ResultDetailModalProps {
@@ -53,13 +53,20 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
             </div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Percentage</p>
-              <p className={`font-bold text-2xl ${pct >= 70 ? "text-green-600" : "text-destructive"}`}>
-                {pct.toFixed(1)}%
-              </p>
+              <p className="font-bold text-2xl text-primary">{pct.toFixed(1)}%</p>
             </div>
-            <Badge variant={pct >= 70 ? "success" : "destructive"} className="text-base px-4 py-1.5">
-              {pct >= 70 ? "Pass" : "Fail"}
-            </Badge>
+            {data.grade && (
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Grade</p>
+                <p className={`font-bold text-3xl ${
+                  data.grade === "A" ? "text-green-600" :
+                  data.grade === "B" ? "text-blue-600" :
+                  data.grade === "C" ? "text-yellow-600" :
+                  data.grade === "D" ? "text-orange-600" :
+                  "text-destructive"
+                }`}>{data.grade}</p>
+              </div>
+            )}
           </div>
 
           {/* Answer breakdown */}
@@ -94,7 +101,7 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                       </p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {OPTION_KEYS.map((key, idx) => {
+                      {OPTION_KEYS.map((_key, idx) => {
                         const label = OPTION_LABELS[idx];
                         const optionKey = `option${label}`;
                         const value = ans[optionKey];
