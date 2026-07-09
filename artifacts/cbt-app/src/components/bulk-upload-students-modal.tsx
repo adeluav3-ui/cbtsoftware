@@ -74,6 +74,9 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
                     const matched = CLASSES.find(c => c.toLowerCase() === raw.toLowerCase());
                     if (matched) {
                         studentClass = matched;
+                    } else {
+                        errors.push(`Line ${i + 1}: Unknown class "${raw}". Valid classes: ${CLASSES.join(', ')}`);
+                        continue;
                     }
                 }
             }
