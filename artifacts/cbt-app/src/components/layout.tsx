@@ -2,10 +2,11 @@ import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation, Link } from "wouter";
 import { useLogout, useCurrentUser } from "@workspace/api-client-react";
-import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Camera, ClipboardList, ShieldOff } from "lucide-react";
+import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Camera, ClipboardList, ShieldOff, Wifi } from "lucide-react";
 import { cn } from "./ui-elements";
 
 const API = import.meta.env.VITE_API_URL as string;
+const IS_LOCAL = import.meta.env.VITE_LOCAL_MODE === "true";
 
 function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -139,8 +140,14 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
 
   const navItems = {
     super_admin: [{ title: "Schools", path: "/super-admin", icon: Building }],
-    school_admin: [{ title: "Dashboard", path: "/school-admin", icon: LayoutDashboard }],
-    teacher: [{ title: "Dashboard", path: "/teacher", icon: BookOpen }],
+    school_admin: [
+      { title: "Dashboard", path: "/school-admin", icon: LayoutDashboard },
+      ...(IS_LOCAL ? [{ title: "Network Info", path: "/local-info", icon: Wifi }] : []),
+    ],
+    teacher: [
+      { title: "Dashboard", path: "/teacher", icon: BookOpen },
+      ...(IS_LOCAL ? [{ title: "Network Info", path: "/local-info", icon: Wifi }] : []),
+    ],
     student: [
       { title: "My Exams", path: "/student", icon: PenTool },
       { title: "My Results", path: "/student/results", icon: ClipboardList },
