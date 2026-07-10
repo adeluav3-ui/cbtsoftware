@@ -69,11 +69,17 @@ function App() {
     window.fetch = async (...args) => {
       const res = await orig(...args);
       if (res.status === 423) {
-        res.clone().json().then((data: { error?: string; licenseValidUntil?: string | null }) => {
-          if (data.error === "CLOCK_TAMPER" || data.error === "LICENSE_EXPIRED") {
-            setLicenseLock({ error: data.error, licenseValidUntil: data.licenseValidUntil });
-          }
-        }).catch(() => {});
+        // Await the body before doing anything else — this ensures setLicenseLock
+        // fires before any query function can process the bad response.
+        const data: { error?: string; licenseValidUntil?: string | null } =
+          await res.json().catch(() => ({}));
+        if (data.error === "CLOCK_TAMPER" || data.error === "LICENSE_EXPIRED") {
+          setLicenseLock({ error: data.error, licenseValidUntil: data.licenseValidUntil });
+        }
+        // Throw so TanStack Query puts queries into error state instead of
+        // storing the error body as data. Components that call .map() on data
+        // would otherwise crash because they receive { error: "..." } not [].
+        throw Object.assign(new Error(data.error ?? "locked"), { status: 423 });
       }
       return res;
     };

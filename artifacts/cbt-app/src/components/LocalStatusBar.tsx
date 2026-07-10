@@ -27,9 +27,9 @@ function StatusBarInner() {
   const [qrOpen, setQrOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Only the host-machine roles need the server status strip
-  if (!user || (user.role !== "school_admin" && user.role !== "teacher")) return null;
+  const isAllowed = !!user && (user.role === "school_admin" || user.role === "teacher");
 
+  // All hooks must be called unconditionally — conditional return comes after
   const { data, isError } = useQuery<JoinInfo>({
     queryKey: ["join-info"],
     queryFn: () =>
@@ -40,6 +40,7 @@ function StatusBarInner() {
     // Auto re-check every 30 s — detects IP change without manual refresh
     refetchInterval: 30_000,
     retry: false,
+    enabled: isAllowed,
   });
 
   const { mutate: doRefresh, isPending: refreshing } = useMutation({
@@ -51,6 +52,8 @@ function StatusBarInner() {
       queryClient.setQueryData(["join-info"], fresh);
     },
   });
+
+  if (!isAllowed) return null;
 
   const online = !isError && !!data;
 

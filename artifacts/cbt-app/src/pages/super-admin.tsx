@@ -643,6 +643,29 @@ export default function SuperAdminDashboard() {
                 {licenseError && <p className="text-sm text-destructive font-medium">{licenseError}</p>}
                 {licenseSuccess && <p className="text-sm text-green-600 font-medium">{licenseSuccess}</p>}
               </form>
+              {detailSchool.licenseValidUntil && (
+                <div className="mt-4 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Send this file to the school so they can update their offline server's license without re-importing data.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const res = await fetch(`${API}/schools/${detailSchool.code}/sync/license-patch`, { credentials: "include" });
+                      if (!res.ok) return;
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `cbt-license-${detailSchool.code}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-border bg-muted hover:bg-muted/80 font-medium transition-colors"
+                  >
+                    Download License Patch File
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Danger zone */}

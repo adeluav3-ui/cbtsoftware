@@ -126,6 +126,60 @@ router.post("/import-school", async (req, res) => {
   });
 });
 
+// ── Cloud: download a license patch file for the local server ────────────────
+// GET /api/schools/:schoolCode/sync/license-patch
+router.get("/license-patch", requireAuth, async (req, res) => {
+  if (process.env.DEPLOY_MODE === "local") {
+    res.status(404).json({ error: "Not available in local mode" });
+    return;
+  }
+  const { schoolCode } = req.params as { schoolCode: string };
+  if (req.session.role !== "super_admin" && req.session.schoolCode !== schoolCode) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const [school] = await db.select().from(schoolsTable).where(eq(schoolsTable.code, schoolCode));
+  if (!school) { res.status(404).json({ error: "School not found" }); return; }
+
+  res.setHeader("Content-Disposition", `attachment; filename="cbt-license-${schoolCode}.json"`);
+  res.json({
+    type: "license-patch",
+    schoolCode: school.code,
+    licenseValidUntil: school.licenseValidUntil?.toISOString() ?? null,
+    generatedAt: new Date().toISOString(),
+  });
+});
+
+// ── Local: apply a license patch without wiping exam data ────────────────────
+// POST /api/schools/:schoolCode/sync/apply-license-patch
+router.post("/apply-license-patch", requireAuth, async (req, res) => {
+  if (process.env.DEPLOY_MODE !== "local") {
+    res.status(404).json({ error: "Not available in cloud mode" });
+    return;
+  }
+  const { schoolCode } = req.params as { schoolCode: string };
+  if (req.session.role !== "school_admin" || req.session.schoolCode !== schoolCode) {
+    res.status(403).json({ error: "Only the school admin can update the license" });
+    return;
+  }
+  const { type, schoolCode: patchCode, licenseValidUntil } = req.body as Record<string, string>;
+  if (type !== "license-patch") {
+    res.status(400).json({ error: "Invalid file — not a license patch" });
+    return;
+  }
+  if (patchCode !== schoolCode) {
+    res.status(400).json({ error: "School code in patch does not match" });
+    return;
+  }
+  const parsed = licenseValidUntil ? new Date(licenseValidUntil) : null;
+  if (!parsed || isNaN(parsed.getTime())) {
+    res.status(400).json({ error: "Invalid licenseValidUntil date in patch" });
+    return;
+  }
+  await db.update(schoolsTable).set({ licenseValidUntil: parsed }).where(eq(schoolsTable.code, schoolCode));
+  res.json({ ok: true, licenseValidUntil: parsed.toISOString() });
+});
+
 // ── Local: export results for uploading to cloud ──────────────────────────────
 // GET /api/schools/:schoolCode/sync/results-export
 router.get("/results-export", requireAuth, async (req, res) => {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { DashboardLayout } from "@/components/layout";
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -101,6 +102,56 @@ function LicenseStatusSection({ schoolCode }: { schoolCode: string }) {
   );
 }
 
+function ApplyLicensePatchSection({ schoolCode }: { schoolCode: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const payload = JSON.parse(await file.text());
+      const r = await fetch(`${API}/schools/${schoolCode}/sync/apply-license-patch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Failed to apply patch");
+      const expires = new Date(data.licenseValidUntil);
+      setStatus(`License updated — valid until ${expires.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`);
+    } catch (err: any) {
+      setStatus(`Error: ${err.message}`);
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm space-y-3">
+      <h2 className="font-bold text-gray-800">Update License</h2>
+      <p className="text-sm text-gray-500">
+        Upload the license patch file sent by your CBT Software administrator to update your local license without losing any data.
+      </p>
+      <label className="block cursor-pointer">
+        <span className="inline-block px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 transition-colors">
+          {busy ? "Applying…" : "Choose license patch file (.json)"}
+        </span>
+        <input type="file" accept=".json" className="hidden" onChange={handleFile} disabled={busy} />
+      </label>
+      {status && (
+        <p className={`text-sm ${status.startsWith("Error") ? "text-red-500" : "text-green-600"}`}>
+          {status}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ExportResultsSection({ schoolCode }: { schoolCode: string }) {
   const handleExport = () => {
     window.open(`${API}/schools/${schoolCode}/sync/results-export`, "_blank");
@@ -129,12 +180,11 @@ export default function LocalServerInfo() {
     refetchInterval: 5000,
   });
 
-  // School code comes from session — parse from join info or fall back to empty
-  // In local mode the admin is logged in and knows their school code
   const [schoolCode, setSchoolCode] = useState("");
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center gap-6 p-6 py-12">
+    <DashboardLayout allowedRoles={["school_admin", "teacher"]}>
+    <div className="flex flex-col items-center gap-6 py-6">
       {/* QR / connection card */}
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm text-center space-y-6">
         <h1 className="text-2xl font-bold text-gray-800">Connect to CBT Server</h1>
@@ -212,10 +262,12 @@ export default function LocalServerInfo() {
       {schoolCode.length >= 3 && (
         <>
           <LicenseStatusSection schoolCode={schoolCode} />
+          <ApplyLicensePatchSection schoolCode={schoolCode} />
           <ImportSchoolSection schoolCode={schoolCode} />
           <ExportResultsSection schoolCode={schoolCode} />
         </>
       )}
     </div>
+    </DashboardLayout>
   );
 }
