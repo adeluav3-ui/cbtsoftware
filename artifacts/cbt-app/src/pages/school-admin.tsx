@@ -1397,8 +1397,6 @@ export default function SchoolAdminDashboard() {
         const classStudents = allCredentials.filter(s => s.class === credentialsClass);
 
         const handlePrintCredentials = () => {
-          const win = window.open('', '_blank', 'width=900,height=700');
-          if (!win) return;
           const rows = classStudents.map((s, i) => `
             <tr style="border-bottom:1px solid #e5e7eb;">
               <td style="padding:8px 12px;text-align:center;">${i + 1}</td>
@@ -1406,7 +1404,7 @@ export default function SchoolAdminDashboard() {
               <td style="padding:8px 12px;font-family:monospace;">${s.username}</td>
               <td style="padding:8px 12px;font-family:monospace;">${s.generatedPassword ?? '—'}</td>
             </tr>`).join('');
-          win.document.write(`<!DOCTYPE html><html><head><title>Credentials – ${credentialsClass}</title>
+          const html = `<!DOCTYPE html><html><head><title>Credentials – ${credentialsClass}</title>
             <style>
               body{font-family:Arial,sans-serif;margin:24px;color:#111;}
               h2{margin-bottom:4px;}p{margin-bottom:16px;color:#555;font-size:13px;}
@@ -1419,9 +1417,20 @@ export default function SchoolAdminDashboard() {
             <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${classStudents.length} student${classStudents.length !== 1 ? 's' : ''}</p>
             <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
             <tbody>${rows}</tbody></table>
-            <script>window.onload=function(){window.print();}<\/script>
-            </body></html>`);
-          win.document.close();
+            </body></html>`;
+          // Use a hidden iframe + Blob URL so this works in both regular browsers
+          // and Electron — window.open() in Electron is redirected to the system
+          // browser which can't receive document.write() content.
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const iframe = document.createElement('iframe');
+          iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;';
+          iframe.src = url;
+          document.body.appendChild(iframe);
+          iframe.onload = () => {
+            iframe.contentWindow?.print();
+            setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000);
+          };
         };
 
         return (

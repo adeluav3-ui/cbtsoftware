@@ -153,8 +153,25 @@ function ApplyLicensePatchSection({ schoolCode }: { schoolCode: string }) {
 }
 
 function ExportResultsSection({ schoolCode }: { schoolCode: string }) {
-  const handleExport = () => {
-    window.open(`${API}/schools/${schoolCode}/sync/results-export`, "_blank");
+  const [busy, setBusy] = useState(false);
+
+  const handleExport = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API}/schools/${schoolCode}/sync/results-export`, { credentials: "include" });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cbt-results-${schoolCode}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent — user will see nothing happened and can retry
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -165,9 +182,10 @@ function ExportResultsSection({ schoolCode }: { schoolCode: string }) {
       </p>
       <button
         onClick={handleExport}
-        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+        disabled={busy}
+        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
       >
-        Download Results File
+        {busy ? "Downloading…" : "Download Results File"}
       </button>
     </div>
   );
