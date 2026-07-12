@@ -2,7 +2,7 @@
 
 
 const { app, BrowserWindow, dialog, shell } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const http = require('http');
 const fs   = require('fs');
@@ -94,6 +94,46 @@ function stopServer() {
   }
 }
 
+// Adds a Windows Firewall inbound rule for port 8080 on first launch.
+// Runs once — a flag file in userData prevents repeat prompts.
+function ensureFirewallRule() {
+  const flagPath = path.join(app.getPath('userData'), '.firewall-configured');
+  if (fs.existsSync(flagPath)) return;
+
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'One-Time Network Setup',
+    message: 'Allow student devices to connect',
+    detail:
+      'CBT Software needs to open port 8080 in Windows Firewall so students ' +
+      'on the same Wi-Fi network can reach this server from their devices.\n\n' +
+      'Click "Allow" and then click "Yes" on the Windows security prompt that appears.',
+    buttons: ['Allow', 'Skip'],
+    defaultId: 0,
+  }).then(({ response }) => {
+    if (response !== 0) {
+      log('Firewall setup skipped by user');
+      return;
+    }
+    try {
+      execSync(
+        'powershell -WindowStyle Hidden -Command "' +
+          'Start-Process cmd ' +
+          "-ArgumentList '/c netsh advfirewall firewall add rule " +
+            'name=\\"CBT Software Local\\" ' +
+            'dir=in action=allow protocol=TCP localport=8080 profile=any' +
+          "' " +
+          '-Verb RunAs -Wait"',
+        { windowsHide: true, timeout: 30000 }
+      );
+      fs.writeFileSync(flagPath, '1');
+      log('Firewall rule added successfully');
+    } catch (err) {
+      log(`Firewall rule setup failed: ${err.message}`);
+    }
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width:    1280,
@@ -119,6 +159,9 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
+
+    // Open port 8080 in Windows Firewall on first launch so students can connect.
+    ensureFirewallRule();
 
     // Check for updates in background — silently downloads; prompts admin when ready.
     if (app.isPackaged) {
