@@ -17,7 +17,7 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState("Student");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [schoolCode, setSchoolCode] = useState("");
+  const [schoolCode, setSchoolCode] = useState(() => localStorage.getItem("cbt_school_code") ?? "");
   const [errorMsg, setErrorMsg] = useState("");
   const [, setLocation] = useLocation();
   const { refetch, setUser } = useAuth();
@@ -87,6 +87,7 @@ export default function Login() {
       },
       {
         onSuccess: (data) => {
+          if (schoolCode) localStorage.setItem("cbt_school_code", schoolCode.toUpperCase());
           queryClient.setQueryData(getCurrentUserQueryKey(), data);
           setUser(data);
           if (data.role === 'super_admin') setLocation("/super-admin");
