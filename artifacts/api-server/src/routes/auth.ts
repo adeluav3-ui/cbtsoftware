@@ -3,6 +3,14 @@ import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  isDeviceRegistered,
+  countRegisteredDevices,
+  getMaxDevices,
+  registerDevice,
+} from "../local-device-registry.js";
+
+const isLocal = process.env.DEPLOY_MODE === "local";
 
 const router = Router();
 
@@ -67,6 +75,42 @@ router.post("/login", async (req: Request, res: Response) => {
       isDisabled = school?.isDisabled ?? false;
       if (isDisabled) {
         return res.status(403).json({ error: "This school's access has been suspended. Please contact the platform administrator." });
+      }
+    }
+
+    // ── Local mode: enforce per-school device seat limit ───────────────────────
+    if (isLocal && user.schoolCode) {
+      const deviceId = req.cookies?.cbt_device_id as string | undefined;
+      if (!deviceId) {
+        return res.status(403).json({ error: "Device ID cookie missing. Please clear browser data and try again." });
+      }
+      const alreadyRegistered = isDeviceRegistered(deviceId);
+      if (!alreadyRegistered) {
+        const max = getMaxDevices(user.schoolCode);
+        if (max !== null) {
+          const count = countRegisteredDevices(user.schoolCode);
+          if (count >= max) {
+            return res.status(403).json({
+              error: `This school has reached its device limit (${max} devices). Contact your administrator to free up a seat.`,
+            });
+          }
+        }
+        registerDevice(deviceId, user.schoolCode, {
+          userId: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          role: user.role,
+          ipAddress: req.ip,
+        });
+      } else {
+        // Refresh last_seen + info on every login for known devices
+        registerDevice(deviceId, user.schoolCode, {
+          userId: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          role: user.role,
+          ipAddress: req.ip,
+        });
       }
     }
 

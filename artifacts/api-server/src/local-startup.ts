@@ -19,16 +19,40 @@ export function getJoinInfo(): JoinInfo | null {
   return _joinInfo;
 }
 
+// Virtual/loopback adapter name fragments to skip — these are never the
+// real LAN interface and confuse IP detection on machines running VMware,
+// VirtualBox, Hyper-V, WSL, or similar tools.
+const VIRTUAL_ADAPTER_PATTERNS = [
+  /vmware/i, /virtualbox/i, /vethernet/i, /hyper.?v/i,
+  /wsl/i, /loopback/i, /pseudo/i, /tap/i, /tunnel/i,
+  /bluetooth/i, /teredo/i, /isatap/i, /6to4/i,
+];
+
 function getLanIp(): string | null {
   const ifaces = os.networkInterfaces();
-  for (const name of Object.keys(ifaces)) {
-    for (const iface of (ifaces[name] ?? [])) {
+  const candidates: Array<{ name: string; address: string }> = [];
+
+  for (const [name, addrs] of Object.entries(ifaces)) {
+    if (VIRTUAL_ADAPTER_PATTERNS.some(p => p.test(name))) continue;
+    for (const iface of (addrs ?? [])) {
       if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
+        candidates.push({ name, address: iface.address });
       }
     }
   }
-  return null;
+
+  if (candidates.length === 0) return null;
+
+  // Prefer Wi-Fi / Wireless adapters
+  const wifi = candidates.find(c => /wi.?fi|wireless|wlan/i.test(c.name));
+  if (wifi) return wifi.address;
+
+  // Prefer Ethernet next
+  const eth = candidates.find(c => /ethernet|local area connection/i.test(c.name));
+  if (eth) return eth.address;
+
+  // Fall back to whatever's left
+  return candidates[0].address;
 }
 
 // Re-detect LAN IP and (if it changed) re-register mDNS. Call this

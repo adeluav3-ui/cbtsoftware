@@ -236,11 +236,26 @@ export function initDb(db: Database): void {
   // ── Schema migrations (idempotent) ─────────────────────────────────────────
   // SQLite does not support ADD COLUMN IF NOT EXISTS — wrap in try/catch.
   try { db.exec("ALTER TABLE schools ADD COLUMN license_valid_until INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE schools ADD COLUMN max_devices INTEGER"); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS server_config (
       key TEXT PRIMARY KEY,
       value TEXT
+    )
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS registered_devices (
+      device_id     TEXT PRIMARY KEY,
+      school_code   TEXT NOT NULL,
+      registered_at INTEGER NOT NULL,
+      last_seen     INTEGER NOT NULL,
+      user_id       INTEGER,
+      username      TEXT,
+      full_name     TEXT,
+      role          TEXT,
+      ip_address    TEXT
     )
   `);
 }

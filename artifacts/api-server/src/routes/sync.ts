@@ -146,6 +146,7 @@ router.get("/license-patch", requireAuth, async (req, res) => {
     type: "license-patch",
     schoolCode: school.code,
     licenseValidUntil: school.licenseValidUntil?.toISOString() ?? null,
+    maxDevices: (school as any).maxDevices ?? null,
     generatedAt: new Date().toISOString(),
   });
 });
@@ -162,7 +163,7 @@ router.post("/apply-license-patch", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Only the school admin can update the license" });
     return;
   }
-  const { type, schoolCode: patchCode, licenseValidUntil } = req.body as Record<string, string>;
+  const { type, schoolCode: patchCode, licenseValidUntil, maxDevices } = req.body as Record<string, any>;
   if (type !== "license-patch") {
     res.status(400).json({ error: "Invalid file — not a license patch" });
     return;
@@ -176,8 +177,12 @@ router.post("/apply-license-patch", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid licenseValidUntil date in patch" });
     return;
   }
-  await db.update(schoolsTable).set({ licenseValidUntil: parsed }).where(eq(schoolsTable.code, schoolCode));
-  res.json({ ok: true, licenseValidUntil: parsed.toISOString() });
+  const updateData: Record<string, any> = { licenseValidUntil: parsed };
+  if (maxDevices !== undefined && maxDevices !== null) {
+    updateData.maxDevices = Number(maxDevices);
+  }
+  await db.update(schoolsTable).set(updateData as any).where(eq(schoolsTable.code, schoolCode));
+  res.json({ ok: true, licenseValidUntil: parsed.toISOString(), maxDevices: updateData.maxDevices ?? null });
 });
 
 // ── Local: export results for uploading to cloud ──────────────────────────────

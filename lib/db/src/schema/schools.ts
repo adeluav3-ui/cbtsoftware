@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,7 @@ export const schoolsTable = pgTable("schools", {
   nextTermBegins: text("next_term_begins"),
   isDisabled: boolean("is_disabled").notNull().default(false),
   licenseValidUntil: timestamp("license_valid_until"),
+  maxDevices: integer("max_devices"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

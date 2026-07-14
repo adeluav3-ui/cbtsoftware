@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { DashboardLayout } from "@/components/layout";
+import { useAuth } from "@/lib/auth";
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -191,12 +192,122 @@ function ExportResultsSection({ schoolCode }: { schoolCode: string }) {
   );
 }
 
+interface RegisteredDevice {
+  deviceId: string;
+  schoolCode: string;
+  registeredAt: number;
+  lastSeen: number;
+  userId: number | null;
+  username: string | null;
+  fullName: string | null;
+  role: string | null;
+  ipAddress: string | null;
+}
+
+function RegisteredDevicesSection({ schoolCode }: { schoolCode: string }) {
+  const queryClient = useQueryClient();
+  const [deregistering, setDeregistering] = useState<string | null>(null);
+
+  const { data, isLoading, refetch } = useQuery<{ devices: RegisteredDevice[]; count: number; max: number | null }>({
+    queryKey: ["registered-devices", schoolCode],
+    queryFn: () =>
+      fetch(`${API}/devices/registered-devices`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!schoolCode,
+    refetchInterval: 30_000,
+  });
+
+  const handleDeregister = async (deviceId: string) => {
+    setDeregistering(deviceId);
+    try {
+      const res = await fetch(`${API}/devices/registered-devices/${encodeURIComponent(deviceId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["registered-devices", schoolCode] });
+      }
+    } finally {
+      setDeregistering(null);
+    }
+  };
+
+  const devices = data?.devices ?? [];
+  const count = data?.count ?? 0;
+  const max = data?.max ?? null;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-gray-800">Registered Devices</h2>
+        <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${max !== null && count >= max ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600"}`}>
+          {count}{max !== null ? ` / ${max}` : ""} seats
+        </span>
+      </div>
+      <p className="text-sm text-gray-500">
+        {max !== null
+          ? `This school has a limit of ${max} device${max === 1 ? "" : "s"}. Each unique device that logs in claims a permanent seat. Remove a device below to free up a slot.`
+          : "No device limit is set. Any number of devices can log in."}
+      </p>
+
+      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+      {!isLoading && devices.length === 0 && (
+        <p className="text-sm text-gray-400 italic">No devices registered yet. Devices appear here after their first login.</p>
+      )}
+
+      {devices.length > 0 && (
+        <div className="space-y-2">
+          {devices.map(d => {
+            const minsAgo = Math.round((Date.now() - d.lastSeen) / 60_000);
+            const lastSeenStr = minsAgo < 60
+              ? `${minsAgo}m ago`
+              : minsAgo < 1440
+                ? `${Math.round(minsAgo / 60)}h ago`
+                : `${Math.round(minsAgo / 1440)}d ago`;
+            return (
+              <div key={d.deviceId} className="flex items-center justify-between gap-2 p-3 border border-gray-200 rounded-xl">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {d.fullName ?? d.username ?? <span className="italic text-gray-400">Unknown</span>}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {d.role ? <span className="capitalize">{d.role.replace("_", " ")}</span> : null}
+                    {d.ipAddress ? ` · ${d.ipAddress}` : null}
+                    {` · last seen ${lastSeenStr}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeregister(d.deviceId)}
+                  disabled={deregistering === d.deviceId}
+                  className="shrink-0 px-2 py-1 rounded-lg border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  {deregistering === d.deviceId ? "…" : "Remove"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button
+        onClick={() => refetch()}
+        className="text-xs text-blue-500 hover:underline"
+      >
+        Refresh
+      </button>
+    </div>
+  );
+}
+
 export default function LocalServerInfo() {
   const { data, isLoading, isError } = useQuery<JoinInfo>({
     queryKey: ["join-info"],
     queryFn: () => fetch(`${API}/join-info`).then((r) => r.json()),
     refetchInterval: 5000,
   });
+
+  const { user } = useAuth();
+  const sessionSchoolCode = user?.schoolCode ?? "";
 
   const [schoolCode, setSchoolCode] = useState("");
 
@@ -261,6 +372,9 @@ export default function LocalServerInfo() {
           </>
         )}
       </div>
+
+      {/* Registered devices (seat management) */}
+      {sessionSchoolCode && <RegisteredDevicesSection schoolCode={sessionSchoolCode} />}
 
       {/* School code input for sync operations */}
       <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm space-y-3">

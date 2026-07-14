@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as sqliteSchema from "../../../lib/db/src/schema.sqlite.js";
 import { initDb } from "./local-init-db.js";
+import { initDeviceRegistry } from "./local-device-registry.js";
 
 const dbPath = process.env.SQLITE_PATH ?? "./cbt-local.db";
 export const sqlite = new Database(dbPath);
@@ -13,6 +14,7 @@ sqlite.pragma("foreign_keys = ON");
 
 // Idempotent — creates tables only if they don't exist yet
 initDb(sqlite);
+initDeviceRegistry(sqlite);
 
 export const db = drizzle(sqlite, { schema: sqliteSchema });
 export const pool = undefined;

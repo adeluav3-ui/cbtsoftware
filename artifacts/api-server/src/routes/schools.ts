@@ -13,7 +13,7 @@ const router = Router();
 
 // Create a new school with admin account
 router.post("/create", requireSuperAdmin, async (req: Request, res: Response) => {
-  const { code, name, adminUsername, adminPassword } = req.body;
+  const { code, name, adminUsername, adminPassword, maxDevices } = req.body;
 
   if (!code || !name || !adminUsername || !adminPassword) {
     return res.status(400).json({ error: "School code, name, admin username and password are all required" });
@@ -53,7 +53,7 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
 
       const [newSchool] = await tx
         .insert(schoolsTable)
-        .values({ code: upperCode, name, licenseValidUntil })
+        .values({ code: upperCode, name, licenseValidUntil, maxDevices: maxDevices ? Number(maxDevices) : null })
         .returning();
 
       await tx.insert(usersTable).values({
@@ -1253,6 +1253,32 @@ router.patch("/:schoolCode/license", requireSuperAdmin, async (req: Request, res
 
     if (!updated) return res.status(404).json({ error: "School not found" });
     res.json({ code: updated.code, licenseValidUntil: updated.licenseValidUntil?.toISOString() ?? null });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+router.patch("/:schoolCode/max-devices", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  const { maxDevices } = req.body;
+
+  const val = maxDevices !== undefined && maxDevices !== null && maxDevices !== "" ? Number(maxDevices) : null;
+  if (val !== null && (isNaN(val) || val < 1)) {
+    return res.status(400).json({ error: "maxDevices must be a positive integer or null" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ maxDevices: val } as any)
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning({ code: schoolsTable.code, maxDevices: (schoolsTable as any).maxDevices });
+
+    if (!updated) return res.status(404).json({ error: "School not found" });
+    res.json({ code: updated.code, maxDevices: updated.maxDevices ?? null });
     return;
   } catch (err) {
     console.error(err);

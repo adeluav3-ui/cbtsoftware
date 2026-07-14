@@ -36,6 +36,7 @@ interface School {
   createdAt: string | null;
   isDisabled?: boolean;
   licenseValidUntil?: string | null;
+  maxDevices?: number | null;
 }
 
 export default function SuperAdminDashboard() {
@@ -53,6 +54,7 @@ export default function SuperAdminDashboard() {
   const [newName, setNewName] = useState("");
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newMaxDevices, setNewMaxDevices] = useState("");
   const [addError, setAddError] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
@@ -81,6 +83,34 @@ export default function SuperAdminDashboard() {
   const [isExtendingLicense, setIsExtendingLicense] = useState(false);
   const [licenseError, setLicenseError] = useState("");
   const [licenseSuccess, setLicenseSuccess] = useState("");
+
+  // Max devices
+  const [maxDevicesInput, setMaxDevicesInput] = useState("");
+  const [isUpdatingMaxDevices, setIsUpdatingMaxDevices] = useState(false);
+  const [maxDevicesError, setMaxDevicesError] = useState("");
+  const [maxDevicesSuccess, setMaxDevicesSuccess] = useState("");
+
+  const handleUpdateMaxDevices = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailSchool) return;
+    setIsUpdatingMaxDevices(true);
+    setMaxDevicesError(""); setMaxDevicesSuccess("");
+    try {
+      const res = await fetch(`${API}/schools/${detailSchool.code}/max-devices`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ maxDevices: maxDevicesInput === "" ? null : Number(maxDevicesInput) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMaxDevicesError(data.error || "Failed to update"); }
+      else {
+        setMaxDevicesSuccess(`Device limit updated to ${data.maxDevices ?? "unlimited"}.`);
+        queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
+      }
+    } catch { setMaxDevicesError("Network error"); }
+    finally { setIsUpdatingMaxDevices(false); }
+  };
 
   const handleExtendLicense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +212,7 @@ export default function SuperAdminDashboard() {
           name: newName,
           adminUsername: newAdminUsername,
           adminPassword: newAdminPassword,
+          maxDevices: newMaxDevices ? Number(newMaxDevices) : null,
         }),
       });
       const data = await res.json();
@@ -190,7 +221,7 @@ export default function SuperAdminDashboard() {
       } else {
         queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
         setIsAddOpen(false);
-        setNewCode(""); setNewName(""); setNewAdminUsername(""); setNewAdminPassword("");
+        setNewCode(""); setNewName(""); setNewAdminUsername(""); setNewAdminPassword(""); setNewMaxDevices("");
       }
     } catch {
       setAddError("Network error. Please try again.");
@@ -207,6 +238,9 @@ export default function SuperAdminDashboard() {
     setLicenseDate("");
     setLicenseError("");
     setLicenseSuccess("");
+    setMaxDevicesInput(school.maxDevices != null ? String(school.maxDevices) : "");
+    setMaxDevicesError("");
+    setMaxDevicesSuccess("");
     if (!overviewCache[school.code]) {
       setOverviewLoading(true);
       try {
@@ -512,6 +546,16 @@ export default function SuperAdminDashboard() {
               required
             />
           </div>
+          <div>
+            <Label>Max Devices <span className="text-muted-foreground font-normal">(optional — leave blank for unlimited)</span></Label>
+            <Input
+              type="number"
+              min="1"
+              value={newMaxDevices}
+              onChange={e => setNewMaxDevices(e.target.value)}
+              placeholder="e.g. 30"
+            />
+          </div>
           <div className="border-t border-border pt-4">
             <p className="text-sm text-muted-foreground mb-4 font-medium">School Admin Account</p>
             <div className="space-y-4">
@@ -666,6 +710,34 @@ export default function SuperAdminDashboard() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Max Devices */}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Device Limit (Offline Mode)</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                {detailSchool.maxDevices != null
+                  ? <>Limit: <span className="font-semibold text-foreground">{detailSchool.maxDevices} devices</span></>
+                  : "No device limit set (unlimited)."}
+              </p>
+              <form onSubmit={handleUpdateMaxDevices} className="space-y-3">
+                <Label>Set device limit</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={maxDevicesInput}
+                    onChange={e => { setMaxDevicesInput(e.target.value); setMaxDevicesError(""); setMaxDevicesSuccess(""); }}
+                    placeholder="e.g. 30 (blank = unlimited)"
+                    className="flex-1"
+                  />
+                  <Button type="submit" variant="outline" size="sm" isLoading={isUpdatingMaxDevices}>
+                    Save
+                  </Button>
+                </div>
+                {maxDevicesError && <p className="text-sm text-destructive font-medium">{maxDevicesError}</p>}
+                {maxDevicesSuccess && <p className="text-sm text-green-600 font-medium">{maxDevicesSuccess}</p>}
+              </form>
             </div>
 
             {/* Danger zone */}

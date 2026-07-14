@@ -1,5 +1,11 @@
 import { Router } from "express";
 import { upsertDevice, getDevices } from "../device-tracker.js";
+import {
+  getRegisteredDevices,
+  deregisterDevice,
+  countRegisteredDevices,
+  getMaxDevices,
+} from "../local-device-registry.js";
 
 const router = Router();
 
@@ -35,6 +41,53 @@ router.get("/devices", (req, res) => {
     return;
   }
   res.status(403).json({ error: "Forbidden" });
+});
+
+// GET /registered-devices — local mode only; school_admin sees their school's seats
+router.get("/registered-devices", (req, res) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const isLocal = process.env.DEPLOY_MODE === "local";
+  if (!isLocal) {
+    res.status(404).json({ error: "Not available in cloud mode" });
+    return;
+  }
+  const { role, schoolCode } = req.session;
+  if (role !== "school_admin" && role !== "super_admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const code = schoolCode ?? "";
+  const devices = getRegisteredDevices(code);
+  const max = getMaxDevices(code);
+  res.json({ devices, count: devices.length, max });
+});
+
+// DELETE /registered-devices/:deviceId — deregister a seat (local mode, school_admin only)
+router.delete("/registered-devices/:deviceId", (req, res) => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const isLocal = process.env.DEPLOY_MODE === "local";
+  if (!isLocal) {
+    res.status(404).json({ error: "Not available in cloud mode" });
+    return;
+  }
+  const { role, schoolCode } = req.session;
+  if (role !== "school_admin" && role !== "super_admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const { deviceId } = req.params as { deviceId: string };
+  const removed = deregisterDevice(deviceId, schoolCode ?? "");
+  if (!removed) {
+    res.status(404).json({ error: "Device not found" });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 export default router;
