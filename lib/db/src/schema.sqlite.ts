@@ -30,6 +30,7 @@ export const schoolsTable = sqliteTable("schools", {
   nextTermBegins: text("next_term_begins"),
   isDisabled: integer("is_disabled", { mode: "boolean" }).notNull().default(false),
   licenseValidUntil: integer("license_valid_until", { mode: "timestamp" }),
+  maxDevices: integer("max_devices"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
