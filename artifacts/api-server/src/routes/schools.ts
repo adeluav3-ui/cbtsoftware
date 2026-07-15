@@ -1273,9 +1273,9 @@ router.patch("/:schoolCode/max-devices", requireSuperAdmin, async (req: Request,
   try {
     const [updated] = await db
       .update(schoolsTable)
-      .set({ maxDevices: val } as any)
+      .set({ maxDevices: val })
       .where(eq(schoolsTable.code, schoolCodeStr))
-      .returning({ code: schoolsTable.code, maxDevices: (schoolsTable as any).maxDevices });
+      .returning({ code: schoolsTable.code, maxDevices: schoolsTable.maxDevices });
 
     if (!updated) return res.status(404).json({ error: "School not found" });
     res.json({ code: updated.code, maxDevices: updated.maxDevices ?? null });

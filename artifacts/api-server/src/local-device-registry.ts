@@ -101,6 +101,11 @@ export function getRegisteredDevices(schoolCode: string): RegisteredDevice[] {
   }));
 }
 
+export function setMaxDevices(schoolCode: string, max: number | null): void {
+  if (!_db) return;
+  _db.prepare("UPDATE schools SET max_devices = ? WHERE code = ?").run(max, schoolCode);
+}
+
 export function deregisterDevice(deviceId: string, schoolCode: string): boolean {
   if (!_db) return false;
   const result = _db.prepare(

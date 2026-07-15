@@ -7,6 +7,7 @@ import {
   subjectScoresTable, deviceSessionsTable, serverConfigTable,
 } from "@workspace/db/schema";
 import { eq, and, inArray, sql, count } from "drizzle-orm";
+import { setMaxDevices } from "../local-device-registry.js";
 
 const router = Router({ mergeParams: true });
 
@@ -146,7 +147,7 @@ router.get("/license-patch", requireAuth, async (req, res) => {
     type: "license-patch",
     schoolCode: school.code,
     licenseValidUntil: school.licenseValidUntil?.toISOString() ?? null,
-    maxDevices: (school as any).maxDevices ?? null,
+    maxDevices: school.maxDevices ?? null,
     generatedAt: new Date().toISOString(),
   });
 });
@@ -177,12 +178,15 @@ router.post("/apply-license-patch", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid licenseValidUntil date in patch" });
     return;
   }
-  const updateData: Record<string, any> = { licenseValidUntil: parsed };
-  if (maxDevices !== undefined && maxDevices !== null) {
-    updateData.maxDevices = Number(maxDevices);
-  }
-  await db.update(schoolsTable).set(updateData as any).where(eq(schoolsTable.code, schoolCode));
-  res.json({ ok: true, licenseValidUntil: parsed.toISOString(), maxDevices: updateData.maxDevices ?? null });
+  await db.update(schoolsTable).set({ licenseValidUntil: parsed }).where(eq(schoolsTable.code, schoolCode));
+
+  // maxDevices: use raw SQLite directly — bypasses any Drizzle schema mapping issues.
+  // setMaxDevices() is a no-op when _db is null (cloud mode), which can never reach
+  // this branch anyway (guarded above by DEPLOY_MODE !== "local").
+  const parsedMax = maxDevices !== undefined && maxDevices !== null ? Number(maxDevices) : null;
+  setMaxDevices(schoolCode, parsedMax);
+
+  res.json({ ok: true, licenseValidUntil: parsed.toISOString(), maxDevices: parsedMax });
 });
 
 // ── Local: export results for uploading to cloud ──────────────────────────────
