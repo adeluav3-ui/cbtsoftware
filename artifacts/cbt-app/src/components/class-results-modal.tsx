@@ -35,7 +35,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrend
 const EARLY_YEARS_CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5"];
 
 function classToLevel(cls: string): string {
-    if (cls === 'Pre-School' || cls === 'KG1' || cls === 'KG2') return 'kg';
+    if (cls === 'Pre-School') return 'preschool';
+    if (cls === 'KG1' || cls === 'KG2') return 'kg';
     if (cls === 'Nursery 1' || cls === 'Nursery 2') return 'nursery';
     if (cls.startsWith('Pry')) return 'primary';
     if (cls.startsWith('JSS')) return 'junior';
