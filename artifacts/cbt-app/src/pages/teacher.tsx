@@ -208,8 +208,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (eClass && schoolCode) {
       let level = 'kg';
-      if (eClass === 'Pre-School') level = 'preschool';
-      else if (eClass === 'Nursery 1' || eClass === 'Nursery 2') level = 'nursery';
+      if (eClass === 'Nursery 1' || eClass === 'Nursery 2') level = 'nursery';
       else if (eClass.startsWith('Pry')) level = 'primary';
       else if (eClass.startsWith('JSS')) level = 'junior';
       else if (eClass.startsWith('SSS')) level = 'senior';

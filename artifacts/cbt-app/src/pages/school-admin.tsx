@@ -66,7 +66,7 @@ export default function SchoolAdminDashboard() {
   const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
   const [subjectModalOpen, setSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState("");
-  const [newSubjectLevel, setNewSubjectLevel] = useState<"preschool" | "kg" | "nursery" | "primary" | "junior" | "senior">("kg");
+  const [newSubjectLevel, setNewSubjectLevel] = useState<"kg" | "nursery" | "primary" | "junior" | "senior">("kg");
   const [subjectError, setSubjectError] = useState("");
   const [isAddingSubject, setIsAddingSubject] = useState(false);
 
@@ -81,7 +81,7 @@ export default function SchoolAdminDashboard() {
   // Bulk subject upload state
   const [bulkSubjectModalOpen, setBulkSubjectModalOpen] = useState(false);
   const [bulkSubjectsText, setBulkSubjectsText] = useState("");
-  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"preschool" | "kg" | "nursery" | "primary" | "junior" | "senior">("kg");
+  const [bulkSubjectsLevel, setBulkSubjectsLevel] = useState<"kg" | "nursery" | "primary" | "junior" | "senior">("kg");
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [bulkSubjectError, setBulkSubjectError] = useState("");
   const [bulkSubjectSuccess, setBulkSubjectSuccess] = useState("");
@@ -948,8 +948,7 @@ export default function SchoolAdminDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {([
-                { level: 'preschool', label: 'Pre-School' },
-                { level: 'kg', label: 'Kindergarten (KG1, KG2)' },
+                { level: 'kg', label: 'Pre-School / Kindergarten (Pre-School, KG1, KG2)' },
                 { level: 'nursery', label: 'Nursery (Nursery 1, Nursery 2)' },
                 { level: 'primary', label: 'Primary (Pry 1-5)' },
                 { level: 'junior', label: 'Junior Secondary (JSS1-3)' },
@@ -996,9 +995,8 @@ export default function SchoolAdminDashboard() {
               </div>
               <div>
                 <Label>Level</Label>
-                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "preschool" | "kg" | "nursery" | "primary" | "junior" | "senior")}>
-                  <option value="preschool">Pre-School</option>
-                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                  <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
@@ -1020,9 +1018,8 @@ export default function SchoolAdminDashboard() {
             <div className="space-y-4">
               <div>
                 <Label>Level</Label>
-                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "preschool" | "kg" | "nursery" | "primary" | "junior" | "senior")}>
-                  <option value="preschool">Pre-School</option>
-                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                  <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
@@ -1048,13 +1045,7 @@ export default function SchoolAdminDashboard() {
               <div className="bg-muted/20 p-3 rounded-lg">
                 <p className="text-sm font-semibold mb-2">Common Subjects:</p>
                 <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                  {bulkSubjectsLevel === "preschool" ? (
-                    <>
-                      <span>• Play & Learn</span> <span>• Language Development</span> <span>• Early Numeracy</span>
-                      <span>• Creative Arts</span> <span>• Music & Movement</span> <span>• Environmental Awareness</span>
-                      <span>• Physical Development</span> <span>• Religious & Moral Studies</span> <span>• Social Skills</span>
-                    </>
-                  ) : bulkSubjectsLevel === "kg" ? (
+                  {bulkSubjectsLevel === "kg" ? (
                     <>
                       <span>• Literacy</span> <span>• Numeracy</span> <span>• Phonics</span>
                       <span>• Creative Arts</span> <span>• Music & Movement</span> <span>• Environmental Studies</span>

@@ -412,8 +412,8 @@ router.post("/:schoolCode/subjects", requireSchoolAdmin, async (req: Request, re
   const schoolCodeStr = String(schoolCode);
   const { name, level } = req.body;
 
-  if (!name || !level || !['preschool', 'kg', 'nursery', 'primary', 'junior', 'senior'].includes(level)) {
-    return res.status(400).json({ error: "Subject name and valid level (preschool/kg/nursery/primary/junior/senior) required" });
+  if (!name || !level || !['kg', 'nursery', 'primary', 'junior', 'senior'].includes(level)) {
+    return res.status(400).json({ error: "Subject name and valid level (kg/nursery/primary/junior/senior) required" });
   }
 
   try {
@@ -1043,7 +1043,7 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
 
     // Determine the correct level for this class
     const levelMap: Record<string, string> = {
-      "Pre-School": "preschool", KG1: "kg", KG2: "kg",
+      "Pre-School": "kg", KG1: "kg", KG2: "kg",
       "Nursery 1": "nursery", "Nursery 2": "nursery",
       "Pry 1": "primary", "Pry 2": "primary", "Pry 3": "primary", "Pry 4": "primary", "Pry 5": "primary",
       JSS1: "junior", JSS2: "junior", JSS3: "junior",
