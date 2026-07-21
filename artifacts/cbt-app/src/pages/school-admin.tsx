@@ -925,7 +925,7 @@ export default function SchoolAdminDashboard() {
             <div>
               <h2 className="text-lg md:text-xl font-bold font-display">Subject Management</h2>
               <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                Add subjects for KG, Nursery, Primary, Junior and Senior Secondary classes
+                Add subjects for Pre-School, KG, Nursery, Primary, Junior and Senior Secondary classes
               </p>      </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" size="sm" onClick={() => setBulkSubjectModalOpen(true)} className="w-full sm:w-auto">
@@ -948,7 +948,7 @@ export default function SchoolAdminDashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {([
-                { level: 'kg', label: 'Kindergarten (KG1, KG2)' },
+                { level: 'kg', label: 'Pre-School / Kindergarten (Pre-School, KG1, KG2)' },
                 { level: 'nursery', label: 'Nursery (Nursery 1, Nursery 2)' },
                 { level: 'primary', label: 'Primary (Pry 1-5)' },
                 { level: 'junior', label: 'Junior Secondary (JSS1-3)' },
@@ -996,7 +996,7 @@ export default function SchoolAdminDashboard() {
               <div>
                 <Label>Level</Label>
                 <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
-                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                  <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
@@ -1019,7 +1019,7 @@ export default function SchoolAdminDashboard() {
               <div>
                 <Label>Level</Label>
                 <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
-                  <option value="kg">Kindergarten (KG1, KG2)</option>
+                  <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
