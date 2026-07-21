@@ -1,0 +1,35 @@
+# Git
+.git
+.github
+
+# Env files — never bake secrets into the image
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production
+
+# Dependencies and build output — both are regenerated inside Docker
+**/node_modules
+**/dist
+**/dist-local
+
+# Frontend and desktop source — api-server doesn't need these
+# (their package.json files are still copied by the Dockerfile explicitly)
+artifacts/cbt-app/src
+artifacts/cbt-app/public
+artifacts/cbt-app/index.html
+artifacts/cbt-app/vite.config.ts
+artifacts/cbt-app/tailwind.config.ts
+artifacts/desktop-app/src
+artifacts/desktop-app/resources
+artifacts/mockup-sandbox/src
+
+# Local artefacts
+*.zip
+main.js
+artifacts/api-server/uploads
+scripts/.node-cache
+lib/db/drizzle
+*.db
+*.db-shm
+*.db-wal
