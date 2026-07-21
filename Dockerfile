@@ -45,7 +45,7 @@ RUN cd lib/db && pnpm build && \
 # node_modules (no workspace symlinks, no devDependencies).
 # dist/ is in .gitignore so pnpm deploy skips it — we copy the three dist
 # directories explicitly afterwards to guarantee they are present.
-RUN pnpm --filter @workspace/api-server deploy /deploy && \
+RUN pnpm --filter @workspace/api-server deploy --legacy /deploy && \
     cp -r artifacts/api-server/dist         /deploy/dist && \
     cp -r lib/db/dist                       /deploy/node_modules/@workspace/db/dist && \
     cp -r lib/api-zod/dist                  /deploy/node_modules/@workspace/api-zod/dist

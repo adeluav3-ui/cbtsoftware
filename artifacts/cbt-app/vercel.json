@@ -6,7 +6,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://cbtsoftware.onrender.com/api/:path*"
+            "destination": "https://cbtsoftware-api.fly.dev/api/:path*"
         },
         {
             "source": "/(.*)",
