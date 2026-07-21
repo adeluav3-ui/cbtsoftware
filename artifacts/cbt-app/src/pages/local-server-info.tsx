@@ -106,6 +106,7 @@ function LicenseStatusSection({ schoolCode }: { schoolCode: string }) {
 function ApplyLicensePatchSection({ schoolCode }: { schoolCode: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -123,7 +124,9 @@ function ApplyLicensePatchSection({ schoolCode }: { schoolCode: string }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? "Failed to apply patch");
       const expires = new Date(data.licenseValidUntil);
-      setStatus(`License updated — valid until ${expires.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`);
+      const maxMsg = data.maxDevices != null ? ` Device limit: ${data.maxDevices}.` : "";
+      setStatus(`License updated — valid until ${expires.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.${maxMsg}`);
+      queryClient.invalidateQueries({ queryKey: ["registered-devices"] });
     } catch (err: any) {
       setStatus(`Error: ${err.message}`);
     } finally {
@@ -208,12 +211,19 @@ function RegisteredDevicesSection({ schoolCode }: { schoolCode: string }) {
   const queryClient = useQueryClient();
   const [deregistering, setDeregistering] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useQuery<{ devices: RegisteredDevice[]; count: number; max: number | null }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ devices: RegisteredDevice[]; count: number; max: number | null }>({
     queryKey: ["registered-devices", schoolCode],
-    queryFn: () =>
-      fetch(`${API}/devices/registered-devices`, { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`${API}/devices/registered-devices`, { credentials: "include" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error ?? `Server error ${r.status}`);
+      }
+      return r.json();
+    },
     enabled: !!schoolCode,
     refetchInterval: 30_000,
+    retry: 1,
   });
 
   const handleDeregister = async (deviceId: string) => {
@@ -251,11 +261,17 @@ function RegisteredDevicesSection({ schoolCode }: { schoolCode: string }) {
 
       {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
-      {!isLoading && devices.length === 0 && (
+      {isError && (
+        <p className="text-sm text-red-500">
+          Could not load device data: {(error as Error)?.message ?? "unknown error"}
+        </p>
+      )}
+
+      {!isLoading && !isError && devices.length === 0 && (
         <p className="text-sm text-gray-400 italic">No devices registered yet. Devices appear here after their first login.</p>
       )}
 
-      {devices.length > 0 && (
+      {!isError && devices.length > 0 && (
         <div className="space-y-2">
           {devices.map(d => {
             const minsAgo = Math.round((Date.now() - d.lastSeen) / 60_000);

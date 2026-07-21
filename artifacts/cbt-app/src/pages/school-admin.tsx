@@ -3,9 +3,9 @@ import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select, PasswordInput } from "@/components/ui-elements";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound, Smartphone, Tablet, Monitor } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -19,7 +19,7 @@ export default function SchoolAdminDashboard() {
   const queryClient = useQueryClient();
 
   const [classFilter, setClassFilter] = useState("KG1");
-  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   const REGULAR_CLASSES = CLASSES.filter(c => c !== "Entrance Exam" && c !== "Staff Interview");
 
   const { data: teachers = [] } = useListTeachers(schoolCode);
@@ -615,6 +615,28 @@ export default function SchoolAdminDashboard() {
     return () => clearInterval(id);
   }, [activeTab]);
 
+  // Cloud mode — connected devices (active in last 30 min, polled every 30 s)
+  type CloudDevice = {
+    deviceId: string;
+    deviceType: "phone" | "tablet" | "desktop";
+    ipAddress: string | null;
+    fullName: string | null;
+    username: string | null;
+    role: string | null;
+    firstSeen: string;
+    lastSeen: string;
+  };
+  const { data: cloudDevicesData } = useQuery<{ devices: CloudDevice[]; count: number } | null>({
+    queryKey: ["school-devices", schoolCode],
+    queryFn: async () => {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/devices/school-devices`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: activeTab === "Devices",
+    refetchInterval: activeTab === "Devices" ? 30_000 : false,
+  });
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -694,7 +716,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Devices", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -1492,6 +1514,72 @@ export default function SchoolAdminDashboard() {
           </div>
         );
       })()}
+
+      {/* ── Devices Tab (cloud mode) ──────────────────── */}
+      {activeTab === "Devices" && (
+        <div className="max-w-2xl space-y-4">
+          <Card className="p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold">Connected Devices</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Devices active in the last 30 minutes. Auto-refreshes every 30 seconds.
+                </p>
+              </div>
+              {cloudDevicesData != null && (
+                <div className="text-right shrink-0">
+                  <span className="text-3xl font-bold">{cloudDevicesData.count}</span>
+                  <p className="text-xs text-muted-foreground">active</p>
+                </div>
+              )}
+            </div>
+
+            {cloudDevicesData === undefined ? (
+              <p className="text-sm text-muted-foreground italic">Loading...</p>
+            ) : cloudDevicesData === null ? (
+              <p className="text-sm text-muted-foreground italic">Not available in local mode.</p>
+            ) : cloudDevicesData.devices.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No active devices in the last 30 minutes.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground text-xs">
+                      <th className="py-2 pr-3 font-semibold">Type</th>
+                      <th className="py-2 pr-4 font-semibold">User</th>
+                      <th className="py-2 pr-4 font-semibold">Role</th>
+                      <th className="py-2 pr-4 font-semibold">IP</th>
+                      <th className="py-2 font-semibold">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cloudDevicesData.devices.map(d => {
+                      const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
+                      const DeviceIcon = d.deviceType === "phone" ? Smartphone : d.deviceType === "tablet" ? Tablet : Monitor;
+                      const iconColor = secAgo < 90 ? "text-green-500" : secAgo < 300 ? "text-yellow-500" : "text-gray-400";
+                      return (
+                        <tr key={d.deviceId} className="border-b border-border/30 hover:bg-muted/20">
+                          <td className="py-2 pr-3">
+                            <DeviceIcon className={`w-4 h-4 ${iconColor}`} />
+                          </td>
+                          <td className="py-2 pr-4 font-medium">
+                            {d.fullName ?? d.username ?? <span className="italic text-muted-foreground">guest</span>}
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground capitalize text-xs">{d.role ?? "—"}</td>
+                          <td className="py-2 pr-4 font-mono text-muted-foreground text-xs">{d.ipAddress || "—"}</td>
+                          <td className="py-2 text-muted-foreground text-xs">
+                            {secAgo < 60 ? `${Math.round(secAgo)}s ago` : `${Math.round(secAgo / 60)}m ago`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* ── Local Server Tab ──────────────────────────── */}
       {activeTab === "Local Server" && (() => {

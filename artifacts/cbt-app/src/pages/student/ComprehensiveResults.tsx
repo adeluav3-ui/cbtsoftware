@@ -80,7 +80,7 @@ const AUTO_COMMENTS = [
     "A promising student. With consistency and hard work, you will excel.",
 ];
 
-const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+const CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
 function getOrdinalSuffix(n: number): string {
     const s = ["th", "st", "nd", "rd"];

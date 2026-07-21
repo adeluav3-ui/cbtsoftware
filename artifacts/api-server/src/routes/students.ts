@@ -78,7 +78,7 @@ router.post("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Res
     return res.status(400).json({ error: "Username, password, full name and class required" });
   }
 
-  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const validClasses = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   if (!validClasses.includes(studentClass)) {
     return res.status(400).json({ error: "Invalid class" });
   }
@@ -136,7 +136,7 @@ router.patch("/:studentId/class", requireSchoolAdmin, async (req: Request<Studen
   const { schoolCode, studentId } = req.params;
   const { class: newClass } = req.body;
 
-  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const validClasses = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   if (!newClass || !validClasses.includes(newClass)) {
     return res.status(400).json({ error: "Valid class required" });
   }

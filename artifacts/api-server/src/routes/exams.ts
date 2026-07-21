@@ -274,7 +274,7 @@ router.patch("/:examId", requireSchoolStaff, async (req: RequestWithSession, res
   const userId = req.session?.userId;
   const userRole = req.session?.role;
 
-  const validClasses = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const validClasses = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   if (!newClass || !validClasses.includes(newClass)) {
     return res.status(400).json({ error: "Valid class is required" });
   }

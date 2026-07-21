@@ -807,7 +807,7 @@ router.post("/:schoolCode/next-term-begins", requireSchoolStaff, async (req: Req
 router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
-  const classOrder = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+  const classOrder = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
   try {
     // Get current session to advance it
@@ -1043,7 +1043,7 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
 
     // Determine the correct level for this class
     const levelMap: Record<string, string> = {
-      KG1: "kg", KG2: "kg",
+      "Pre-School": "kg", KG1: "kg", KG2: "kg",
       "Nursery 1": "nursery", "Nursery 2": "nursery",
       "Pry 1": "primary", "Pry 2": "primary", "Pry 3": "primary", "Pry 4": "primary", "Pry 5": "primary",
       JSS1: "junior", JSS2: "junior", JSS3: "junior",

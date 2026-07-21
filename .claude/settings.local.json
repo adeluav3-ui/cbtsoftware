@@ -3,7 +3,32 @@
     "allow": [
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\HP\\\\CBT\\\\cbtsoftware\\\\artifacts\\\\cbt-app\\\\src\" -Recurse -Include \"*.tsx\", \"*.ts\")",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(VITE_API_URL=\"https://cbtsoftware.onrender.com/api\" pnpm run build)",
+      "PowerShell(Get-Process | Select-Object Name | Sort-Object Name -Unique | Where-Object { $_.Name -match \"360|avast|avg|bitdefender|kaspersky|norton|mcafee|eset|sophos|trend|guard|safe|secure|protect|antivir\" -or $_.Name -match \"^\\(dwm|explorer|svchost|lsass|winlogon|csrss\\)$\" -eq $false } | Select-Object -First 30)",
+      "PowerShell(Get-Process | Select-Object Name | Sort-Object Name -Unique | Where-Object { $_.Name -match \"360|avast|avg|bitdefender|kaspersky|norton|mcafee|eset|sophos|trend|guard|safe|secure\" } | Select-Object -First 20)",
+      "PowerShell(Get-Process)",
+      "Bash(powershell -Command \"echo '' | npx drizzle-kit push --config ./drizzle.config.ts --force 2>&1\")",
+      "Bash(Select-String -NotMatch \"Pulling|2K|1G|spinning\")",
+      "Bash(Select-Object -Last 15)",
+      "Bash(npx drizzle-kit *)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware status)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware log --oneline -5)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware diff artifacts/api-server/src/app.ts)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware diff artifacts/cbt-app/src/App.tsx)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware diff package.json pnpm-workspace.yaml)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware diff pnpm-lock.yaml)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware add artifacts/cbt-app/src/components/LicenseLock.tsx artifacts/cbt-app/src/App.tsx artifacts/cbt-app/src/pages/local-server-info.tsx artifacts/cbt-app/src/pages/super-admin.tsx)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware status --short)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware add artifacts/cbt-app/src/pages/home.tsx)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware commit -m ' *)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware log --oneline -10)",
+      "Bash(git -C c:/Users/HP/CBT/cbtsoftware push origin main)",
+      "Bash(pnpm drizzle-kit *)",
+      "Bash(gh release *)",
+      "Bash(ls \"c:/Users/HP/CBT/cbtsoftware-releases/\" 2>/dev/null || echo \"Releases repo not found at that path\")",
+      "Read(//c/Users/HP/CBT/**)",
+      "PowerShell(git clone https://github.com/adeluav3-ui/cbtsoftware-releases.git \"C:\\\\Users\\\\HP\\\\CBT\\\\cbtsoftware-releases\" 2>&1)"
     ]
   }
 }

@@ -1,5 +1,14 @@
 import crypto from "node:crypto";
 
+export type DeviceType = "phone" | "tablet" | "desktop";
+
+export function getDeviceType(userAgent: string): DeviceType {
+  const ua = userAgent.toLowerCase();
+  if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/i.test(ua)) return "tablet";
+  if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini|windows phone/i.test(ua)) return "phone";
+  return "desktop";
+}
+
 export interface DeviceInfo {
   deviceId: string;
   firstSeen: Date;

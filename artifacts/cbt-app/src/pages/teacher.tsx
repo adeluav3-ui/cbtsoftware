@@ -30,7 +30,7 @@ export default function TeacherDashboard() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("My Exams");
-  const CLASSES = ["KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
+  const CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
   const REGULAR_CLASSES = CLASSES.filter(c => c !== "Entrance Exam" && c !== "Staff Interview");
 
   // ── Exams ────────────────────────────────────────
@@ -487,6 +487,7 @@ export default function TeacherDashboard() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {[
+              { label: "Pre-School", class: "Pre-School", color: "from-red-400 to-pink-500" },
               { label: "KG 1", class: "KG1", color: "from-pink-500 to-rose-500" },
               { label: "KG 2", class: "KG2", color: "from-pink-400 to-fuchsia-500" },
               { label: "Nursery 1", class: "Nursery 1", color: "from-purple-500 to-violet-600" },
