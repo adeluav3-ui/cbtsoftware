@@ -303,7 +303,7 @@ export function ClassResultsView({ schoolCode, defaultClass, tableMaxHeight = "m
                                                 max={scheme.midTermTotal}
                                                 value={row.midterm}
                                                 onChange={e => handleScoreChange(student.id, 'midterm', e.target.value)}
-                                                className="w-16 text-center text-sm"
+                                                className="w-20 text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 placeholder="—"
                                             />
                                         </td>
@@ -314,7 +314,7 @@ export function ClassResultsView({ schoolCode, defaultClass, tableMaxHeight = "m
                                                 max={scheme.classActivityTotal}
                                                 value={row.activity}
                                                 onChange={e => handleScoreChange(student.id, 'activity', e.target.value)}
-                                                className="w-16 text-center text-sm"
+                                                className="w-20 text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 placeholder="—"
                                             />
                                         </td>
@@ -325,7 +325,7 @@ export function ClassResultsView({ schoolCode, defaultClass, tableMaxHeight = "m
                                                 max={scheme.examTotal}
                                                 value={row.exam}
                                                 onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                                                className="w-16 text-center text-sm"
+                                                className="w-20 text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 placeholder="—"
                                             />
                                         </td>
