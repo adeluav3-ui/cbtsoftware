@@ -32,7 +32,7 @@ interface ClassResultsModalProps {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
 
-const EARLY_YEARS_CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5"];
+const ALL_CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
 function classToLevel(cls: string): string {
     if (cls === 'Pre-School' || cls === 'KG1' || cls === 'KG2') return 'kg';
@@ -227,7 +227,7 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
                     <div>
                         <Label>Class</Label>
                         <Select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
-                            {EARLY_YEARS_CLASSES.map(c => (
+                            {ALL_CLASSES.map(c => (
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </Select>
@@ -274,16 +274,17 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
                         <table className="w-full text-left border-collapse text-sm">
                             <thead className="sticky top-0 bg-background z-10">
                                 <tr className="border-b border-border">
+                                    <th className="px-2 py-2 font-semibold text-muted-foreground">S/N</th>
                                     <th className="px-2 py-2 font-semibold">Student</th>
-                                    <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">CA<br /><span className="font-normal text-xs text-muted-foreground">/20</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/60</span></th>
+                                    <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.midTermTotal}</span></th>
+                                    <th className="px-2 py-2 font-semibold text-center">CA<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.classActivityTotal}</span></th>
+                                    <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.examTotal}</span></th>
                                     <th className="px-2 py-2 font-semibold text-center">Total<br /><span className="font-normal text-xs text-muted-foreground">/100</span></th>
                                     <th className="px-2 py-2 font-semibold text-center">Save</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {students.map(student => {
+                                {students.map((student, idx) => {
                                     const row = scores[student.id] || { midterm: "", activity: "", exam: "", saved: false, saving: false };
                                     const mt = parseInt(row.midterm) || 0;
                                     const ca = parseInt(row.activity) || 0;
@@ -294,6 +295,7 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
 
                                     return (
                                         <tr key={student.id} className={`border-b border-border/50 transition-colors ${row.saved ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/20"}`}>
+                                            <td className="px-2 py-2 text-muted-foreground text-sm text-center">{idx + 1}</td>
                                             <td className="px-2 py-2">
                                                 <div className="font-medium text-sm">{student.fullName}</div>
                                                 <div className="text-xs text-muted-foreground">{student.username}</div>

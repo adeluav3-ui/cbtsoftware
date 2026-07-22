@@ -11,6 +11,7 @@ import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { format } from "date-fns";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
+import { ClassResultsModal } from "@/components/class-results-modal";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -637,6 +638,9 @@ export default function SchoolAdminDashboard() {
     refetchInterval: activeTab === "Devices" ? 30_000 : false,
   });
 
+  // Upload Results modal state
+  const [uploadResultsOpen, setUploadResultsOpen] = useState(false);
+
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -716,7 +720,7 @@ export default function SchoolAdminDashboard() {
       </div>
 
       <div className="mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Devices", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
+        <CustomTabs tabs={["Teachers", "Students", "Results", "Upload Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Devices", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* Teachers Tab */}
@@ -914,6 +918,22 @@ export default function SchoolAdminDashboard() {
               )}
             </tbody>
           </table>
+        </Card>
+      )}
+
+      {/* Upload Results Tab */}
+      {activeTab === "Upload Results" && (
+        <Card className="p-6 flex flex-col items-center justify-center gap-4 min-h-60">
+          <BookOpen className="w-12 h-12 text-primary opacity-60" />
+          <div className="text-center">
+            <h2 className="text-lg font-bold">Upload Class Results</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Select a class and subject, then enter scores for all students at once.
+            </p>
+          </div>
+          <Button onClick={() => setUploadResultsOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> Enter Results
+          </Button>
         </Card>
       )}
 
@@ -2006,6 +2026,12 @@ export default function SchoolAdminDashboard() {
           // Refresh students list after bulk upload
           queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         }}
+      />
+
+      <ClassResultsModal
+        isOpen={uploadResultsOpen}
+        onClose={() => setUploadResultsOpen(false)}
+        schoolCode={schoolCode}
       />
 
       {/* Detail modals */}

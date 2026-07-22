@@ -480,9 +480,9 @@ export default function TeacherDashboard() {
       {activeTab === "Class Results" && (
         <div>
           <div className="mb-4">
-            <h3 className="text-base md:text-lg font-semibold">Early Years & Primary Result Entry</h3>
+            <h3 className="text-base md:text-lg font-semibold">Class Result Entry</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Click a class to upload scores for all students at once. Subjects must first be configured by the school admin.
+              Click a class to enter scores for all students at once. Subjects must first be configured by the school admin.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -497,6 +497,12 @@ export default function TeacherDashboard() {
               { label: "Primary 3", class: "Pry 3", color: "from-teal-500 to-emerald-500" },
               { label: "Primary 4", class: "Pry 4", color: "from-green-500 to-emerald-600" },
               { label: "Primary 5", class: "Pry 5", color: "from-lime-500 to-green-500" },
+              { label: "JSS 1", class: "JSS1", color: "from-cyan-500 to-blue-600" },
+              { label: "JSS 2", class: "JSS2", color: "from-indigo-500 to-blue-700" },
+              { label: "JSS 3", class: "JSS3", color: "from-violet-500 to-indigo-600" },
+              { label: "SSS 1", class: "SSS1", color: "from-amber-500 to-orange-500" },
+              { label: "SSS 2", class: "SSS2", color: "from-orange-500 to-red-500" },
+              { label: "SSS 3", class: "SSS3", color: "from-red-500 to-rose-600" },
             ].map(({ label, class: cls, color }) => (
               <button
                 key={cls}
