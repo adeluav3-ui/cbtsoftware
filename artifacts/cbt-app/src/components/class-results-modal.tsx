@@ -90,11 +90,6 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
             const data = await res.json();
             if (Array.isArray(data)) {
                 setStudents(data);
-                const initial: Record<number, ScoreRow> = {};
-                data.forEach((s: Student) => {
-                    initial[s.id] = { midterm: "", activity: "", exam: "", saved: false, saving: false };
-                });
-                setScores(initial);
             }
         } catch (err) {
             console.error("Failed to fetch students", err);
@@ -103,34 +98,35 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
         }
     }, [schoolCode]);
 
-    // Load existing scores for the selected class + subject
-    const loadExistingScores = useCallback(async (studentList: Student[], subject: string) => {
+    // Load existing scores for the selected class + subject in a single bulk request
+    const loadExistingScores = useCallback(async (cls: string, subject: string, studentList: Student[]) => {
         const updated: Record<number, ScoreRow> = {};
         studentList.forEach(s => {
             updated[s.id] = { midterm: "", activity: "", exam: "", saved: false, saving: false };
         });
 
-        await Promise.all(studentList.map(async (student) => {
-            try {
-                const res = await fetch(
-                    `${API_BASE_URL}/schools/${schoolCode}/students/${student.id}/subject-scores`,
-                    { credentials: "include" }
-                );
-                if (!res.ok) return;
+        try {
+            const res = await fetch(
+                `${API_BASE_URL}/schools/${schoolCode}/students/class-subject-scores?class=${encodeURIComponent(cls)}&subject=${encodeURIComponent(subject)}`,
+                { credentials: "include" }
+            );
+            if (res.ok) {
                 const data = await res.json();
-                if (!Array.isArray(data)) return;
-                const subjectData = data.find((s: any) => s.subjectName === subject);
-                if (subjectData) {
-                    updated[student.id] = {
-                        midterm: subjectData.midTermScore !== null ? String(subjectData.midTermScore) : "",
-                        activity: subjectData.classActivityScore !== null ? String(subjectData.classActivityScore) : "",
-                        exam: subjectData.examScore !== null ? String(subjectData.examScore) : "",
-                        saved: false,
-                        saving: false,
-                    };
+                if (Array.isArray(data)) {
+                    for (const row of data) {
+                        if (updated[row.studentId] !== undefined) {
+                            updated[row.studentId] = {
+                                midterm: row.midTermScore !== null && row.midTermScore !== undefined ? String(row.midTermScore) : "",
+                                activity: row.classActivityScore !== null && row.classActivityScore !== undefined ? String(row.classActivityScore) : "",
+                                exam: row.examScore !== null && row.examScore !== undefined ? String(row.examScore) : "",
+                                saved: false,
+                                saving: false,
+                            };
+                        }
+                    }
                 }
-            } catch (_) {}
-        }));
+            }
+        } catch (_) {}
 
         setScores(updated);
     }, [schoolCode]);
@@ -159,9 +155,9 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
 
     useEffect(() => {
         if (isOpen && selectedSubject && students.length > 0) {
-            loadExistingScores(students, selectedSubject);
+            loadExistingScores(selectedClass, selectedSubject, students);
         }
-    }, [selectedSubject, students.length]);
+    }, [selectedSubject, students]);
 
     const handleScoreChange = (studentId: number, field: 'midterm' | 'activity' | 'exam', value: string) => {
         const max = field === 'exam' ? scheme.examTotal : field === 'midterm' ? scheme.midTermTotal : scheme.classActivityTotal;
@@ -254,9 +250,9 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
 
                 {/* Score Guide */}
                 <div className="flex gap-4 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
-                    <span>Mid-Term: <strong>/20</strong></span>
-                    <span>Class Activity: <strong>/20</strong></span>
-                    <span>Exam: <strong>/60</strong></span>
+                    <span>Mid-Term: <strong>/{scheme.midTermTotal}</strong></span>
+                    <span>Class Activity: <strong>/{scheme.classActivityTotal}</strong></span>
+                    <span>Exam: <strong>/{scheme.examTotal}</strong></span>
                     <span>Total: <strong>/100</strong></span>
                 </div>
 
@@ -304,10 +300,10 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
                                                 <Input
                                                     type="number"
                                                     min={0}
-                                                    max={20}
+                                                    max={scheme.midTermTotal}
                                                     value={row.midterm}
                                                     onChange={e => handleScoreChange(student.id, 'midterm', e.target.value)}
-                                                    className="w-14 text-center text-sm"
+                                                    className="w-16 text-center text-sm"
                                                     placeholder="—"
                                                 />
                                             </td>
@@ -315,10 +311,10 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
                                                 <Input
                                                     type="number"
                                                     min={0}
-                                                    max={20}
+                                                    max={scheme.classActivityTotal}
                                                     value={row.activity}
                                                     onChange={e => handleScoreChange(student.id, 'activity', e.target.value)}
-                                                    className="w-14 text-center text-sm"
+                                                    className="w-16 text-center text-sm"
                                                     placeholder="—"
                                                 />
                                             </td>
@@ -326,10 +322,10 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
                                                 <Input
                                                     type="number"
                                                     min={0}
-                                                    max={60}
+                                                    max={scheme.examTotal}
                                                     value={row.exam}
                                                     onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                                                    className="w-14 text-center text-sm"
+                                                    className="w-16 text-center text-sm"
                                                     placeholder="—"
                                                 />
                                             </td>

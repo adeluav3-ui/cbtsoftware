@@ -704,6 +704,70 @@ router.get("/subject-scores", requireSchoolStaff, async (req: Request<SchoolPara
   }
 });
 
+// Bulk fetch subject scores for all students in a class (for the bulk result entry modal)
+router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+  const { class: studentClass, subject } = req.query as { class?: string; subject?: string };
+
+  if (!studentClass || !subject) {
+    return res.status(400).json({ error: "class and subject query params are required" });
+  }
+
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCode))
+      .limit(1);
+
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    // Get student IDs in the given class
+    const classStudents = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.schoolCode, schoolCode),
+          eq(usersTable.class, studentClass),
+          eq(usersTable.role, "student")
+        )
+      );
+
+    if (classStudents.length === 0) {
+      return res.json([]);
+    }
+
+    const studentIds = classStudents.map(s => s.id);
+
+    const scores = await db
+      .select({
+        studentId: subjectScoresTable.studentId,
+        midTermScore: subjectScoresTable.midTermScore,
+        classActivityScore: subjectScoresTable.classActivityScore,
+        examScore: subjectScoresTable.examScore,
+      })
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.schoolCode, schoolCode),
+          eq(subjectScoresTable.subjectName, subject),
+          eq(subjectScoresTable.term, currentTerm),
+          eq(subjectScoresTable.academicSession, currentAcademicSession),
+          inArray(subjectScoresTable.studentId, studentIds)
+        )
+      );
+
+    res.json(scores);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Get all students with login credentials (school admin only)
 router.get("/credentials", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
