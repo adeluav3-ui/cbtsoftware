@@ -617,6 +617,12 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
       if (component === 'activity') updateData.classActivityScore = score;
       if (component === 'exam') updateData.examScore = score;
 
+      // Compute totalScore from merged values
+      const mt = component === 'midterm' ? score : existing.midTermScore;
+      const ca = component === 'activity' ? score : existing.classActivityScore;
+      const ex = component === 'exam' ? score : existing.examScore;
+      updateData.totalScore = (mt !== null && ca !== null && ex !== null) ? mt + ca + ex : null;
+
       [updated] = await db
         .update(subjectScoresTable)
         .set(updateData)
@@ -634,6 +640,8 @@ router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Reques
       if (component === 'midterm') insertData.midTermScore = score;
       if (component === 'activity') insertData.classActivityScore = score;
       if (component === 'exam') insertData.examScore = score;
+      // Only one component on insert — total can't be computed yet
+      insertData.totalScore = null;
 
       [updated] = await db
         .insert(subjectScoresTable)

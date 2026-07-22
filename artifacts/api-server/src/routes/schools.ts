@@ -1080,10 +1080,15 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
       ));
 
     // Build per-student row
+    // Use stored totalScore if present; otherwise compute from components (handles records saved before totalScore was being stored)
     const scoreByStudent = new Map<number, Map<string, number | null>>();
     for (const s of scores) {
       if (!scoreByStudent.has(s.studentId)) scoreByStudent.set(s.studentId, new Map());
-      scoreByStudent.get(s.studentId)!.set(s.subjectName, s.totalScore ?? null);
+      let total: number | null = s.totalScore ?? null;
+      if (total === null && s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null) {
+        total = s.midTermScore + s.classActivityScore + s.examScore;
+      }
+      scoreByStudent.get(s.studentId)!.set(s.subjectName, total);
     }
 
     const rows = students.map(student => {
