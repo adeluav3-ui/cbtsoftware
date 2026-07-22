@@ -774,7 +774,10 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
 
     const studentIds = classStudents.map(s => s.id);
 
-    const scores = await db
+    const subjectLower = subject.toLowerCase();
+
+    // 1. Stored manual/CBT-upserted scores — case-insensitive subject name match
+    const storedScores = await db
       .select({
         studentId: subjectScoresTable.studentId,
         midTermScore: subjectScoresTable.midTermScore,
@@ -785,14 +788,85 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
       .where(
         and(
           eq(subjectScoresTable.schoolCode, schoolCode),
-          eq(subjectScoresTable.subjectName, subject),
+          sql`lower(${subjectScoresTable.subjectName}) = ${subjectLower}`,
           eq(subjectScoresTable.term, currentTerm),
           eq(subjectScoresTable.academicSession, currentAcademicSession),
           inArray(subjectScoresTable.studentId, studentIds)
         )
       );
 
-    res.json(scores);
+    // 2. CBT mid-term results (fallback for students with no stored entry)
+    const midTermCbtResults = await db
+      .select({
+        studentId: resultsTable.studentId,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+      })
+      .from(resultsTable)
+      .innerJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(
+        and(
+          eq(examsTable.schoolCode, schoolCode),
+          sql`lower(${examsTable.subject}) = ${subjectLower}`,
+          eq(examsTable.assessmentType, 'mid_term'),
+          inArray(resultsTable.studentId, studentIds)
+        )
+      );
+
+    // 3. CBT exam results (fallback for students with no stored entry)
+    const examCbtResults = await db
+      .select({
+        studentId: resultsTable.studentId,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+      })
+      .from(resultsTable)
+      .innerJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(
+        and(
+          eq(examsTable.schoolCode, schoolCode),
+          sql`lower(${examsTable.subject}) = ${subjectLower}`,
+          eq(examsTable.assessmentType, 'exam'),
+          inArray(resultsTable.studentId, studentIds)
+        )
+      );
+
+    // 4. Grading scheme for CBT score scaling
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+    const midTermCbtMax = gradingScheme?.midTermCbt ?? 10;
+    const examCbtMax = gradingScheme?.examCbt ?? 30;
+
+    // 5. Merge: stored scores take precedence; CBT results fill in missing components
+    const storedMap = new Map(storedScores.map(s => [s.studentId, s]));
+
+    const merged = studentIds.map(studentId => {
+      const stored = storedMap.get(studentId);
+      const midTermCbt = midTermCbtResults.find(r => r.studentId === studentId);
+      const examCbt = examCbtResults.find(r => r.studentId === studentId);
+
+      let midTermScore = stored?.midTermScore ?? null;
+      if (midTermScore === null && midTermCbt && midTermCbt.totalQuestions > 0) {
+        midTermScore = Math.round((midTermCbt.score / midTermCbt.totalQuestions) * midTermCbtMax);
+      }
+
+      let examScore = stored?.examScore ?? null;
+      if (examScore === null && examCbt && examCbt.totalQuestions > 0) {
+        examScore = Math.round((examCbt.score / examCbt.totalQuestions) * examCbtMax);
+      }
+
+      return {
+        studentId,
+        midTermScore,
+        classActivityScore: stored?.classActivityScore ?? null,
+        examScore,
+      };
+    }).filter(r => r.midTermScore !== null || r.classActivityScore !== null || r.examScore !== null);
+
+    res.json(merged);
     return;
   } catch (err) {
     console.error(err);

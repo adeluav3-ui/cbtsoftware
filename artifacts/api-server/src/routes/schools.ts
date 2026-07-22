@@ -1079,26 +1079,96 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
         eq(subjectScoresTable.academicSession, filterSession),
       ));
 
-    // Build per-student row
-    // Use stored totalScore if present; otherwise compute from components (handles records saved before totalScore was being stored)
+    // CBT mid-term and exam results as fallback for JSS/SSS students
+    const midTermCbtAll = await db
+      .select({
+        studentId: resultsTable.studentId,
+        subject: examsTable.subject,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+      })
+      .from(resultsTable)
+      .innerJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(and(
+        eq(examsTable.schoolCode, schoolCode),
+        eq(examsTable.assessmentType, 'mid_term'),
+        inArray(resultsTable.studentId, studentIds),
+      ));
+
+    const examCbtAll = await db
+      .select({
+        studentId: resultsTable.studentId,
+        subject: examsTable.subject,
+        score: resultsTable.score,
+        totalQuestions: resultsTable.totalQuestions,
+      })
+      .from(resultsTable)
+      .innerJoin(examsTable, eq(resultsTable.examId, examsTable.id))
+      .where(and(
+        eq(examsTable.schoolCode, schoolCode),
+        eq(examsTable.assessmentType, 'exam'),
+        inArray(resultsTable.studentId, studentIds),
+      ));
+
+    const [gradingScheme] = await db
+      .select()
+      .from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCode))
+      .limit(1);
+    const midTermCbtMax = gradingScheme?.midTermCbt ?? 10;
+    const examCbtMax = gradingScheme?.examCbt ?? 30;
+
+    // Build per-student row keyed by lowercase subject name for case-insensitive matching
+    // Use stored totalScore if present; otherwise compute from components
     const scoreByStudent = new Map<number, Map<string, number | null>>();
+    // Also store component scores for CBT fallback merging
+    const componentsByStudent = new Map<number, Map<string, { mt: number | null; ca: number | null; ex: number | null }>>();
+
     for (const s of scores) {
       if (!scoreByStudent.has(s.studentId)) scoreByStudent.set(s.studentId, new Map());
+      if (!componentsByStudent.has(s.studentId)) componentsByStudent.set(s.studentId, new Map());
       let total: number | null = s.totalScore ?? null;
       if (total === null && s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null) {
         total = s.midTermScore + s.classActivityScore + s.examScore;
       }
-      scoreByStudent.get(s.studentId)!.set(s.subjectName, total);
+      const key = s.subjectName.toLowerCase();
+      scoreByStudent.get(s.studentId)!.set(key, total);
+      componentsByStudent.get(s.studentId)!.set(key, {
+        mt: s.midTermScore ?? null,
+        ca: s.classActivityScore ?? null,
+        ex: s.examScore ?? null,
+      });
     }
 
     const rows = students.map(student => {
       const subjectScoresMap = scoreByStudent.get(student.id) ?? new Map();
+      const componentsMap = componentsByStudent.get(student.id) ?? new Map();
       const subjectTotals: Record<string, number | null> = {};
       let grandTotal = 0;
       let subjectCount = 0;
 
       for (const subj of subjects) {
-        const score = subjectScoresMap.has(subj) ? subjectScoresMap.get(subj)! : null;
+        const subjLower = subj.toLowerCase();
+        let score = subjectScoresMap.has(subjLower) ? subjectScoresMap.get(subjLower)! : null;
+
+        // CBT fallback: if no complete score yet, try computing from CBT results
+        if (score === null) {
+          const stored = componentsMap.get(subjLower);
+          const midTermCbt = midTermCbtAll.find(r => r.studentId === student.id && r.subject.toLowerCase() === subjLower);
+          const examCbt = examCbtAll.find(r => r.studentId === student.id && r.subject.toLowerCase() === subjLower);
+
+          const mt = stored?.mt ?? (midTermCbt && midTermCbt.totalQuestions > 0
+            ? Math.round((midTermCbt.score / midTermCbt.totalQuestions) * midTermCbtMax)
+            : null);
+          const ca = stored?.ca ?? null;
+          const ex = stored?.ex ?? (examCbt && examCbt.totalQuestions > 0
+            ? Math.round((examCbt.score / examCbt.totalQuestions) * examCbtMax)
+            : null);
+
+          if (mt !== null && ca !== null && ex !== null) {
+            score = mt + ca + ex;
+          }
+        }
         subjectTotals[subj] = score;
         if (score !== null) {
           grandTotal += score;
