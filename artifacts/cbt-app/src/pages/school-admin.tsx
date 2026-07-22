@@ -595,7 +595,10 @@ export default function SchoolAdminDashboard() {
 
   // Credentials tab state
   const [credentialsClass, setCredentialsClass] = useState("KG1");
+  const [credentialsView, setCredentialsView] = useState<"students" | "teachers">("students");
   const { data: allCredentials = [], isLoading: credentialsLoading } = useStudentCredentials(schoolCode);
+  const [teacherCredentials, setTeacherCredentials] = useState<Array<{ id: number; fullName: string; username: string; generatedPassword: string | null }>>([]);
+  const [teacherCredentialsLoading, setTeacherCredentialsLoading] = useState(false);
   const credentialsPrintRef = useRef<HTMLDivElement>(null);
 
   // Local server — connected devices (polled every 30 s when tab is open)
@@ -1434,7 +1437,7 @@ export default function SchoolAdminDashboard() {
       {activeTab === "Credentials" && (() => {
         const classStudents = allCredentials.filter(s => s.class === credentialsClass);
 
-        const handlePrintCredentials = () => {
+        const handlePrintStudents = () => {
           const rows = classStudents.map((s, i) => `
             <tr style="border-bottom:1px solid #e5e7eb;">
               <td style="padding:8px 12px;text-align:center;">${i + 1}</td>
@@ -1443,89 +1446,174 @@ export default function SchoolAdminDashboard() {
               <td style="padding:8px 12px;font-family:monospace;">${s.generatedPassword ?? '—'}</td>
             </tr>`).join('');
           const html = `<!DOCTYPE html><html><head><title>Credentials – ${credentialsClass}</title>
-            <style>
-              body{font-family:Arial,sans-serif;margin:24px;color:#111;}
-              h2{margin-bottom:4px;}p{margin-bottom:16px;color:#555;font-size:13px;}
-              table{width:100%;border-collapse:collapse;font-size:13px;}
-              thead tr{background:#f3f4f6;}th{padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #d1d5db;}
-              tr:nth-child(even){background:#f9fafb;}
-              @media print{body{margin:12px;}}
-            </style></head><body>
+            <style>body{font-family:Arial,sans-serif;margin:24px;color:#111;}h2{margin-bottom:4px;}p{margin-bottom:16px;color:#555;font-size:13px;}
+            table{width:100%;border-collapse:collapse;font-size:13px;}thead tr{background:#f3f4f6;}th{padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #d1d5db;}
+            tr:nth-child(even){background:#f9fafb;}@media print{body{margin:12px;}}</style></head><body>
             <h2>Student Login Credentials — ${credentialsClass}</h2>
             <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${classStudents.length} student${classStudents.length !== 1 ? 's' : ''}</p>
             <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
-            <tbody>${rows}</tbody></table>
-            </body></html>`;
-          // Use a hidden iframe + Blob URL so this works in both regular browsers
-          // and Electron — window.open() in Electron is redirected to the system
-          // browser which can't receive document.write() content.
+            <tbody>${rows}</tbody></table></body></html>`;
           const blob = new Blob([html], { type: 'text/html' });
           const url = URL.createObjectURL(blob);
           const iframe = document.createElement('iframe');
           iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;';
           iframe.src = url;
           document.body.appendChild(iframe);
-          iframe.onload = () => {
-            iframe.contentWindow?.print();
-            setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000);
-          };
+          iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000); };
+        };
+
+        const handlePrintTeachers = () => {
+          const rows = teacherCredentials.map((t, i) => `
+            <tr style="border-bottom:1px solid #e5e7eb;">
+              <td style="padding:8px 12px;text-align:center;">${i + 1}</td>
+              <td style="padding:8px 12px;font-weight:600;">${t.fullName}</td>
+              <td style="padding:8px 12px;font-family:monospace;">${t.username}</td>
+              <td style="padding:8px 12px;font-family:monospace;">${t.generatedPassword ?? '—'}</td>
+            </tr>`).join('');
+          const html = `<!DOCTYPE html><html><head><title>Teacher Credentials</title>
+            <style>body{font-family:Arial,sans-serif;margin:24px;color:#111;}h2{margin-bottom:4px;}p{margin-bottom:16px;color:#555;font-size:13px;}
+            table{width:100%;border-collapse:collapse;font-size:13px;}thead tr{background:#f3f4f6;}th{padding:8px 12px;text-align:left;font-weight:700;border-bottom:2px solid #d1d5db;}
+            tr:nth-child(even){background:#f9fafb;}@media print{body{margin:12px;}}</style></head><body>
+            <h2>Teacher Login Credentials</h2>
+            <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${teacherCredentials.length} teacher${teacherCredentials.length !== 1 ? 's' : ''}</p>
+            <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
+            <tbody>${rows}</tbody></table></body></html>`;
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const iframe = document.createElement('iframe');
+          iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;';
+          iframe.src = url;
+          document.body.appendChild(iframe);
+          iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000); };
+        };
+
+        const loadTeacherCredentials = async () => {
+          if (teacherCredentials.length > 0) return;
+          setTeacherCredentialsLoading(true);
+          try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/teachers/credentials`, { credentials: "include" });
+            if (res.ok) setTeacherCredentials(await res.json());
+          } catch (_) {}
+          setTeacherCredentialsLoading(false);
         };
 
         return (
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-lg font-bold flex items-center gap-2"><KeyRound className="w-5 h-5" /> Student Login Credentials</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">View and export student usernames and passwords by class.</p>
+                <h2 className="text-lg font-bold flex items-center gap-2"><KeyRound className="w-5 h-5" /> Login Credentials</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">View and export usernames and passwords.</p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Select value={credentialsClass} onChange={e => setCredentialsClass(e.target.value)} className="w-44">
-                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                </Select>
-                {classStudents.length > 0 && (
-                  <Button variant="outline" onClick={handlePrintCredentials}>
-                    <Printer className="w-4 h-4 mr-2" /> Export PDF
-                  </Button>
-                )}
+              {/* Students/Teachers toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCredentialsView("students")}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${credentialsView === "students" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                >
+                  Students
+                </button>
+                <button
+                  onClick={() => { setCredentialsView("teachers"); loadTeacherCredentials(); }}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${credentialsView === "teachers" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                >
+                  Teachers
+                </button>
               </div>
             </div>
 
-            {credentialsLoading && (
-              <Card className="py-12 text-center text-muted-foreground">Loading credentials…</Card>
-            )}
-
-            {!credentialsLoading && classStudents.length === 0 && (
-              <Card className="py-12 text-center text-muted-foreground">
-                <KeyRound className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                <p className="font-semibold">No students found in {credentialsClass}</p>
-              </Card>
-            )}
-
-            {!credentialsLoading && classStudents.length > 0 && (
-              <Card className="p-0 overflow-hidden" ref={credentialsPrintRef}>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-muted/50 border-b border-border">
-                        <th className="px-4 py-3 font-semibold w-10">#</th>
-                        <th className="px-4 py-3 font-semibold">Full Name</th>
-                        <th className="px-4 py-3 font-semibold">Username</th>
-                        <th className="px-4 py-3 font-semibold">Password</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {classStudents.map((student, idx) => (
-                        <tr key={student.id} className="border-b border-border/50 hover:bg-muted/10">
-                          <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
-                          <td className="px-4 py-3 font-semibold">{student.fullName}</td>
-                          <td className="px-4 py-3 font-mono text-sm">{student.username}</td>
-                          <td className="px-4 py-3 font-mono text-sm">{student.generatedPassword ?? <span className="text-muted-foreground italic">not available</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {/* ── Students ── */}
+            {credentialsView === "students" && (
+              <>
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  <Select value={credentialsClass} onChange={e => setCredentialsClass(e.target.value)} className="w-44">
+                    {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </Select>
+                  {classStudents.length > 0 && (
+                    <Button variant="outline" onClick={handlePrintStudents}>
+                      <Printer className="w-4 h-4 mr-2" /> Export PDF
+                    </Button>
+                  )}
                 </div>
-              </Card>
+                {credentialsLoading && <Card className="py-12 text-center text-muted-foreground">Loading credentials…</Card>}
+                {!credentialsLoading && classStudents.length === 0 && (
+                  <Card className="py-12 text-center text-muted-foreground">
+                    <KeyRound className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                    <p className="font-semibold">No students found in {credentialsClass}</p>
+                  </Card>
+                )}
+                {!credentialsLoading && classStudents.length > 0 && (
+                  <Card className="p-0 overflow-hidden" ref={credentialsPrintRef}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b border-border">
+                            <th className="px-4 py-3 font-semibold w-10">#</th>
+                            <th className="px-4 py-3 font-semibold">Full Name</th>
+                            <th className="px-4 py-3 font-semibold">Username</th>
+                            <th className="px-4 py-3 font-semibold">Password</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classStudents.map((student, idx) => (
+                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/10">
+                              <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
+                              <td className="px-4 py-3 font-semibold">{student.fullName}</td>
+                              <td className="px-4 py-3 font-mono text-sm">{student.username}</td>
+                              <td className="px-4 py-3 font-mono text-sm">{student.generatedPassword ?? <span className="text-muted-foreground italic">not available</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* ── Teachers ── */}
+            {credentialsView === "teachers" && (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  {teacherCredentials.length > 0 && (
+                    <Button variant="outline" onClick={handlePrintTeachers}>
+                      <Printer className="w-4 h-4 mr-2" /> Export PDF
+                    </Button>
+                  )}
+                </div>
+                {teacherCredentialsLoading && <Card className="py-12 text-center text-muted-foreground">Loading credentials…</Card>}
+                {!teacherCredentialsLoading && teacherCredentials.length === 0 && (
+                  <Card className="py-12 text-center text-muted-foreground">
+                    <KeyRound className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                    <p className="font-semibold">No teachers found</p>
+                  </Card>
+                )}
+                {!teacherCredentialsLoading && teacherCredentials.length > 0 && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b border-border">
+                            <th className="px-4 py-3 font-semibold w-10">#</th>
+                            <th className="px-4 py-3 font-semibold">Full Name</th>
+                            <th className="px-4 py-3 font-semibold">Username</th>
+                            <th className="px-4 py-3 font-semibold">Password</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {teacherCredentials.map((t, idx) => (
+                            <tr key={t.id} className="border-b border-border/50 hover:bg-muted/10">
+                              <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
+                              <td className="px-4 py-3 font-semibold">{t.fullName}</td>
+                              <td className="px-4 py-3 font-mono text-sm">{t.username}</td>
+                              <td className="px-4 py-3 font-mono text-sm">{t.generatedPassword ?? <span className="text-muted-foreground italic">Reset password to reveal</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         );

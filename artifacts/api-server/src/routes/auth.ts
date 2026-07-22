@@ -15,11 +15,14 @@ const isLocal = process.env.DEPLOY_MODE === "local";
 const router = Router();
 
 router.post("/login", async (req: Request, res: Response) => {
-  const { username, password, schoolCode } = req.body;
+  const { username: rawUsername, password, schoolCode } = req.body;
 
-  if (!username || !password) {
+  if (!rawUsername || !password) {
     return res.status(400).json({ error: "Username and password required" });
   }
+
+  // Normalize: trim whitespace and lowercase so mobile auto-capitalize doesn't break login
+  const username = rawUsername.trim().toLowerCase();
 
   try {
     let user;

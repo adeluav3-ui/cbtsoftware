@@ -79,6 +79,7 @@ router.post("/", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Res
       .values({
         username,
         password: hashedPassword,
+        generatedPassword: password,
         fullName,
         role: "teacher",
         schoolCode,
@@ -260,6 +261,56 @@ router.post("/profile-picture", requireAuth, async (req: Request, res: Response)
       return res.status(404).json({ error: "User not found" });
     }
 
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get all teacher credentials (username + password) for a school
+router.get("/credentials", requireSchoolAdmin, async (req: Request<SchoolParams>, res: Response) => {
+  const { schoolCode } = req.params;
+  try {
+    const teachers = await db
+      .select({
+        id: usersTable.id,
+        fullName: usersTable.fullName,
+        username: usersTable.username,
+        generatedPassword: usersTable.generatedPassword,
+      })
+      .from(usersTable)
+      .where(and(eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "teacher")))
+      .orderBy(usersTable.fullName);
+    res.json(teachers);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Reset a teacher's password
+router.post("/:teacherId/reset-password", requireSchoolAdmin, async (req: Request<TeacherParams>, res: Response) => {
+  const { schoolCode, teacherId } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: "Password must be at least 4 characters" });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const [updated] = await db
+      .update(usersTable)
+      .set({ password: hashedPassword, generatedPassword: newPassword })
+      .where(and(eq(usersTable.id, parseInt(teacherId)), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "teacher")))
+      .returning({ id: usersTable.id, fullName: usersTable.fullName, username: usersTable.username });
+
+    if (!updated) return res.status(404).json({ error: "Teacher not found" });
     res.json(updated);
     return;
   } catch (err) {
