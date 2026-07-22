@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable, schoolsTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   isDeviceRegistered,
   countRegisteredDevices,
@@ -21,7 +21,8 @@ router.post("/login", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Username and password required" });
   }
 
-  // Normalize: trim whitespace and lowercase so mobile auto-capitalize doesn't break login
+  // Normalize input: trim whitespace and lowercase for case-insensitive match
+  // We use lower() on the DB column too so existing usernames with mixed case still match
   const username = rawUsername.trim().toLowerCase();
 
   try {
@@ -31,14 +32,14 @@ router.post("/login", async (req: Request, res: Response) => {
       const [found] = await db
         .select()
         .from(usersTable)
-        .where(and(eq(usersTable.username, username), eq(usersTable.schoolCode, schoolCode)))
+        .where(and(sql`lower(${usersTable.username}) = ${username}`, eq(usersTable.schoolCode, schoolCode)))
         .limit(1);
       user = found;
     } else {
       const [found] = await db
         .select()
         .from(usersTable)
-        .where(and(eq(usersTable.username, username), eq(usersTable.role, "super_admin")))
+        .where(and(sql`lower(${usersTable.username}) = ${username}`, eq(usersTable.role, "super_admin")))
         .limit(1);
       user = found;
     }
