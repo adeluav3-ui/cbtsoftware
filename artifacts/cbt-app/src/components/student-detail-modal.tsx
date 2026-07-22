@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Modal, Badge, Button, Input } from "@/components/ui-elements";
 import { ChevronDown, ChevronRight, CheckCircle, XCircle, MinusCircle, Save, Clock, Upload, User, RefreshCw, Eye, EyeOff, Pencil, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 
 interface StudentDetailModalProps {
