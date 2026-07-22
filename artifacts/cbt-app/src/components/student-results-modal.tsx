@@ -111,6 +111,11 @@ export function StudentResultsModal({
     const [nameValue, setNameValue] = useState("");
     const [savingName, setSavingName] = useState(false);
 
+    useEffect(() => {
+        setDisplayName(studentName);
+        setEditingName(false);
+    }, [studentName, studentId]);
+
     // Add subject state
     const [showAddSubject, setShowAddSubject] = useState(false);
     const [newSubjectName, setNewSubjectName] = useState("");

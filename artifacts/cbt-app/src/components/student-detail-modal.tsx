@@ -80,6 +80,11 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const [savingName, setSavingName] = useState(false);
   const [displayName, setDisplayName] = useState(studentName);
 
+  useEffect(() => {
+    setDisplayName(studentName);
+    setEditingName(false);
+  }, [studentName, studentId]);
+
   const { data, isLoading, refetch: refetchStudent } = useQuery({
     queryKey: ["student-detail", schoolCode, studentId],
     queryFn: () => fetchStudentDetail(schoolCode, studentId!),
