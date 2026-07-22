@@ -11,7 +11,7 @@ import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { format } from "date-fns";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
-import { ClassResultsModal } from "@/components/class-results-modal";
+import { ClassResultsView } from "@/components/class-results-modal";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -638,9 +638,6 @@ export default function SchoolAdminDashboard() {
     refetchInterval: activeTab === "Devices" ? 30_000 : false,
   });
 
-  // Upload Results modal state
-  const [uploadResultsOpen, setUploadResultsOpen] = useState(false);
-
   // Broadsheet state
   const [broadsheetClass, setBroadsheetClass] = useState("KG1");
   const [broadsheetData, setBroadsheetData] = useState<{ students: any[]; subjects: string[] } | null>(null);
@@ -923,17 +920,16 @@ export default function SchoolAdminDashboard() {
 
       {/* Upload Results Tab */}
       {activeTab === "Upload Results" && (
-        <Card className="p-6 flex flex-col items-center justify-center gap-4 min-h-60">
-          <BookOpen className="w-12 h-12 text-primary opacity-60" />
-          <div className="text-center">
-            <h2 className="text-lg font-bold">Upload Class Results</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Select a class and subject, then enter scores for all students at once.
+        <Card className="p-4 md:p-6">
+          <div className="mb-5">
+            <h2 className="text-lg md:text-xl font-bold font-display flex items-center gap-2">
+              <BookOpen className="w-5 h-5" /> Class Result Entry
+            </h2>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">
+              Select a class and subject, then enter or update scores for all students at once.
             </p>
           </div>
-          <Button onClick={() => setUploadResultsOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Enter Results
-          </Button>
+          <ClassResultsView schoolCode={schoolCode} tableMaxHeight="max-h-[65vh]" />
         </Card>
       )}
 
@@ -2028,15 +2024,18 @@ export default function SchoolAdminDashboard() {
         }}
       />
 
-      <ClassResultsModal
-        isOpen={uploadResultsOpen}
-        onClose={() => setUploadResultsOpen(false)}
-        schoolCode={schoolCode}
-      />
-
       {/* Detail modals */}
       <TeacherDetailModal teacherId={selectedTeacherId} teacherName={selectedTeacherName} schoolCode={schoolCode} onClose={() => setSelectedTeacherId(null)} />
-      <StudentDetailModal studentId={selectedStudentId} studentName={selectedStudentName} schoolCode={schoolCode} onClose={() => setSelectedStudentId(null)} />
+      <StudentDetailModal
+        studentId={selectedStudentId}
+        studentName={selectedStudentName}
+        schoolCode={schoolCode}
+        onClose={() => setSelectedStudentId(null)}
+        onNameUpdated={(name) => {
+          setSelectedStudentName(name);
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
+        }}
+      />
       <ResultDetailModal resultId={selectedResultId} schoolCode={schoolCode} onClose={() => setSelectedResultId(null)} />
     </DashboardLayout>
   );

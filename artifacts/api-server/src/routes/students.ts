@@ -132,6 +132,31 @@ router.post("/", requireSchoolStaff, async (req: Request<SchoolParams>, res: Res
 });
 
 // Move student to a different class
+router.patch("/:studentId/name", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { fullName } = req.body;
+
+  if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
+    return res.status(400).json({ error: "Name must be at least 2 characters" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ fullName: fullName.trim() })
+      .where(and(eq(usersTable.id, parseInt(studentId)), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "student")))
+      .returning({ id: usersTable.id, fullName: usersTable.fullName });
+
+    if (!updated) return res.status(404).json({ error: "Student not found" });
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 router.patch("/:studentId/class", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
   const { class: newClass } = req.body;

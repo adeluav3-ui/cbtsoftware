@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Modal, Button, Label, Select, Input, Badge } from "@/components/ui-elements";
+import { Modal, Button, Label, Select, Input } from "@/components/ui-elements";
 import { Loader2, Save, CheckCircle2 } from "lucide-react";
 
 interface Student {
@@ -23,6 +23,12 @@ interface ScoreRow {
     saving: boolean;
 }
 
+interface ClassResultsViewProps {
+    schoolCode: string;
+    defaultClass?: string;
+    tableMaxHeight?: string;
+}
+
 interface ClassResultsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -42,7 +48,7 @@ function classToLevel(cls: string): string {
     return 'senior';
 }
 
-export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }: ClassResultsModalProps) {
+export function ClassResultsView({ schoolCode, defaultClass, tableMaxHeight = "max-h-[60vh]" }: ClassResultsViewProps) {
     const [selectedClass, setSelectedClass] = useState(defaultClass || "KG1");
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [selectedSubject, setSelectedSubject] = useState("");
@@ -98,7 +104,6 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
         }
     }, [schoolCode]);
 
-    // Load existing scores for the selected class + subject in a single bulk request
     const loadExistingScores = useCallback(async (cls: string, subject: string, studentList: Student[]) => {
         const updated: Record<number, ScoreRow> = {};
         studentList.forEach(s => {
@@ -131,30 +136,26 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
         setScores(updated);
     }, [schoolCode]);
 
+    // Initial load
     useEffect(() => {
-        if (isOpen) {
-            fetchSubjects(selectedClass);
-            fetchStudents(selectedClass);
-            fetch(`${API_BASE_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
-                .then(r => r.ok ? r.json() : null)
-                .then(d => { if (d) setScheme({ midTermTotal: d.midTermTotal ?? 20, classActivityTotal: d.classActivityTotal ?? 20, examTotal: d.examTotal ?? 60 }); })
-                .catch(() => {});
-        }
-        if (!isOpen) {
-            setSaveMessage("");
-        }
-    }, [isOpen]);
+        fetchSubjects(selectedClass);
+        fetchStudents(selectedClass);
+        fetch(`${API_BASE_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d) setScheme({ midTermTotal: d.midTermTotal ?? 20, classActivityTotal: d.classActivityTotal ?? 20, examTotal: d.examTotal ?? 60 }); })
+            .catch(() => {});
+    }, []);
 
+    // Reload when class changes
     useEffect(() => {
-        if (isOpen) {
-            fetchSubjects(selectedClass);
-            fetchStudents(selectedClass);
-            setSaveMessage("");
-        }
+        fetchSubjects(selectedClass);
+        fetchStudents(selectedClass);
+        setSaveMessage("");
     }, [selectedClass]);
 
+    // Load existing scores when subject or students change
     useEffect(() => {
-        if (isOpen && selectedSubject && students.length > 0) {
+        if (selectedSubject && students.length > 0) {
             loadExistingScores(selectedClass, selectedSubject, students);
         }
     }, [selectedSubject, students]);
@@ -216,174 +217,181 @@ export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }:
     ).length;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Upload Class Results" size="lg">
-            <div className="space-y-4">
-                {/* Class & Subject Selectors */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <Label>Class</Label>
-                        <Select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
-                            {ALL_CLASSES.map(c => (
-                                <option key={c} value={c}>{c}</option>
+        <div className="space-y-4">
+            {/* Class & Subject Selectors */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <Label>Class</Label>
+                    <Select value={selectedClass} onChange={e => setSelectedClass(e.target.value)}>
+                        {ALL_CLASSES.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                        ))}
+                    </Select>
+                </div>
+                <div>
+                    <Label>Subject</Label>
+                    {isLoadingSubjects ? (
+                        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                        </div>
+                    ) : subjects.length === 0 ? (
+                        <p className="text-xs text-yellow-600 mt-2">
+                            No subjects configured for this class. Ask the school admin to add subjects.
+                        </p>
+                    ) : (
+                        <Select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
+                            {subjects.map(s => (
+                                <option key={s.id} value={s.name}>{s.name}</option>
                             ))}
                         </Select>
-                    </div>
-                    <div>
-                        <Label>Subject</Label>
-                        {isLoadingSubjects ? (
-                            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-                            </div>
-                        ) : subjects.length === 0 ? (
-                            <p className="text-xs text-yellow-600 mt-2">
-                                No subjects configured for this class. Ask the school admin to add subjects.
-                            </p>
-                        ) : (
-                            <Select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
-                                {subjects.map(s => (
-                                    <option key={s.id} value={s.name}>{s.name}</option>
-                                ))}
-                            </Select>
-                        )}
-                    </div>
+                    )}
                 </div>
-
-                {/* Score Guide */}
-                <div className="flex gap-4 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
-                    <span>Mid-Term: <strong>/{scheme.midTermTotal}</strong></span>
-                    <span>Class Activity: <strong>/{scheme.classActivityTotal}</strong></span>
-                    <span>Exam: <strong>/{scheme.examTotal}</strong></span>
-                    <span>Total: <strong>/100</strong></span>
-                </div>
-
-                {/* Students Table */}
-                {isLoadingStudents ? (
-                    <div className="flex justify-center py-10">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    </div>
-                ) : students.length === 0 ? (
-                    <div className="text-center py-10 text-muted-foreground">
-                        No students in {selectedClass} yet.
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto max-h-[50vh]">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead className="sticky top-0 bg-background z-10">
-                                <tr className="border-b border-border">
-                                    <th className="px-2 py-2 font-semibold text-muted-foreground">S/N</th>
-                                    <th className="px-2 py-2 font-semibold">Student</th>
-                                    <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.midTermTotal}</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">CA<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.classActivityTotal}</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.examTotal}</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">Total<br /><span className="font-normal text-xs text-muted-foreground">/100</span></th>
-                                    <th className="px-2 py-2 font-semibold text-center">Save</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {students.map((student, idx) => {
-                                    const row = scores[student.id] || { midterm: "", activity: "", exam: "", saved: false, saving: false };
-                                    const mt = parseInt(row.midterm) || 0;
-                                    const ca = parseInt(row.activity) || 0;
-                                    const ex = parseInt(row.exam) || 0;
-                                    const hasAny = row.midterm !== "" || row.activity !== "" || row.exam !== "";
-                                    const hasAll = row.midterm !== "" && row.activity !== "" && row.exam !== "";
-                                    const total = hasAll ? mt + ca + ex : null;
-
-                                    return (
-                                        <tr key={student.id} className={`border-b border-border/50 transition-colors ${row.saved ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/20"}`}>
-                                            <td className="px-2 py-2 text-muted-foreground text-sm text-center">{idx + 1}</td>
-                                            <td className="px-2 py-2">
-                                                <div className="font-medium text-sm">{student.fullName}</div>
-                                                <div className="text-xs text-muted-foreground">{student.username}</div>
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={scheme.midTermTotal}
-                                                    value={row.midterm}
-                                                    onChange={e => handleScoreChange(student.id, 'midterm', e.target.value)}
-                                                    className="w-16 text-center text-sm"
-                                                    placeholder="—"
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={scheme.classActivityTotal}
-                                                    value={row.activity}
-                                                    onChange={e => handleScoreChange(student.id, 'activity', e.target.value)}
-                                                    className="w-16 text-center text-sm"
-                                                    placeholder="—"
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={scheme.examTotal}
-                                                    value={row.exam}
-                                                    onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                                                    className="w-16 text-center text-sm"
-                                                    placeholder="—"
-                                                />
-                                            </td>
-                                            <td className="px-2 py-2 text-center">
-                                                {total !== null ? (
-                                                    <span className={`font-bold text-sm ${total >= 70 ? "text-green-600" : total >= 50 ? "text-yellow-600" : "text-destructive"}`}>
-                                                        {total}
-                                                    </span>
-                                                ) : "—"}
-                                            </td>
-                                            <td className="px-2 py-2 text-center">
-                                                {row.saved ? (
-                                                    <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => saveStudentScore(student.id)}
-                                                        isLoading={row.saving}
-                                                        disabled={!hasAny || !selectedSubject}
-                                                        className="px-2 py-1 text-xs"
-                                                    >
-                                                        <Save className="w-3 h-3" />
-                                                    </Button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* Footer */}
-                {students.length > 0 && (
-                    <div className="flex items-center justify-between pt-2 border-t border-border">
-                        <div className="text-xs text-muted-foreground">
-                            {filledCount} of {students.length} students have scores entered
-                        </div>
-                        <div className="flex items-center gap-3">
-                            {saveMessage && (
-                                <span className="text-green-600 text-sm flex items-center gap-1">
-                                    <CheckCircle2 className="w-4 h-4" /> {saveMessage}
-                                </span>
-                            )}
-                            <Button
-                                onClick={handleSaveAll}
-                                isLoading={isSavingAll}
-                                disabled={filledCount === 0 || !selectedSubject}
-                                size="sm"
-                            >
-                                <Save className="w-4 h-4 mr-1" /> Save All
-                            </Button>
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {/* Score Guide */}
+            <div className="flex gap-4 text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg">
+                <span>Mid-Term: <strong>/{scheme.midTermTotal}</strong></span>
+                <span>Class Activity: <strong>/{scheme.classActivityTotal}</strong></span>
+                <span>Exam: <strong>/{scheme.examTotal}</strong></span>
+                <span>Total: <strong>/100</strong></span>
+            </div>
+
+            {/* Students Table */}
+            {isLoadingStudents ? (
+                <div className="flex justify-center py-10">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+            ) : students.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                    No students in {selectedClass} yet.
+                </div>
+            ) : (
+                <div className={`overflow-x-auto ${tableMaxHeight}`}>
+                    <table className="w-full text-left border-collapse text-sm">
+                        <thead className="sticky top-0 bg-background z-10">
+                            <tr className="border-b border-border">
+                                <th className="px-2 py-2 font-semibold text-muted-foreground">S/N</th>
+                                <th className="px-2 py-2 font-semibold">Student</th>
+                                <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.midTermTotal}</span></th>
+                                <th className="px-2 py-2 font-semibold text-center">CA<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.classActivityTotal}</span></th>
+                                <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs text-muted-foreground">/{scheme.examTotal}</span></th>
+                                <th className="px-2 py-2 font-semibold text-center">Total<br /><span className="font-normal text-xs text-muted-foreground">/100</span></th>
+                                <th className="px-2 py-2 font-semibold text-center">Save</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {students.map((student, idx) => {
+                                const row = scores[student.id] || { midterm: "", activity: "", exam: "", saved: false, saving: false };
+                                const mt = parseInt(row.midterm) || 0;
+                                const ca = parseInt(row.activity) || 0;
+                                const ex = parseInt(row.exam) || 0;
+                                const hasAny = row.midterm !== "" || row.activity !== "" || row.exam !== "";
+                                const hasAll = row.midterm !== "" && row.activity !== "" && row.exam !== "";
+                                const total = hasAll ? mt + ca + ex : null;
+
+                                return (
+                                    <tr key={student.id} className={`border-b border-border/50 transition-colors ${row.saved ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/20"}`}>
+                                        <td className="px-2 py-2 text-muted-foreground text-sm text-center">{idx + 1}</td>
+                                        <td className="px-2 py-2">
+                                            <div className="font-medium text-sm">{student.fullName}</div>
+                                            <div className="text-xs text-muted-foreground">{student.username}</div>
+                                        </td>
+                                        <td className="px-2 py-2">
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={scheme.midTermTotal}
+                                                value={row.midterm}
+                                                onChange={e => handleScoreChange(student.id, 'midterm', e.target.value)}
+                                                className="w-16 text-center text-sm"
+                                                placeholder="—"
+                                            />
+                                        </td>
+                                        <td className="px-2 py-2">
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={scheme.classActivityTotal}
+                                                value={row.activity}
+                                                onChange={e => handleScoreChange(student.id, 'activity', e.target.value)}
+                                                className="w-16 text-center text-sm"
+                                                placeholder="—"
+                                            />
+                                        </td>
+                                        <td className="px-2 py-2">
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={scheme.examTotal}
+                                                value={row.exam}
+                                                onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
+                                                className="w-16 text-center text-sm"
+                                                placeholder="—"
+                                            />
+                                        </td>
+                                        <td className="px-2 py-2 text-center">
+                                            {total !== null ? (
+                                                <span className={`font-bold text-sm ${total >= 70 ? "text-green-600" : total >= 50 ? "text-yellow-600" : "text-destructive"}`}>
+                                                    {total}
+                                                </span>
+                                            ) : "—"}
+                                        </td>
+                                        <td className="px-2 py-2 text-center">
+                                            {row.saved ? (
+                                                <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto" />
+                                            ) : (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => saveStudentScore(student.id)}
+                                                    isLoading={row.saving}
+                                                    disabled={!hasAny || !selectedSubject}
+                                                    className="px-2 py-1 text-xs"
+                                                >
+                                                    <Save className="w-3 h-3" />
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Footer */}
+            {students.length > 0 && (
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <div className="text-xs text-muted-foreground">
+                        {filledCount} of {students.length} students have scores entered
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {saveMessage && (
+                            <span className="text-green-600 text-sm flex items-center gap-1">
+                                <CheckCircle2 className="w-4 h-4" /> {saveMessage}
+                            </span>
+                        )}
+                        <Button
+                            onClick={handleSaveAll}
+                            isLoading={isSavingAll}
+                            disabled={filledCount === 0 || !selectedSubject}
+                            size="sm"
+                        >
+                            <Save className="w-4 h-4 mr-1" /> Save All
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export function ClassResultsModal({ isOpen, onClose, schoolCode, defaultClass }: ClassResultsModalProps) {
+    if (!isOpen) return null;
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Upload Class Results" size="lg">
+            <ClassResultsView schoolCode={schoolCode} defaultClass={defaultClass} tableMaxHeight="max-h-[50vh]" />
         </Modal>
     );
 }

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Modal, Badge, Button, Input } from "@/components/ui-elements";
-import { ChevronDown, ChevronRight, CheckCircle, XCircle, MinusCircle, Save, Clock, Upload, User, Key, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { ChevronDown, ChevronRight, CheckCircle, XCircle, MinusCircle, Save, Clock, Upload, User, RefreshCw, Eye, EyeOff, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 
@@ -9,6 +9,7 @@ interface StudentDetailModalProps {
   studentName: string;
   schoolCode: string;
   onClose: () => void;
+  onNameUpdated?: (newName: string) => void;
 }
 
 interface SubjectScore {
@@ -64,7 +65,7 @@ async function resetStudentPassword(schoolCode: string, studentId: number, newPa
 
 const OPTION_LABELS = ["A", "B", "C", "D"];
 
-export function StudentDetailModal({ studentId, studentName, schoolCode, onClose }: StudentDetailModalProps) {
+export function StudentDetailModal({ studentId, studentName, schoolCode, onClose, onNameUpdated }: StudentDetailModalProps) {
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"exams" | "subjects">("exams");
   const [editingScores, setEditingScores] = useState<{ [key: string]: number }>({});
@@ -74,6 +75,10 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const [resettingPassword, setResettingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [displayName, setDisplayName] = useState(studentName);
 
   const { data, isLoading, refetch: refetchStudent } = useQuery({
     queryKey: ["student-detail", schoolCode, studentId],
@@ -136,6 +141,25 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
     } finally {
       setResettingPassword(false);
     }
+  };
+
+  const handleSaveName = async () => {
+    if (!studentId || !nameValue.trim()) return;
+    setSavingName(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/name`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName: nameValue.trim() }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        setDisplayName(nameValue.trim());
+        setEditingName(false);
+        onNameUpdated?.(nameValue.trim());
+      }
+    } catch (_) {}
+    setSavingName(false);
   };
 
   const getComponentStatus = (score: number | null) => {
@@ -205,7 +229,7 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   };
 
   return (
-    <Modal isOpen={studentId !== null} onClose={onClose} title={`Student Profile — ${studentName}`} size="lg">
+    <Modal isOpen={studentId !== null} onClose={onClose} title={`Student Profile — ${displayName}`} size="lg">
       <div className="space-y-4">
         {/* Profile Picture Upload */}
         <div className="flex justify-center mb-4">
@@ -232,6 +256,38 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
 
         {/* Student Info Card with Username and Password */}
         <div className="bg-muted/20 p-4 rounded-lg">
+          {/* Editable Full Name */}
+          <div className="mb-3 pb-3 border-b border-border/50">
+            <p className="text-xs text-muted-foreground mb-1">Full Name</p>
+            {editingName ? (
+              <div className="flex gap-2">
+                <Input
+                  value={nameValue}
+                  onChange={e => setNameValue(e.target.value)}
+                  className="text-sm flex-1"
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                  autoFocus
+                />
+                <Button size="sm" onClick={handleSaveName} isLoading={savingName}>
+                  <Save className="w-3 h-3 mr-1" /> Save
+                </Button>
+                <button onClick={() => setEditingName(false)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm">{displayName}</p>
+                <button
+                  onClick={() => { setNameValue(displayName); setEditingName(true); }}
+                  className="p-1 rounded text-muted-foreground hover:text-primary transition-colors"
+                  title="Edit name"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground">Username</p>

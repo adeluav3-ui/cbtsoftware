@@ -20,6 +20,7 @@ interface StudentResultsModalProps {
     studentClass: string;
     schoolCode: string;
     onScoresUpdated?: () => void;
+    onNameUpdated?: (newName: string) => void;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://cbtsoftware.onrender.com/api';
@@ -94,15 +95,21 @@ export function StudentResultsModal({
     studentClass,
     schoolCode,
     onScoresUpdated,
+    onNameUpdated,
 }: StudentResultsModalProps) {
     const [subjects, setSubjects] = useState<SubjectResult[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [overallAverage, setOverallAverage] = useState(0);
     const [completedSubjectsCount, setCompletedSubjectsCount] = useState(0);
     const [scheme, setScheme] = useState({ midTermTotal: 20, classActivityTotal: 20, examTotal: 60, gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 });
-    // key = "subjectName-component", value = current input value while editing
     const [editingScores, setEditingScores] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState<string | null>(null);
+
+    // Name editing
+    const [displayName, setDisplayName] = useState(studentName);
+    const [editingName, setEditingName] = useState(false);
+    const [nameValue, setNameValue] = useState("");
+    const [savingName, setSavingName] = useState(false);
 
     // Add subject state
     const [showAddSubject, setShowAddSubject] = useState(false);
@@ -224,6 +231,25 @@ export function StudentResultsModal({
         }
     };
 
+    const handleSaveName = async () => {
+        if (!studentId || !nameValue.trim()) return;
+        setSavingName(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/name`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fullName: nameValue.trim() }),
+                credentials: "include",
+            });
+            if (res.ok) {
+                setDisplayName(nameValue.trim());
+                setEditingName(false);
+                onNameUpdated?.(nameValue.trim());
+            }
+        } catch (_) {}
+        setSavingName(false);
+    };
+
     const handleEditScore = (key: string, value: number) => {
         setEditingScores(prev => ({ ...prev, [key]: value }));
     };
@@ -248,10 +274,43 @@ export function StudentResultsModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Results: ${studentName}`} size="lg">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Results: ${displayName}`} size="lg">
             <div className="space-y-4">
                 {/* Student Info */}
-                <div className="bg-muted/20 p-4 rounded-lg flex justify-between items-center">
+                <div className="bg-muted/20 p-4 rounded-lg">
+                    {/* Editable Full Name */}
+                    <div className="mb-3 pb-3 border-b border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1">Full Name</p>
+                        {editingName ? (
+                            <div className="flex gap-2">
+                                <Input
+                                    value={nameValue}
+                                    onChange={e => setNameValue(e.target.value)}
+                                    className="text-sm flex-1"
+                                    onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                                    autoFocus
+                                />
+                                <Button size="sm" onClick={handleSaveName} isLoading={savingName}>
+                                    <Save className="w-3 h-3 mr-1" /> Save
+                                </Button>
+                                <button onClick={() => setEditingName(false)} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <p className="font-semibold text-sm">{displayName}</p>
+                                <button
+                                    onClick={() => { setNameValue(displayName); setEditingName(true); }}
+                                    className="p-1 rounded text-muted-foreground hover:text-primary transition-colors"
+                                    title="Edit name"
+                                >
+                                    <Pencil className="w-3 h-3" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex justify-between items-center">
                     <div>
                         <p className="text-sm text-muted-foreground">Class</p>
                         <p className="font-semibold text-lg">{studentClass}</p>
@@ -268,6 +327,7 @@ export function StudentResultsModal({
                         <p className="text-xs text-muted-foreground mt-1">
                             {completedSubjectsCount} subject{completedSubjectsCount !== 1 ? 's' : ''} completed
                         </p>
+                    </div>
                     </div>
                 </div>
 

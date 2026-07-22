@@ -583,7 +583,19 @@ export default function TeacherDashboard() {
 
       <BulkUploadStudentsModal isOpen={bulkStudentModalOpen} onClose={() => setBulkStudentModalOpen(false)} schoolCode={schoolCode} onSuccess={() => { queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) }); }} />
 
-      <StudentResultsModal isOpen={studentResultsModalOpen} onClose={() => setStudentResultsModalOpen(false)} studentId={selectedStudentId !== null ? selectedStudentId : 0} studentName={selectedStudentName} studentClass={selectedStudentClass} schoolCode={schoolCode} onScoresUpdated={() => { fetchSubjectScores(); }} />
+      <StudentResultsModal
+        isOpen={studentResultsModalOpen}
+        onClose={() => setStudentResultsModalOpen(false)}
+        studentId={selectedStudentId !== null ? selectedStudentId : 0}
+        studentName={selectedStudentName}
+        studentClass={selectedStudentClass}
+        schoolCode={schoolCode}
+        onScoresUpdated={() => { fetchSubjectScores(); }}
+        onNameUpdated={(name) => {
+          setSelectedStudentName(name);
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
+        }}
+      />
 
       <ClassResultsModal isOpen={classResultsModalOpen} onClose={() => setClassResultsModalOpen(false)} schoolCode={schoolCode} defaultClass={classResultsDefaultClass} />
 
