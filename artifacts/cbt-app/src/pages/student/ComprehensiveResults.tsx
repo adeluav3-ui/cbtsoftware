@@ -334,6 +334,171 @@ export default function ComprehensiveResults() {
         </div>
     );
 
+    const handlePrintReportCard = () => {
+        if (!selectedStudent) return;
+
+        const gradeColour = (g?: string | null) => {
+            if (g === 'A') return '#16a34a';
+            if (g === 'B') return '#2563eb';
+            if (g === 'C') return '#ca8a04';
+            if (g === 'D') return '#ea580c';
+            if (g === 'F') return '#dc2626';
+            return '#6b7280';
+        };
+
+        const ratingColour = (r: number | null) =>
+            r && r >= 4 ? '#16a34a' : r && r >= 3 ? '#ca8a04' : r ? '#dc2626' : '#6b7280';
+
+        const subjectRows = subjects.map(s => {
+            const complete = s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
+            return `<tr>
+              <td>${s.subjectName}</td>
+              <td class="center">${s.midTermScore ?? '—'}</td>
+              <td class="center">${s.classActivityScore ?? '—'}</td>
+              <td class="center">${s.examScore ?? '—'}</td>
+              <td class="center bold">${complete ? `${s.totalScore}/100` : '—'}</td>
+              <td class="center bold" style="color:${gradeColour(s.grade)}">${s.grade || '—'}</td>
+            </tr>`;
+        }).join('');
+
+        const makeTraitTable = (list: TraitRating[], label: string) => `
+          <div class="trait-section">
+            <h4 class="trait-label">${label}</h4>
+            <table class="trait-table">
+              <thead><tr><th>Trait</th><th class="center">Rating</th></tr></thead>
+              <tbody>${list.map(t => `<tr>
+                <td>${t.traitName}</td>
+                <td class="center" style="color:${ratingColour(t.rating)};font-weight:600">
+                  ${t.rating ? `${t.rating} – ${RATING_LABELS[t.rating]}` : '—'}
+                </td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>`;
+
+        const nextTermStr = (() => {
+            if (!schoolInfo.nextTermBegins) return 'Not yet set';
+            try {
+                const d = new Date(schoolInfo.nextTermBegins);
+                return isNaN(d.getTime()) ? schoolInfo.nextTermBegins
+                    : d.toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            } catch { return schoolInfo.nextTermBegins; }
+        })();
+
+        const logoHtml = schoolInfo.logoUrl
+            ? `<img src="${schoolInfo.logoUrl}" alt="logo" style="width:52px;height:52px;object-fit:contain">`
+            : '';
+        const photoHtml = selectedStudent.profilePicture
+            ? `<img src="${selectedStudent.profilePicture}" alt="photo" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid #7c3aed">`
+            : `<div style="width:64px;height:64px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:22px;color:#9ca3af">👤</div>`;
+
+        const miniHeader = `
+          <div style="border-bottom:2px solid #e5e7eb;padding-bottom:10px;margin-bottom:14px">
+            <div style="font-weight:700;font-size:13px">${schoolInfo.name}</div>
+            <div style="font-size:11px;color:#6b7280">${schoolInfo.currentTerm} · ${schoolInfo.academicSession}</div>
+            <div style="font-weight:600;font-size:13px;margin-top:3px">${selectedStudent.fullName} — ${selectedStudent.class}</div>
+          </div>`;
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+          <title>Report Card – ${selectedStudent.fullName}</title>
+          <style>
+            @page { size: A4 portrait; margin: 1.2cm; }
+            body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; }
+            h2 { margin:0; font-size:15px; }
+            h3 { margin:0 0 10px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; }
+            h4 { margin:0; }
+            table { width:100%; border-collapse:collapse; }
+            th, td { padding:5px 7px; border-bottom:1px solid #e5e7eb; font-size:10.5px; }
+            thead tr { background:#f3f4f6; }
+            th { font-weight:700; }
+            tfoot tr { background:#f3f4f6; border-top:2px solid #d1d5db; }
+            .center { text-align:center; }
+            .bold { font-weight:700; }
+            .page2 { page-break-before:always; break-before:page; padding-top:0; }
+            .traits { display:flex; gap:16px; }
+            .trait-section { flex:1; }
+            .trait-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; border-bottom:1px solid #d1d5db; padding-bottom:4px; margin-bottom:6px; }
+            .trait-table { width:100%; border-collapse:collapse; }
+            .trait-table th, .trait-table td { padding:3px 5px; border-bottom:1px solid #f3f4f6; font-size:10px; }
+            .comment-box { border:1px solid #d1d5db; border-radius:4px; padding:8px; font-style:italic; color:#555; min-height:32px; font-size:11px; margin-top:6px; }
+            .next-term { background:#f9fafb; border:1px solid #e5e7eb; border-radius:4px; padding:8px 10px; margin:12px 0; font-size:11px; }
+          </style>
+        </head><body>
+
+        <!-- PAGE 1 -->
+        <div>
+          <!-- Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px">
+              ${logoHtml}
+              <div>
+                <h2>${schoolInfo.name}</h2>
+                <div style="font-size:10px;color:#6b7280;margin-top:2px">${schoolInfo.currentTerm} · ${schoolInfo.academicSession}</div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-top:2px">Student Report Card</div>
+              </div>
+            </div>
+            <div style="text-align:right">
+              ${photoHtml}
+              <div style="font-weight:700;margin-top:5px;font-size:12px">${selectedStudent.fullName}</div>
+              <div style="font-size:10px;color:#6b7280">${selectedStudent.class}</div>
+            </div>
+          </div>
+
+          <!-- Attendance -->
+          <div style="background:#f9fafb;border-radius:4px;padding:6px 10px;margin-bottom:12px;font-size:10.5px;display:flex;gap:16px;align-items:center">
+            <span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Attendance</span>
+            <span>Days opened: <strong>${attendance.timesSchoolOpened}</strong></span>
+            <span>Times present: <strong>${attendance.timesPresent}</strong></span>
+            <span>Rate: <strong>${attendancePct}%</strong></span>
+          </div>
+
+          <!-- Academic Results -->
+          <h3>Academic Performance</h3>
+          <table>
+            <thead><tr>
+              <th>Subject</th>
+              <th class="center">Mid-Term<br><span style="font-weight:400">/${scheme.midTermTotal}</span></th>
+              <th class="center">CA<br><span style="font-weight:400">/${scheme.classActivityTotal}</span></th>
+              <th class="center">Exam<br><span style="font-weight:400">/${scheme.examTotal}</span></th>
+              <th class="center">Total<br><span style="font-weight:400">/100</span></th>
+              <th class="center">Grade</th>
+            </tr></thead>
+            <tbody>${subjectRows}</tbody>
+            <tfoot><tr>
+              <td colspan="4" class="bold">Overall Average</td>
+              <td class="center bold">${overallAvg.toFixed(1)}%</td>
+              <td class="center bold" style="color:${gradeColour(overallGrade)}">${overallGrade}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="page2">
+          ${miniHeader}
+          <h3>Cognitive, Affective &amp; Psychomotor Assessment</h3>
+          <div class="traits">
+            ${makeTraitTable(cognitiveTraits, 'Cognitive Domain')}
+            ${makeTraitTable(affectiveTraits, 'Affective Domain')}
+            ${makeTraitTable(psychomotorTraits, 'Psychomotor Domain')}
+          </div>
+
+          <div class="next-term">
+            <span style="font-weight:700;color:#6b7280">Next Term Begins:</span>
+            <span style="font-weight:600;margin-left:6px">${nextTermStr}</span>
+          </div>
+
+          <h3 style="margin-top:14px">Teacher's / Principal's Comment</h3>
+          <div class="comment-box">${comment || 'No comment added yet.'}</div>
+        </div>
+
+        </body></html>`;
+
+        const win = window.open('', '_blank', 'width=900,height=800');
+        if (!win) { alert('Allow popups for this site to print the report card.'); return; }
+        win.document.write(html);
+        win.document.close();
+        setTimeout(() => { win.focus(); win.print(); }, 500);
+    };
+
     // Format the "next term begins" date for display
     const formatNextTermDate = (dateStr: string | null) => {
         if (!dateStr) return null;
@@ -630,11 +795,8 @@ export default function ComprehensiveResults() {
 
                                     {/* Action Buttons */}
                                     <div className="mt-5 flex justify-end gap-3 print:hidden">
-                                        <Button variant="outline" onClick={() => window.print()}>
-                                            <Printer className="w-4 h-4 mr-2" /> Print
-                                        </Button>
-                                        <Button variant="outline" onClick={() => window.print()}>
-                                            <Download className="w-4 h-4 mr-2" /> Save as PDF
+                                        <Button variant="outline" onClick={handlePrintReportCard}>
+                                            <Printer className="w-4 h-4 mr-2" /> Print / Save as PDF
                                         </Button>
                                     </div>
                                 </>
