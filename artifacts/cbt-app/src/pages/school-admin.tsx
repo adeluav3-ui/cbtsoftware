@@ -976,7 +976,7 @@ export default function SchoolAdminDashboard() {
           ? filtered.filter(r =>
               r.class === resExpandedGroup.class &&
               r.subject === resExpandedGroup.subject &&
-              (r as any).assessmentType === resExpandedGroup.type
+              getType(r) === resExpandedGroup.type
             )
           : null;
 
