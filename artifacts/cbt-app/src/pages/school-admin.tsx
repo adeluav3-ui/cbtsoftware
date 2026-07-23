@@ -374,7 +374,8 @@ export default function SchoolAdminDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ fromName: mergeSubject.name, toName: mergeTargetName.trim(), level: mergeSubject.level }),
+        // mergeSubject is the TARGET (survivor); mergeTargetName is the SOURCE to absorb
+        body: JSON.stringify({ fromName: mergeTargetName.trim(), toName: mergeSubject.name, level: mergeSubject.level }),
       });
       const data = await res.json();
       if (!res.ok) { setMergeError(data.error || "Merge failed"); return; }
@@ -1042,17 +1043,17 @@ export default function SchoolAdminDashboard() {
           )}
 
           {/* Merge Subject Modal */}
-          <Modal isOpen={mergeSubject !== null} onClose={() => setMergeSubject(null)} title="Merge Subject">
+          <Modal isOpen={mergeSubject !== null} onClose={() => setMergeSubject(null)} title="Absorb Into Subject">
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                All scores and exams under <strong>"{mergeSubject?.name}"</strong> ({mergeSubject?.level} level) will be moved into the subject you choose below. Only {mergeSubject?.level}-level data is affected — other levels remain unchanged.
+                Enter the other subject name whose scores and exams should be absorbed into <strong>"{mergeSubject?.name}"</strong>. That name will be removed and all its data moved here. Only {mergeSubject?.level}-level data is affected.
               </p>
               <div>
-                <Label>Merge into (type exact target subject name)</Label>
+                <Label>Absorb from (other subject name to remove)</Label>
                 <Input
                   value={mergeTargetName}
                   onChange={e => setMergeTargetName(e.target.value)}
-                  placeholder={`e.g., ${mergeSubject?.level === 'junior' ? 'English Language' : 'English Studies'}`}
+                  placeholder={`e.g., ${mergeSubject?.level === 'junior' ? 'English Studies' : 'English Language'}`}
                   list="merge-target-options"
                 />
                 <datalist id="merge-target-options">
@@ -1060,7 +1061,7 @@ export default function SchoolAdminDashboard() {
                     .filter(s => s.level === mergeSubject?.level && s.name !== mergeSubject?.name)
                     .map(s => <option key={s.id} value={s.name} />)}
                 </datalist>
-                <p className="text-xs text-muted-foreground mt-1">Pick from the same level or type any name.</p>
+                <p className="text-xs text-muted-foreground mt-1">Can be a name that only exists in CBT exam data, not necessarily in the subject list.</p>
               </div>
               {mergeError && <p className="text-sm text-destructive">{mergeError}</p>}
               <div className="flex gap-3 pt-2">
