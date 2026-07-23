@@ -995,21 +995,29 @@ router.get("/:studentId/class-position", requireAuth, async (req: Request<Studen
         eq(subjectScoresTable.academicSession, currentAcademicSession),
       ));
 
-    const grandTotals = new Map<number, number>();
+    const accumulator = new Map<number, { total: number; count: number }>();
     for (const s of classmateScores) {
       if (s.totalScore !== null) {
-        grandTotals.set(s.studentId, (grandTotals.get(s.studentId) ?? 0) + s.totalScore);
+        const curr = accumulator.get(s.studentId) ?? { total: 0, count: 0 };
+        accumulator.set(s.studentId, { total: curr.total + s.totalScore, count: curr.count + 1 });
       }
     }
 
+    // Rank by average percentage so students with fewer scored subjects are not
+    // penalised by a lower raw grandTotal vs students with more subjects scored.
+    const averages = new Map<number, number>();
+    for (const [id, { total, count }] of accumulator) {
+      averages.set(id, count > 0 ? total / count : 0);
+    }
+
     const myId = parseInt(studentId);
-    const myTotal = grandTotals.get(myId) ?? 0;
-    const sorted = [...grandTotals.values()].sort((a, b) => b - a);
+    const myAvg = averages.get(myId) ?? 0;
+    const sorted = [...averages.entries()].sort((a, b) => b[1] - a[1]);
     let positionInClass: number | null = null;
     let pos = 1;
     for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && sorted[i] !== sorted[i - 1]) pos = i + 1;
-      if (sorted[i] === myTotal) { positionInClass = pos; break; }
+      if (i > 0 && sorted[i][1] !== sorted[i - 1][1]) pos = i + 1;
+      if (sorted[i][0] === myId) { positionInClass = pos; break; }
     }
 
     res.json({ positionInClass, totalInClass });

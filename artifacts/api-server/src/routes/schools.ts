@@ -1290,12 +1290,18 @@ router.get("/:schoolCode/broadsheet", requireSchoolAdmin, async (req: Request, r
       return { id: student.id, fullName: student.fullName, subjectTotals, grandTotal, average };
     });
 
-    // Calculate positions based on grandTotal descending
-    const sorted = [...rows].sort((a, b) => b.grandTotal - a.grandTotal);
+    // Calculate positions based on average percentage descending so students with
+    // fewer scored subjects are not unfairly penalised by a lower raw grandTotal.
+    const sorted = [...rows].sort((a, b) => {
+      if (a.average === null && b.average === null) return 0;
+      if (a.average === null) return 1;
+      if (b.average === null) return -1;
+      return b.average - a.average;
+    });
     const positionMap = new Map<number, number>();
     let pos = 1;
     for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && sorted[i].grandTotal !== sorted[i - 1].grandTotal) pos = i + 1;
+      if (i > 0 && sorted[i].average !== sorted[i - 1].average) pos = i + 1;
       positionMap.set(sorted[i].id, pos);
     }
 
