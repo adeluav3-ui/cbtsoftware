@@ -471,11 +471,6 @@ export default function ComprehensiveResults() {
                                     )}
                                     <p className="font-semibold mt-1 text-sm">{selectedStudent.fullName}</p>
                                     <p className="text-xs text-muted-foreground">{selectedStudent.class}</p>
-                                    {position && (
-                                        <p className="text-xs font-bold text-primary mt-0.5">
-                                            Position: {getOrdinalSuffix(position.positionInClass)} / {position.totalInClass}
-                                        </p>
-                                    )}
                                 </div>
                             </div>
 
