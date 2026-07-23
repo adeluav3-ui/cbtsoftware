@@ -1056,6 +1056,7 @@ router.post("/:examId/reassign", requireSchoolStaff, async (req: Request<ExamPar
       studentId: resultsTable.studentId,
       score: resultsTable.score,
       totalQuestions: resultsTable.totalQuestions,
+      class: resultsTable.class,
     }).from(resultsTable)
       .where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.schoolCode, schoolCodeStr)));
 
@@ -1084,6 +1085,7 @@ router.post("/:examId/reassign", requireSchoolStaff, async (req: Request<ExamPar
         const newValues: any = {
           studentId: r.studentId,
           subjectName: newSubjectTrimmed,
+          className: r.class ?? "Unknown",
           schoolCode: schoolCodeStr,
           term: currentTerm,
           academicSession: currentAcademicSession,
