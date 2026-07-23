@@ -78,6 +78,8 @@ export default function SchoolAdminDashboard() {
   const [isUpdatingTerm, setIsUpdatingTerm] = useState(false);
   const [termError, setTermError] = useState("");
   const [academicSession, setAcademicSession] = useState("2025/2026");
+  const [nextTermBeginsDate, setNextTermBeginsDate] = useState("");
+  const [isSavingNextTermDate, setIsSavingNextTermDate] = useState(false);
 
   // Subject merge state
   const [mergeSubject, setMergeSubject] = useState<{ id: number; name: string; level: string } | null>(null);
@@ -199,6 +201,7 @@ export default function SchoolAdminDashboard() {
       setCurrentTerm(data.currentTerm || "First Term");
       setAvailableTerms(data.availableTerms || ["First Term", "Second Term", "Third Term"]);
       setAcademicSession(data.currentAcademicSession || "2025/2026");
+      setNextTermBeginsDate(data.nextTermBegins || "");
     } catch (err) {
       console.error("Failed to fetch school info", err);
     }
@@ -361,6 +364,24 @@ export default function SchoolAdminDashboard() {
       }
     } catch (err) {
       console.error("Failed to delete subject", err);
+    }
+  };
+
+  // Save next term begins date
+  const handleSaveNextTermDate = async () => {
+    setIsSavingNextTermDate(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/next-term-begins`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ nextTermBegins: nextTermBeginsDate || null }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      alert("Failed to save next term date");
+    } finally {
+      setIsSavingNextTermDate(false);
     }
   };
 
@@ -1968,9 +1989,30 @@ export default function SchoolAdminDashboard() {
       {/* New Session Modal */}
       <Modal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Start New Academic Session">
         <div className="space-y-4 text-muted-foreground">
+          <div className="border border-border rounded-lg p-4 space-y-2">
+            <Label className="text-foreground">Next Term Begins</Label>
+            <p className="text-xs">This date appears on student report cards. You can update it any time without promoting students.</p>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={nextTermBeginsDate}
+                onChange={e => setNextTermBeginsDate(e.target.value)}
+                className="flex-1"
+              />
+              <Button onClick={handleSaveNextTermDate} isLoading={isSavingNextTermDate} variant="outline" className="shrink-0">
+                Save Date
+              </Button>
+            </div>
+            {nextTermBeginsDate && (
+              <p className="text-xs text-primary">
+                Set to: {new Date(nextTermBeginsDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            )}
+          </div>
+          <hr className="border-border" />
           <p>Are you sure you want to start a new academic session?</p>
           <p className="text-destructive font-bold">This will automatically promote all students to their next class (e.g. KG1 → KG2, Nursery 2 → Pry 1, JSS1 → JSS2). SSS3 students will be graduated.</p>
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-2">
             <Button variant="ghost" onClick={() => setSessionModalOpen(false)} className="mr-3">Cancel</Button>
             <Button variant="destructive" onClick={() => newSession({ schoolCode })} isLoading={isNSPending}>Yes, Promote Students</Button>
           </div>
