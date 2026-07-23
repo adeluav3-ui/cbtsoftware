@@ -1009,6 +1009,150 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
   }
 });
 
+// Reassign an exam's subject and/or assessment type and migrate stored scores safely.
+// Raw resultsTable rows are never touched — they are the source of truth.
+router.post("/:examId/reassign", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
+  const { newSubject, newAssessmentType } = req.body as { newSubject?: string; newAssessmentType?: string };
+
+  if (!newSubject?.trim() || !newAssessmentType?.trim()) {
+    return res.status(400).json({ error: "newSubject and newAssessmentType are required" });
+  }
+  const validTypes = ["mid_term", "exam", "class_activity"];
+  if (!validTypes.includes(newAssessmentType)) {
+    return res.status(400).json({ error: `newAssessmentType must be one of: ${validTypes.join(", ")}` });
+  }
+
+  try {
+    const [exam] = await db.select().from(examsTable)
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .limit(1);
+    if (!exam) return res.status(404).json({ error: "Exam not found" });
+
+    const oldSubject = exam.subject ?? "";
+    const oldType = exam.assessmentType ?? "exam";
+    const newSubjectTrimmed = newSubject.trim();
+
+    // No-op check
+    if (oldSubject === newSubjectTrimmed && oldType === newAssessmentType) {
+      return res.json({ ok: true, message: "No changes needed", migrated: 0 });
+    }
+
+    // Grading scheme for recalculating scaled scores
+    const [scheme] = await db.select().from(gradingSchemesTable)
+      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr)).limit(1);
+    const midTermCbt = scheme?.midTermCbt ?? 10;
+    const examCbt = scheme?.examCbt ?? 30;
+    const classActivityTotal = scheme?.classActivityTotal ?? 20;
+
+    const newCbtMax = newAssessmentType === "mid_term" ? midTermCbt
+      : newAssessmentType === "exam" ? examCbt
+      : classActivityTotal;
+
+    // Raw CBT results for this exam (source of truth)
+    const rawResults = await db.select({
+      studentId: resultsTable.studentId,
+      score: resultsTable.score,
+      totalQuestions: resultsTable.totalQuestions,
+    }).from(resultsTable)
+      .where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.schoolCode, schoolCodeStr)));
+
+    if (rawResults.length === 0) {
+      // No submissions yet — just update the exam record
+      await db.update(examsTable)
+        .set({ subject: newSubjectTrimmed, assessmentType: newAssessmentType })
+        .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)));
+      return res.json({ ok: true, message: "Exam updated (no submissions to migrate)", migrated: 0 });
+    }
+
+    // Fetch school for current term/session context
+    const [school] = await db.select({
+      currentTerm: schoolsTable.currentTerm,
+      currentAcademicSession: schoolsTable.currentAcademicSession,
+    }).from(schoolsTable).where(eq(schoolsTable.code, schoolCodeStr)).limit(1);
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    await db.transaction(async (tx) => {
+      for (const r of rawResults) {
+        if (!r.totalQuestions || r.totalQuestions === 0) continue;
+        const newScaled = Math.round((r.score / r.totalQuestions) * newCbtMax);
+
+        // 1. Upsert the new column on the new subject row
+        const newValues: any = {
+          studentId: r.studentId,
+          subjectName: newSubjectTrimmed,
+          schoolCode: schoolCodeStr,
+          term: currentTerm,
+          academicSession: currentAcademicSession,
+        };
+        const newUpdate: any = { updatedAt: new Date() };
+        if (newAssessmentType === "mid_term") {
+          newValues.midTermScore = newScaled;
+          newValues.midTermCbtScore = newScaled;
+          newUpdate.midTermScore = newScaled;
+          newUpdate.midTermCbtScore = newScaled;
+        } else if (newAssessmentType === "exam") {
+          newValues.examScore = newScaled;
+          newValues.examCbtScore = newScaled;
+          newUpdate.examScore = newScaled;
+          newUpdate.examCbtScore = newScaled;
+        } else {
+          newValues.classActivityScore = newScaled;
+          newUpdate.classActivityScore = newScaled;
+        }
+
+        await tx.insert(subjectScoresTable).values(newValues)
+          .onConflictDoUpdate({
+            target: [subjectScoresTable.studentId, subjectScoresTable.subjectName, subjectScoresTable.term, subjectScoresTable.academicSession],
+            set: newUpdate,
+          });
+
+        // 2. Clear the OLD column from the old subject row (only the column this exam owned)
+        if (oldSubject !== newSubjectTrimmed || oldType !== newAssessmentType) {
+          const clearUpdate: any = { updatedAt: new Date() };
+          if (oldType === "mid_term") {
+            clearUpdate.midTermScore = null;
+            clearUpdate.midTermCbtScore = null;
+          } else if (oldType === "exam") {
+            clearUpdate.examScore = null;
+            clearUpdate.examCbtScore = null;
+          } else {
+            clearUpdate.classActivityScore = null;
+          }
+          await tx.update(subjectScoresTable)
+            .set(clearUpdate)
+            .where(and(
+              eq(subjectScoresTable.studentId, r.studentId),
+              eq(subjectScoresTable.subjectName, oldSubject),
+              eq(subjectScoresTable.schoolCode, schoolCodeStr),
+              eq(subjectScoresTable.term, currentTerm),
+              eq(subjectScoresTable.academicSession, currentAcademicSession),
+            ));
+        }
+      }
+
+      // 3. Update the exam record itself
+      await tx.update(examsTable)
+        .set({ subject: newSubjectTrimmed, assessmentType: newAssessmentType })
+        .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)));
+    });
+
+    res.json({
+      ok: true,
+      message: `Reassigned ${rawResults.length} student scores from "${oldSubject}" (${oldType}) → "${newSubjectTrimmed}" (${newAssessmentType})`,
+      migrated: rawResults.length,
+    });
+    return;
+  } catch (err) {
+    console.error("Exam reassign error:", err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Teacher enters theory and class activity scores
 router.post("/:examId/scores", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { schoolCode, examId } = req.params;

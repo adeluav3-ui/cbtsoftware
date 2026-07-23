@@ -590,6 +590,11 @@ export default function SchoolAdminDashboard() {
   });
   const [examSearchQuery, setExamSearchQuery] = useState("");
   const [examClassFilter, setExamClassFilter] = useState("All");
+  const [reassignExam, setReassignExam] = useState<{ id: number; title: string; subject: string; assessmentType: string } | null>(null);
+  const [reassignNewSubject, setReassignNewSubject] = useState("");
+  const [reassignNewType, setReassignNewType] = useState("mid_term");
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [reassignResult, setReassignResult] = useState<string | null>(null);
 
   // Student move-class state
   const [moveStudentModalOpen, setMoveStudentModalOpen] = useState(false);
@@ -597,6 +602,28 @@ export default function SchoolAdminDashboard() {
   const [moveTargetClass, setMoveTargetClass] = useState("KG1");
   const [isMovingStudent, setIsMovingStudent] = useState(false);
   const [moveStudentError, setMoveStudentError] = useState("");
+
+  const handleReassignExam = async () => {
+    if (!reassignExam || !reassignNewSubject.trim()) return;
+    setIsReassigning(true);
+    setReassignResult(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${reassignExam.id}/reassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ newSubject: reassignNewSubject.trim(), newAssessmentType: reassignNewType }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setReassignResult(`Error: ${data.error}`); return; }
+      setReassignResult(data.message);
+      queryClient.invalidateQueries({ queryKey: getListExamsQueryKey(schoolCode) });
+    } catch {
+      setReassignResult("Network error. Please try again.");
+    } finally {
+      setIsReassigning(false);
+    }
+  };
 
   const handleMoveStudent = async () => {
     if (!moveStudentTarget) return;
@@ -1404,18 +1431,26 @@ export default function SchoolAdminDashboard() {
                       <tr className="bg-muted/50 border-b border-border text-muted-foreground">
                         <th className="px-4 py-3 font-semibold">Exam Title</th>
                         <th className="px-4 py-3 font-semibold">Subject</th>
+                        <th className="px-4 py-3 font-semibold">Type</th>
                         <th className="px-4 py-3 font-semibold">Class</th>
                         <th className="px-4 py-3 font-semibold">Teacher</th>
-                        <th className="px-4 py-3 font-semibold text-center">Questions</th>
+                        <th className="px-4 py-3 font-semibold text-center">Qs</th>
                         <th className="px-4 py-3 font-semibold text-center">Status</th>
-                        <th className="px-4 py-3 font-semibold text-center">Action</th>
+                        <th className="px-4 py-3 font-semibold text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredExams.map(exam => (
+                      {filteredExams.map(exam => {
+                        const atype = (exam as any).assessmentType ?? "exam";
+                        const atypeLabel = atype === "mid_term" ? "Mid-term" : atype === "exam" ? "Final Exam" : "CA";
+                        const atypeColor = atype === "mid_term" ? "bg-blue-100 text-blue-700" : atype === "exam" ? "bg-purple-100 text-purple-700" : "bg-green-100 text-green-700";
+                        return (
                         <tr key={exam.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
                           <td className="px-4 py-3 font-semibold">{exam.title}</td>
                           <td className="px-4 py-3 text-primary font-medium">{exam.subject}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${atypeColor}`}>{atypeLabel}</span>
+                          </td>
                           <td className="px-4 py-3"><Badge className="text-xs">{exam.class}</Badge></td>
                           <td className="px-4 py-3 text-muted-foreground text-xs">{teacherMap.get(exam.teacherId) || `Teacher #${exam.teacherId}`}</td>
                           <td className="px-4 py-3 text-center text-muted-foreground">{(exam as any).questionCount ?? 0}</td>
@@ -1425,21 +1460,38 @@ export default function SchoolAdminDashboard() {
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <Button
-                              size="sm"
-                              variant={exam.isActive ? "outline" : "secondary"}
-                              className={`text-xs px-3 py-1 ${exam.isActive ? "text-destructive hover:bg-destructive/10 border-destructive/30" : ""}`}
-                              onClick={() => toggleExamStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
-                            >
-                              {exam.isActive ? (
-                                <><PowerOff className="w-3 h-3 mr-1" /> Unpublish</>
-                              ) : (
-                                <><Power className="w-3 h-3 mr-1" /> Publish</>
-                              )}
-                            </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                size="sm"
+                                variant={exam.isActive ? "outline" : "secondary"}
+                                className={`text-xs px-3 py-1 ${exam.isActive ? "text-destructive hover:bg-destructive/10 border-destructive/30" : ""}`}
+                                onClick={() => toggleExamStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
+                              >
+                                {exam.isActive ? (
+                                  <><PowerOff className="w-3 h-3 mr-1" /> Unpublish</>
+                                ) : (
+                                  <><Power className="w-3 h-3 mr-1" /> Publish</>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs px-2 py-1"
+                                title="Fix subject name or exam type"
+                                onClick={() => {
+                                  setReassignExam({ id: exam.id, title: exam.title, subject: exam.subject, assessmentType: atype });
+                                  setReassignNewSubject(exam.subject);
+                                  setReassignNewType(atype);
+                                  setReassignResult(null);
+                                }}
+                              >
+                                <ArrowRightLeft className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2111,6 +2163,51 @@ export default function SchoolAdminDashboard() {
               <Button variant="outline" onClick={() => { setMoveStudentModalOpen(false); setMoveStudentError(""); }} className="flex-1">Cancel</Button>
               <Button onClick={handleMoveStudent} isLoading={isMovingStudent} className="flex-1">
                 <ArrowRightLeft className="w-4 h-4 mr-2" /> Move Student
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Reassign Exam Modal */}
+      <Modal isOpen={reassignExam !== null} onClose={() => { setReassignExam(null); setReassignResult(null); }} title="Fix Exam Subject / Type">
+        {reassignExam && (
+          <div className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-3 text-sm">
+              <p className="font-semibold">{reassignExam.title}</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Currently: <strong>{reassignExam.subject}</strong> · <strong>{reassignExam.assessmentType === "mid_term" ? "Mid-term Test" : reassignExam.assessmentType === "exam" ? "Final Exam" : "Class Activity"}</strong>
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Student CBT scores will be recalculated using the new exam type's scale and moved to the correct column. Raw result data is never deleted.
+            </p>
+            <div>
+              <Label>Subject Name</Label>
+              <Input value={reassignNewSubject} onChange={e => setReassignNewSubject(e.target.value)} placeholder="e.g. English Language" />
+            </div>
+            <div>
+              <Label>Exam Type</Label>
+              <Select value={reassignNewType} onChange={e => setReassignNewType(e.target.value)}>
+                <option value="mid_term">Mid-term Test</option>
+                <option value="exam">Final Exam</option>
+                <option value="class_activity">Class Activity</option>
+              </Select>
+            </div>
+            {reassignResult && (
+              <p className={`text-sm font-medium ${reassignResult.startsWith("Error") ? "text-destructive" : "text-green-600"}`}>
+                {reassignResult}
+              </p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => { setReassignExam(null); setReassignResult(null); }} className="flex-1">Cancel</Button>
+              <Button
+                onClick={handleReassignExam}
+                isLoading={isReassigning}
+                disabled={!reassignNewSubject.trim() || !!reassignResult?.startsWith("Reassigned")}
+                className="flex-1"
+              >
+                <ArrowRightLeft className="w-4 h-4 mr-2" /> Apply Fix
               </Button>
             </div>
           </div>
