@@ -663,21 +663,51 @@ export default function ComprehensiveResults() {
 
             <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-report, #printable-report * { visibility: visible; }
+          @page { size: A4 portrait; margin: 1cm; }
+
+          /* Unblock overflow so content flows across print pages */
+          html, body { overflow: visible !important; height: auto !important; }
+          body > div { overflow: visible !important; height: auto !important; }
+
+          /* Hide app chrome */
+          aside { display: none !important; }
+
+          /* Free the main content area */
+          main {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            position: static !important;
+            flex: none !important;
+            width: 100% !important;
+          }
+          main > div { padding: 0 !important; max-width: 100% !important; }
+          main footer { display: none !important; }
+
+          /* Collapse the grid so the report card takes full width */
+          .grid { display: block !important; }
+
+          /* Hide non-print elements (sidebar, buttons, back link, etc.) */
+          .print\\:hidden { display: none !important; }
+
+          /* Report card */
           #printable-report {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            margin: 0;
-            padding: 24px;
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
             box-shadow: none !important;
             border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 16px !important;
           }
-          .print\\:hidden { display: none !important; }
-          select { display: none !important; }
-          input[type="number"] { border: none; background: transparent; }
-          input[type="date"] { display: none !important; }
+
+          /* Hide interactive inputs */
+          select, input[type="date"] { display: none !important; }
+          input[type="number"] { border: none !important; background: transparent !important; }
+
+          /* Ensure colours print */
+          * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
         }
       `}</style>
         </DashboardLayout>
