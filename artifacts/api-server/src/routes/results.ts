@@ -57,6 +57,7 @@ router.get("/", requireAuth, async (req: Request<SchoolParams>, res: Response) =
         submittedAt: resultsTable.submittedAt,
         examTitle: examsTable.title,
         subject: examsTable.subject,
+        assessmentType: examsTable.assessmentType,
       })
       .from(resultsTable)
       .leftJoin(examsTable, eq(resultsTable.examId, examsTable.id))

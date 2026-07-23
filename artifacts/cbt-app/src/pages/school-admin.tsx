@@ -55,6 +55,12 @@ export default function SchoolAdminDashboard() {
   const [sFullName, setSFullName] = useState("");
   const [sClass, setSClass] = useState("KG1");
 
+  // Results tab filter state
+  const [resClassFilter, setResClassFilter] = useState("");
+  const [resSubjectFilter, setResSubjectFilter] = useState("");
+  const [resTypeFilter, setResTypeFilter] = useState("");
+  const [resExpandedGroup, setResExpandedGroup] = useState<{ class: string; subject: string; type: string } | null>(null);
+
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
   const [academicSessionModalOpen, setAcademicSessionModalOpen] = useState(false);
@@ -927,51 +933,175 @@ export default function SchoolAdminDashboard() {
       )}
 
       {/* Results Tab */}
-      {activeTab === "Results" && (
-        <Card className="p-0 overflow-hidden">
-          <div className="p-4 border-b border-border/50 bg-muted/20">
-            <p className="text-xs text-muted-foreground">Click any result row to view the full question & answer breakdown</p>
+      {activeTab === "Results" && (() => {
+        const CLASS_ORDER = ["Pre-School","KG1","KG2","Nursery 1","Nursery 2","Pry 1","Pry 2","Pry 3","Pry 4","Pry 5","JSS1","JSS2","JSS3","SSS1","SSS2","SSS3"];
+        const typeLabel = (t: string | null) => t === "mid_term" ? "Mid-term Test" : t === "exam" ? "Final Exam" : t ?? "Other";
+
+        // Build unique filter options from all results
+        const allClasses = [...new Set(results.map(r => r.class).filter(Boolean))].sort((a, b) => CLASS_ORDER.indexOf(a!) - CLASS_ORDER.indexOf(b!));
+        const allSubjects = [...new Set(results.filter(r => !resClassFilter || r.class === resClassFilter).map(r => r.subject).filter(Boolean))].sort();
+        const allTypes = [...new Set(results.map(r => (r as any).assessmentType).filter(Boolean))];
+
+        // Filtered results matching current dropdowns
+        const filtered = results.filter(r =>
+          (!resClassFilter || r.class === resClassFilter) &&
+          (!resSubjectFilter || r.subject === resSubjectFilter) &&
+          (!resTypeFilter || (r as any).assessmentType === resTypeFilter)
+        );
+
+        // Group into (class, subject, assessmentType) buckets for summary
+        type GroupKey = string;
+        const groupMap = new Map<GroupKey, typeof results>();
+        for (const r of filtered) {
+          const key = `${r.class}||${r.subject}||${(r as any).assessmentType}`;
+          if (!groupMap.has(key)) groupMap.set(key, []);
+          groupMap.get(key)!.push(r);
+        }
+        const groups = [...groupMap.entries()]
+          .map(([key, rows]) => {
+            const [cls, subj, type] = key.split("||");
+            const avgPct = rows.reduce((s, r) => s + (r.percentage ?? 0), 0) / rows.length;
+            return { cls, subj, type, rows, avgPct };
+          })
+          .sort((a, b) => {
+            const ci = CLASS_ORDER.indexOf(a.cls) - CLASS_ORDER.indexOf(b.cls);
+            if (ci !== 0) return ci;
+            const si = a.subj.localeCompare(b.subj);
+            if (si !== 0) return si;
+            return (a.type === "mid_term" ? 0 : 1) - (b.type === "mid_term" ? 0 : 1);
+          });
+
+        const expandedRows = resExpandedGroup
+          ? filtered.filter(r =>
+              r.class === resExpandedGroup.class &&
+              r.subject === resExpandedGroup.subject &&
+              (r as any).assessmentType === resExpandedGroup.type
+            )
+          : null;
+
+        return (
+          <div className="space-y-4">
+            {/* Filters */}
+            <Card className="p-4">
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex-1 min-w-[140px]">
+                  <Label className="text-xs mb-1 block">Class</Label>
+                  <Select value={resClassFilter} onChange={e => { setResClassFilter(e.target.value); setResSubjectFilter(""); setResExpandedGroup(null); }}>
+                    <option value="">All Classes</option>
+                    {allClasses.map(c => <option key={c} value={c!}>{c}</option>)}
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <Label className="text-xs mb-1 block">Subject</Label>
+                  <Select value={resSubjectFilter} onChange={e => { setResSubjectFilter(e.target.value); setResExpandedGroup(null); }}>
+                    <option value="">All Subjects</option>
+                    {allSubjects.map(s => <option key={s} value={s!}>{s}</option>)}
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[160px]">
+                  <Label className="text-xs mb-1 block">Exam Type</Label>
+                  <Select value={resTypeFilter} onChange={e => { setResTypeFilter(e.target.value); setResExpandedGroup(null); }}>
+                    <option value="">All Types</option>
+                    {allTypes.map(t => <option key={t} value={t}>{typeLabel(t)}</option>)}
+                  </Select>
+                </div>
+                {(resClassFilter || resSubjectFilter || resTypeFilter) && (
+                  <Button variant="outline" onClick={() => { setResClassFilter(""); setResSubjectFilter(""); setResTypeFilter(""); setResExpandedGroup(null); }} className="shrink-0">
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </Card>
+
+            {/* Detail view — when a group row is clicked */}
+            {resExpandedGroup && expandedRows ? (
+              <Card className="p-0 overflow-hidden">
+                <div className="p-4 border-b border-border/50 bg-muted/20 flex items-center gap-3 flex-wrap">
+                  <button onClick={() => setResExpandedGroup(null)} className="text-primary text-sm hover:underline flex items-center gap-1">
+                    ← Back to summary
+                  </button>
+                  <span className="text-muted-foreground">·</span>
+                  <Badge>{resExpandedGroup.class}</Badge>
+                  <span className="font-semibold text-sm">{resExpandedGroup.subject}</span>
+                  <span className="text-muted-foreground text-sm">·</span>
+                  <span className="text-sm text-muted-foreground">{typeLabel(resExpandedGroup.type)}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{expandedRows.length} submission{expandedRows.length !== 1 ? "s" : ""} · Click row for breakdown</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border text-muted-foreground">
+                        <th className="px-4 py-3 font-semibold">Student</th>
+                        <th className="px-4 py-3 font-semibold">Score</th>
+                        <th className="px-4 py-3 font-semibold">Percentage</th>
+                        <th className="px-4 py-3 font-semibold">Submitted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expandedRows.sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0)).map(r => (
+                        <tr key={r.id} className="border-b border-border/50 hover:bg-primary/5 cursor-pointer" onClick={() => setSelectedResultId(r.id)}>
+                          <td className="px-4 py-3 font-semibold text-primary">{r.fullName}</td>
+                          <td className="px-4 py-3 font-bold">{r.score} / {r.totalQuestions}</td>
+                          <td className="px-4 py-3">
+                            <span className={`font-semibold ${(r.percentage ?? 0) >= 50 ? "text-green-600" : "text-destructive"}`}>
+                              {(r.percentage ?? 0).toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : (
+              /* Summary grouped table */
+              <Card className="p-0 overflow-hidden">
+                <div className="p-4 border-b border-border/50 bg-muted/20">
+                  <p className="text-xs text-muted-foreground">{groups.length} group{groups.length !== 1 ? "s" : ""} found — click any row to see individual student results</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border text-muted-foreground">
+                        <th className="px-4 py-3 font-semibold">Class</th>
+                        <th className="px-4 py-3 font-semibold">Subject</th>
+                        <th className="px-4 py-3 font-semibold">Exam Type</th>
+                        <th className="px-4 py-3 font-semibold text-center">Submissions</th>
+                        <th className="px-4 py-3 font-semibold text-center">Avg Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groups.map(({ cls, subj, type, rows, avgPct }) => (
+                        <tr
+                          key={`${cls}||${subj}||${type}`}
+                          className="border-b border-border/50 hover:bg-primary/5 cursor-pointer transition-colors"
+                          onClick={() => setResExpandedGroup({ class: cls, subject: subj, type })}
+                        >
+                          <td className="px-4 py-3"><Badge>{cls}</Badge></td>
+                          <td className="px-4 py-3 font-medium">{subj}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${type === "mid_term" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                              {typeLabel(type)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center font-semibold">{rows.length}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`font-bold ${avgPct >= 50 ? "text-green-600" : "text-destructive"}`}>{avgPct.toFixed(1)}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                      {groups.length === 0 && (
+                        <tr><td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">No results match the selected filters.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
           </div>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-muted/50 border-b border-border text-sm text-muted-foreground">
-                <th className="px-6 py-4 font-semibold">Student Name</th>
-                <th className="px-6 py-4 font-semibold">Class</th>
-                <th className="px-6 py-4 font-semibold">Exam Title</th>
-                <th className="px-6 py-4 font-semibold">Score</th>
-                <th className="px-6 py-4 font-semibold">Percentage</th>
-                <th className="px-6 py-4 font-semibold text-center">Grade</th>
-                <th className="px-6 py-4 font-semibold">Submitted</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map(r => {
-                const pct = r.percentage ?? 0;
-                return (
-                  <tr
-                    key={r.id}
-                    className="border-b border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                    onClick={() => setSelectedResultId(r.id)}
-                  >
-                    <td className="px-6 py-4 font-semibold text-primary">{r.fullName}</td>
-                    <td className="px-6 py-4"><Badge>{r.class}</Badge></td>
-                    <td className="px-6 py-4 font-medium">{r.examTitle || r.subject}</td>
-                    <td className="px-6 py-4 font-bold">{r.score} / {r.totalQuestions}</td>
-                    <td className="px-6 py-4 font-semibold">{pct.toFixed(1)}%</td>
-                    <td className="px-6 py-4 text-center text-muted-foreground">—</td>
-                    <td className="px-6 py-4 text-muted-foreground text-sm">
-                      {r.submittedAt ? format(new Date(r.submittedAt), "MMM d, yyyy h:mm a") : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-              {results.length === 0 && (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No results available yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
-      )}
+        );
+      })()}
 
       {/* Upload Results Tab */}
       {activeTab === "Upload Results" && (
