@@ -84,6 +84,7 @@
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/outfit": "^5.2.8",
+    "docx": "^9.7.1",
     "xlsx": "^0.18.5"
   }
 }

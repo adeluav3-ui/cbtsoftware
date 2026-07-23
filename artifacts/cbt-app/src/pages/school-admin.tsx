@@ -5,7 +5,7 @@ import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, u
 import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound, Smartphone, Tablet, Monitor } from "lucide-react";
+import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound, Smartphone, Tablet, Monitor, Download } from "lucide-react";
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -27,6 +27,7 @@ export default function SchoolAdminDashboard() {
   const { data: students = [], isLoading: studentsLoading } = useListStudents(schoolCode, classFilter);
   const { data: results = [] } = useListResults(schoolCode);
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [schoolName, setSchoolName] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [bulkStudentModalOpen, setBulkStudentModalOpen] = useState(false);
 
@@ -204,6 +205,7 @@ export default function SchoolAdminDashboard() {
       if (!response.ok) return;
       const data = await response.json();
       setSchoolLogo(data.logoUrl);
+      setSchoolName(data.name || "");
       setCurrentTerm(data.currentTerm || "First Term");
       setAvailableTerms(data.availableTerms || ["First Term", "Second Term", "Third Term"]);
       setAcademicSession(data.currentAcademicSession || "2025/2026");
@@ -747,6 +749,135 @@ export default function SchoolAdminDashboard() {
     } finally {
       setIsLoadingBroadsheet(false);
     }
+  };
+
+  const handleBroadsheetPDF = () => {
+    if (!broadsheetData) return;
+    const { students, subjects } = broadsheetData;
+    const title = `${schoolName || schoolCode} — ${broadsheetClass} Broadsheet`;
+    const subtitle = `${currentTerm} · ${academicSession}`;
+
+    const thCols = ['#', 'Student Name', ...subjects, 'Grand Total', 'Avg %', 'Position']
+      .map(h => `<th>${h}</th>`).join('');
+
+    const rows = students.map((s, i) => {
+      const subjectCells = subjects.map(subj => {
+        const score = s.subjectTotals[subj];
+        const val = score !== null && score !== undefined ? score : '—';
+        const colour = typeof score === 'number'
+          ? score >= 70 ? '#16a34a' : score >= 50 ? '#2563eb' : '#dc2626'
+          : '#9ca3af';
+        return `<td style="text-align:center;color:${colour};font-weight:${typeof score === 'number' && score >= 70 ? '700' : '400'}">${val}</td>`;
+      }).join('');
+      return `<tr>
+        <td style="text-align:center;color:#6b7280">${i + 1}</td>
+        <td style="font-weight:600">${s.fullName}</td>
+        ${subjectCells}
+        <td style="text-align:center;font-weight:700">${s.grandTotal}</td>
+        <td style="text-align:center;font-weight:700">${s.average !== null ? `${s.average}%` : '—'}</td>
+        <td style="text-align:center;font-weight:700;color:#7c3aed">${s.position ?? '—'}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${title}</title>
+      <style>
+        @page { size: A3 landscape; margin: 1.2cm; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; }
+        h2 { margin: 0 0 2px; font-size: 15px; }
+        p { margin: 0 0 12px; color: #555; font-size: 11px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #f3f4f6; }
+        th { padding: 6px 8px; text-align: left; font-weight: 700; border-bottom: 2px solid #d1d5db; white-space: nowrap; font-size: 10px; }
+        td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+        tr:nth-child(even) { background: #f9fafb; }
+        @media print { body { margin: 0; } }
+      </style></head><body>
+      <h2>${title}</h2>
+      <p>${subtitle} &nbsp;·&nbsp; ${students.length} student${students.length !== 1 ? 's' : ''}</p>
+      <table><thead><tr>${thCols}</tr></thead><tbody>${rows}</tbody></table>
+    </body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1400px;height:900px;';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      iframe.contentWindow?.print();
+      setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 3000);
+    };
+  };
+
+  const handleBroadsheetDocx = async () => {
+    if (!broadsheetData) return;
+    const { Document, Packer, Table, TableCell, TableRow, Paragraph, TextRun, WidthType, AlignmentType, PageOrientation, HeadingLevel } = await import('docx');
+    const { students, subjects } = broadsheetData;
+
+    const allCols = ['#', 'Student Name', ...subjects, 'Grand Total', 'Avg %', 'Position'];
+    const colCount = allCols.length;
+    const colWidth = Math.floor(9000 / colCount);
+
+    const makeCell = (text: string, bold = false, center = false) =>
+      new TableCell({
+        width: { size: colWidth, type: WidthType.DXA },
+        children: [new Paragraph({
+          alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT,
+          children: [new TextRun({ text, bold, size: 18 })],
+        })],
+      });
+
+    const headerRow = new TableRow({
+      tableHeader: true,
+      children: allCols.map((h, i) => makeCell(h, true, i >= 2)),
+    });
+
+    const dataRows = students.map((s: any, idx: number) => new TableRow({
+      children: [
+        makeCell(String(idx + 1), false, true),
+        makeCell(s.fullName, true),
+        ...subjects.map((subj: string) => {
+          const score = s.subjectTotals[subj];
+          return makeCell(score !== null && score !== undefined ? String(score) : '—', false, true);
+        }),
+        makeCell(String(s.grandTotal), true, true),
+        makeCell(s.average !== null ? `${s.average}%` : '—', true, true),
+        makeCell(String(s.position ?? '—'), true, true),
+      ],
+    }));
+
+    const table = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [headerRow, ...dataRows],
+    });
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            size: { orientation: PageOrientation.LANDSCAPE, width: 16838, height: 11906 },
+            margin: { top: 720, bottom: 720, left: 720, right: 720 },
+          },
+        },
+        children: [
+          new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: `${schoolName || schoolCode} — ${broadsheetClass} Broadsheet`, bold: true })] }),
+          new Paragraph({ children: [new TextRun({ text: `${currentTerm} · ${academicSession}   |   ${students.length} student${students.length !== 1 ? 's' : ''}`, color: '555555' })] }),
+          new Paragraph(''),
+          table,
+        ],
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `broadsheet-${broadsheetClass}-${currentTerm.replace(/\s+/g, '-')}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -1641,11 +1772,14 @@ export default function SchoolAdminDashboard() {
               <Button onClick={() => fetchBroadsheet(broadsheetClass)} isLoading={isLoadingBroadsheet}>
                 Generate
               </Button>
-              {broadsheetData && broadsheetData.students.length > 0 && (
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="w-4 h-4 mr-2" /> Print
+              {broadsheetData && broadsheetData.students.length > 0 && (<>
+                <Button variant="outline" onClick={handleBroadsheetPDF}>
+                  <Printer className="w-4 h-4 mr-2" /> PDF
                 </Button>
-              )}
+                <Button variant="outline" onClick={handleBroadsheetDocx}>
+                  <Download className="w-4 h-4 mr-2" /> DOCX
+                </Button>
+              </>)}
             </div>
           </div>
 

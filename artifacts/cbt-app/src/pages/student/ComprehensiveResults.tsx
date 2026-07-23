@@ -82,11 +82,6 @@ const AUTO_COMMENTS = [
 
 const CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
 
-function getOrdinalSuffix(n: number): string {
-    const s = ["th", "st", "nd", "rd"];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
 
 export default function ComprehensiveResults() {
     const { user } = useAuth();
@@ -110,7 +105,6 @@ export default function ComprehensiveResults() {
     const [isLoadingStudents, setIsLoadingStudents] = useState(false);
     const [scheme, setScheme] = useState({ midTermTotal: 20, classActivityTotal: 20, examTotal: 60, gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 });
 
-    const [position, setPosition] = useState<{ positionInClass: number; totalInClass: number } | null>(null);
     const [traits, setTraits] = useState<TraitRating[]>(DEFAULT_TRAITS.map(t => ({ ...t })));
     const [isSavingTraits, setIsSavingTraits] = useState(false);
     const [attendance, setAttendance] = useState({ timesSchoolOpened: 0, timesPresent: 0 });
@@ -132,7 +126,6 @@ export default function ComprehensiveResults() {
     useEffect(() => {
         if (!selectedStudent) return;
         fetchStudentResults();
-        fetchClassPosition();
         fetchTraits();
         fetchAttendance();
     }, [selectedStudent]);
@@ -180,15 +173,6 @@ export default function ComprehensiveResults() {
         } catch {} finally {
             setIsLoading(false);
         }
-    };
-
-    const fetchClassPosition = async () => {
-        if (!selectedStudent) return;
-        try {
-            const res = await fetch(`${API}/schools/${schoolCode}/students/${selectedStudent.id}/class-position`, { credentials: "include" });
-            if (!res.ok) return;
-            setPosition(await res.json());
-        } catch {}
     };
 
     const fetchTraits = async () => {
@@ -551,8 +535,17 @@ export default function ComprehensiveResults() {
                                         </table>
                                     </div>
 
-                                    {/* Cognitive, Affective & Psychomotor Domains */}
-                                    <div className="mb-4">
+                                    {/* Cognitive, Affective & Psychomotor Domains — starts on page 2 when printed */}
+                                    <div className="mb-4 print-page-2">
+                                        {/* Repeat student identity at top of page 2 (hidden on screen) */}
+                                        <div className="print-page-2-header mb-3 pb-3 border-b-2 border-border">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-sm">{schoolInfo.name}</span>
+                                                <span className="text-muted-foreground text-xs">·</span>
+                                                <span className="text-xs text-muted-foreground">{schoolInfo.currentTerm} · {schoolInfo.academicSession}</span>
+                                            </div>
+                                            <p className="font-semibold text-sm mt-0.5">{selectedStudent?.fullName} — {selectedStudent?.class}</p>
+                                        </div>
                                         <h3 className="font-semibold text-sm mb-3 uppercase tracking-wide text-muted-foreground">
                                             Cognitive, Affective &amp; Psychomotor Assessment
                                         </h3>
@@ -657,8 +650,11 @@ export default function ComprehensiveResults() {
             </div>
 
             <style>{`
+        /* Page-2 mini-header: hidden on screen, visible only when printing */
+        .print-page-2-header { display: none; }
+
         @media print {
-          @page { size: A4 portrait; margin: 1cm; }
+          @page { size: A4 portrait; margin: 1.2cm; }
 
           /* Unblock overflow so content flows across print pages */
           html, body { overflow: visible !important; height: auto !important; }
@@ -694,8 +690,23 @@ export default function ComprehensiveResults() {
             border: none !important;
             border-radius: 0 !important;
             margin: 0 !important;
-            padding: 16px !important;
+            padding: 12px !important;
           }
+
+          /* Page break: Cognitive/Affective/Psychomotor starts on page 2 */
+          .print-page-2 {
+            page-break-before: always !important;
+            break-before: page !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+          }
+
+          /* Show the page-2 mini-header only when printing */
+          .print-page-2-header { display: block !important; }
+
+          /* Prevent unwanted breaks inside tables */
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; }
 
           /* Hide interactive inputs */
           select, input[type="date"] { display: none !important; }
