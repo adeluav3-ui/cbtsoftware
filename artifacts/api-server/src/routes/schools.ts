@@ -493,6 +493,8 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
 
   const from = fromName.trim();
   const to = toName.trim();
+  // Build a safe IN list — values come from the hardcoded levelClassMap, not user input
+  const classInList = sql.join(levelClasses.map(c => sql`${c}`), sql`, `);
 
   try {
     // Step 1: For rows where BOTH fromName and toName exist for the same student+term+session
@@ -516,7 +518,7 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
         AND t.student_id         = f.student_id
         AND t.term               = f.term
         AND t.academic_session   = f.academic_session
-        AND u.class              = ANY(${levelClasses})
+        AND u.class              IN (${classInList})
     `);
 
     // Step 2: Rename remaining fromName rows (no matching toName row) for level students → toName
@@ -526,7 +528,7 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
       WHERE school_code  = ${schoolCodeStr}
         AND subject_name = ${from}
         AND student_id IN (
-          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class = ANY(${levelClasses})
+          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class IN (${classInList})
         )
         AND (student_id, term, academic_session) NOT IN (
           SELECT student_id, term, academic_session
@@ -541,7 +543,7 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
       WHERE school_code = ${schoolCodeStr}
         AND subject_name = ${from}
         AND student_id IN (
-          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class = ANY(${levelClasses})
+          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class IN (${classInList})
         )
     `);
 
@@ -551,7 +553,7 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
       SET subject = ${to}
       WHERE school_code = ${schoolCodeStr}
         AND subject = ${from}
-        AND class = ANY(${levelClasses})
+        AND class IN (${classInList})
     `);
 
     // Step 5: Delete the fromName subject entry from subjects table for this level
