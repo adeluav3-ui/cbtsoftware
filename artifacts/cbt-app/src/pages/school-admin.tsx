@@ -79,6 +79,12 @@ export default function SchoolAdminDashboard() {
   const [termError, setTermError] = useState("");
   const [academicSession, setAcademicSession] = useState("2025/2026");
 
+  // Subject merge state
+  const [mergeSubject, setMergeSubject] = useState<{ id: number; name: string; level: string } | null>(null);
+  const [mergeTargetName, setMergeTargetName] = useState("");
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeError, setMergeError] = useState("");
+
   // Bulk subject upload state
   const [bulkSubjectModalOpen, setBulkSubjectModalOpen] = useState(false);
   const [bulkSubjectsText, setBulkSubjectsText] = useState("");
@@ -355,6 +361,30 @@ export default function SchoolAdminDashboard() {
       }
     } catch (err) {
       console.error("Failed to delete subject", err);
+    }
+  };
+
+  // Merge subject into another
+  const handleMergeSubject = async () => {
+    if (!mergeSubject || !mergeTargetName.trim()) return;
+    setIsMerging(true);
+    setMergeError("");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ fromName: mergeSubject.name, toName: mergeTargetName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMergeError(data.error || "Merge failed"); return; }
+      setMergeSubject(null);
+      setMergeTargetName("");
+      await fetchSubjects();
+    } catch {
+      setMergeError("Network error. Please try again.");
+    } finally {
+      setIsMerging(false);
     }
   };
 
@@ -984,14 +1014,25 @@ export default function SchoolAdminDashboard() {
                     ) : subjects.filter(s => s.level === level).map(subject => (
                       <div key={subject.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg hover:bg-muted/40">
                         <span className="font-medium">{subject.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteSubject(subject.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setMergeSubject(subject); setMergeTargetName(""); setMergeError(""); }}
+                            title="Merge into another subject"
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <ArrowRightLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSubject(subject.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -999,6 +1040,42 @@ export default function SchoolAdminDashboard() {
               ))}
             </div>
           )}
+
+          {/* Merge Subject Modal */}
+          <Modal isOpen={mergeSubject !== null} onClose={() => setMergeSubject(null)} title="Merge Subject">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                All scores and exams under <strong>"{mergeSubject?.name}"</strong> will be moved into the subject you choose below. The old subject name will be removed.
+              </p>
+              <div>
+                <Label>Merge into (type exact target subject name)</Label>
+                <Input
+                  value={mergeTargetName}
+                  onChange={e => setMergeTargetName(e.target.value)}
+                  placeholder={`e.g., ${mergeSubject?.level === 'junior' ? 'English Language' : 'English Studies'}`}
+                  list="merge-target-options"
+                />
+                <datalist id="merge-target-options">
+                  {subjects
+                    .filter(s => s.level === mergeSubject?.level && s.name !== mergeSubject?.name)
+                    .map(s => <option key={s.id} value={s.name} />)}
+                </datalist>
+                <p className="text-xs text-muted-foreground mt-1">Pick from the same level or type any name.</p>
+              </div>
+              {mergeError && <p className="text-sm text-destructive">{mergeError}</p>}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setMergeSubject(null)} className="flex-1">Cancel</Button>
+                <Button
+                  onClick={handleMergeSubject}
+                  isLoading={isMerging}
+                  disabled={!mergeTargetName.trim()}
+                  className="flex-1"
+                >
+                  <ArrowRightLeft className="w-4 h-4 mr-2" /> Merge
+                </Button>
+              </div>
+            </div>
+          </Modal>
 
           {/* Add Subject Modal */}
           <Modal isOpen={subjectModalOpen} onClose={() => setSubjectModalOpen(false)} title="Add New Subject">

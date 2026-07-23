@@ -465,6 +465,81 @@ router.delete("/:schoolCode/subjects/:subjectId", requireSchoolAdmin, async (req
   }
 });
 
+// Merge one subject name into another — coalesces scores, renames exams, deletes old subject
+router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const { schoolCode } = req.params;
+  const schoolCodeStr = String(schoolCode);
+  const { fromName, toName } = req.body as { fromName?: string; toName?: string };
+
+  if (!fromName?.trim() || !toName?.trim()) {
+    return res.status(400).json({ error: "fromName and toName are required" });
+  }
+  if (fromName.trim().toLowerCase() === toName.trim().toLowerCase()) {
+    return res.status(400).json({ error: "fromName and toName must be different" });
+  }
+
+  try {
+    // Step 1: For rows where BOTH fromName and toName exist (same student+term+session),
+    //         coalesce null components from fromName into the toName row.
+    await db.execute(sql`
+      UPDATE subject_scores AS t
+      SET
+        mid_term_score       = COALESCE(t.mid_term_score,       f.mid_term_score),
+        mid_term_cbt_score   = COALESCE(t.mid_term_cbt_score,   f.mid_term_cbt_score),
+        class_activity_score = COALESCE(t.class_activity_score, f.class_activity_score),
+        exam_score           = COALESCE(t.exam_score,           f.exam_score),
+        exam_cbt_score       = COALESCE(t.exam_cbt_score,       f.exam_cbt_score),
+        total_score          = COALESCE(t.total_score,          f.total_score),
+        updated_at           = NOW()
+      FROM subject_scores AS f
+      WHERE f.school_code        = ${schoolCodeStr}
+        AND f.subject_name       = ${fromName.trim()}
+        AND t.school_code        = ${schoolCodeStr}
+        AND t.subject_name       = ${toName.trim()}
+        AND t.student_id         = f.student_id
+        AND t.term               = f.term
+        AND t.academic_session   = f.academic_session
+    `);
+
+    // Step 2: Rename remaining fromName rows (no matching toName row) → toName
+    await db.execute(sql`
+      UPDATE subject_scores
+      SET subject_name = ${toName.trim()}, updated_at = NOW()
+      WHERE school_code  = ${schoolCodeStr}
+        AND subject_name = ${fromName.trim()}
+        AND (student_id, term, academic_session) NOT IN (
+          SELECT student_id, term, academic_session
+          FROM subject_scores
+          WHERE school_code = ${schoolCodeStr} AND subject_name = ${toName.trim()}
+        )
+    `);
+
+    // Step 3: Delete any leftover fromName rows (the ones that were coalesced in step 1)
+    await db.execute(sql`
+      DELETE FROM subject_scores
+      WHERE school_code = ${schoolCodeStr} AND subject_name = ${fromName.trim()}
+    `);
+
+    // Step 4: Rename all exams with fromName subject to toName
+    await db
+      .update(examsTable)
+      .set({ subject: toName.trim() })
+      .where(and(eq(examsTable.schoolCode, schoolCodeStr), eq(examsTable.subject, fromName.trim())));
+
+    // Step 5: Delete the fromName subject from subjects table (if it exists)
+    await db
+      .delete(subjectsTable)
+      .where(and(eq(subjectsTable.schoolCode, schoolCodeStr), eq(subjectsTable.name, fromName.trim())));
+
+    res.json({ ok: true, message: `Merged "${fromName}" into "${toName}" successfully` });
+    return;
+  } catch (err) {
+    console.error("Subject merge error:", err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Get grading scheme for a school
 router.get("/:schoolCode/grading-scheme", requireSchoolStaff, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
