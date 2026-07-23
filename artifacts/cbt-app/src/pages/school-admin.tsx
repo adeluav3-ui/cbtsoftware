@@ -374,7 +374,7 @@ export default function SchoolAdminDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ fromName: mergeSubject.name, toName: mergeTargetName.trim() }),
+        body: JSON.stringify({ fromName: mergeSubject.name, toName: mergeTargetName.trim(), level: mergeSubject.level }),
       });
       const data = await res.json();
       if (!res.ok) { setMergeError(data.error || "Merge failed"); return; }
@@ -1045,7 +1045,7 @@ export default function SchoolAdminDashboard() {
           <Modal isOpen={mergeSubject !== null} onClose={() => setMergeSubject(null)} title="Merge Subject">
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                All scores and exams under <strong>"{mergeSubject?.name}"</strong> will be moved into the subject you choose below. The old subject name will be removed.
+                All scores and exams under <strong>"{mergeSubject?.name}"</strong> ({mergeSubject?.level} level) will be moved into the subject you choose below. Only {mergeSubject?.level}-level data is affected — other levels remain unchanged.
               </p>
               <div>
                 <Label>Merge into (type exact target subject name)</Label>

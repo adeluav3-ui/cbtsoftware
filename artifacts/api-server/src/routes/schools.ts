@@ -466,21 +466,37 @@ router.delete("/:schoolCode/subjects/:subjectId", requireSchoolAdmin, async (req
 });
 
 // Merge one subject name into another — coalesces scores, renames exams, deletes old subject
+// Scoped to a specific level so JSS and SSS subjects with the same name stay independent.
 router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
-  const { fromName, toName } = req.body as { fromName?: string; toName?: string };
+  const { fromName, toName, level } = req.body as { fromName?: string; toName?: string; level?: string };
 
-  if (!fromName?.trim() || !toName?.trim()) {
-    return res.status(400).json({ error: "fromName and toName are required" });
+  if (!fromName?.trim() || !toName?.trim() || !level?.trim()) {
+    return res.status(400).json({ error: "fromName, toName, and level are required" });
   }
   if (fromName.trim().toLowerCase() === toName.trim().toLowerCase()) {
     return res.status(400).json({ error: "fromName and toName must be different" });
   }
 
+  const levelClassMap: Record<string, string[]> = {
+    kg:      ["Pre-School", "KG1", "KG2"],
+    nursery: ["Nursery 1", "Nursery 2"],
+    primary: ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5"],
+    junior:  ["JSS1", "JSS2", "JSS3"],
+    senior:  ["SSS1", "SSS2", "SSS3"],
+  };
+  const levelClasses = levelClassMap[level.trim()];
+  if (!levelClasses) {
+    return res.status(400).json({ error: `Unknown level "${level}"` });
+  }
+
+  const from = fromName.trim();
+  const to = toName.trim();
+
   try {
-    // Step 1: For rows where BOTH fromName and toName exist (same student+term+session),
-    //         coalesce null components from fromName into the toName row.
+    // Step 1: For rows where BOTH fromName and toName exist for the same student+term+session
+    //         AND that student is in this level's classes, coalesce null components into toName.
     await db.execute(sql`
       UPDATE subject_scores AS t
       SET
@@ -492,46 +508,62 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
         total_score          = COALESCE(t.total_score,          f.total_score),
         updated_at           = NOW()
       FROM subject_scores AS f
+      JOIN users AS u ON u.id = f.student_id
       WHERE f.school_code        = ${schoolCodeStr}
-        AND f.subject_name       = ${fromName.trim()}
+        AND f.subject_name       = ${from}
         AND t.school_code        = ${schoolCodeStr}
-        AND t.subject_name       = ${toName.trim()}
+        AND t.subject_name       = ${to}
         AND t.student_id         = f.student_id
         AND t.term               = f.term
         AND t.academic_session   = f.academic_session
+        AND u.class              = ANY(${levelClasses})
     `);
 
-    // Step 2: Rename remaining fromName rows (no matching toName row) → toName
+    // Step 2: Rename remaining fromName rows (no matching toName row) for level students → toName
     await db.execute(sql`
       UPDATE subject_scores
-      SET subject_name = ${toName.trim()}, updated_at = NOW()
+      SET subject_name = ${to}, updated_at = NOW()
       WHERE school_code  = ${schoolCodeStr}
-        AND subject_name = ${fromName.trim()}
+        AND subject_name = ${from}
+        AND student_id IN (
+          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class = ANY(${levelClasses})
+        )
         AND (student_id, term, academic_session) NOT IN (
           SELECT student_id, term, academic_session
           FROM subject_scores
-          WHERE school_code = ${schoolCodeStr} AND subject_name = ${toName.trim()}
+          WHERE school_code = ${schoolCodeStr} AND subject_name = ${to}
         )
     `);
 
-    // Step 3: Delete any leftover fromName rows (the ones that were coalesced in step 1)
+    // Step 3: Delete leftover fromName rows for level students (those already coalesced in step 1)
     await db.execute(sql`
       DELETE FROM subject_scores
-      WHERE school_code = ${schoolCodeStr} AND subject_name = ${fromName.trim()}
+      WHERE school_code = ${schoolCodeStr}
+        AND subject_name = ${from}
+        AND student_id IN (
+          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class = ANY(${levelClasses})
+        )
     `);
 
-    // Step 4: Rename all exams with fromName subject to toName
-    await db
-      .update(examsTable)
-      .set({ subject: toName.trim() })
-      .where(and(eq(examsTable.schoolCode, schoolCodeStr), eq(examsTable.subject, fromName.trim())));
+    // Step 4: Rename exams with fromName subject to toName (only for this level's classes)
+    await db.execute(sql`
+      UPDATE exams
+      SET subject = ${to}
+      WHERE school_code = ${schoolCodeStr}
+        AND subject = ${from}
+        AND class = ANY(${levelClasses})
+    `);
 
-    // Step 5: Delete the fromName subject from subjects table (if it exists)
+    // Step 5: Delete the fromName subject entry from subjects table for this level
     await db
       .delete(subjectsTable)
-      .where(and(eq(subjectsTable.schoolCode, schoolCodeStr), eq(subjectsTable.name, fromName.trim())));
+      .where(and(
+        eq(subjectsTable.schoolCode, schoolCodeStr),
+        eq(subjectsTable.name, from),
+        eq(subjectsTable.level, level.trim()),
+      ));
 
-    res.json({ ok: true, message: `Merged "${fromName}" into "${toName}" successfully` });
+    res.json({ ok: true, message: `Merged "${from}" into "${to}" for ${level} level successfully` });
     return;
   } catch (err) {
     console.error("Subject merge error:", err);
