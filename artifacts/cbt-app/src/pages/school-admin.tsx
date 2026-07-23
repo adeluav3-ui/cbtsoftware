@@ -798,16 +798,11 @@ export default function SchoolAdminDashboard() {
       <table><thead><tr>${thCols}</tr></thead><tbody>${rows}</tbody></table>
     </body></html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1400px;height:900px;';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-    iframe.onload = () => {
-      iframe.contentWindow?.print();
-      setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 3000);
-    };
+    const win = window.open('', '_blank', 'width=1400,height=900');
+    if (!win) { alert('Allow popups for this site to export PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); }, 400);
   };
 
   const handleBroadsheetDocx = async () => {
@@ -1869,13 +1864,11 @@ export default function SchoolAdminDashboard() {
             <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${classStudents.length} student${classStudents.length !== 1 ? 's' : ''}</p>
             <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
             <tbody>${rows}</tbody></table></body></html>`;
-          const blob = new Blob([html], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
-          const iframe = document.createElement('iframe');
-          iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;';
-          iframe.src = url;
-          document.body.appendChild(iframe);
-          iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000); };
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (!win) { alert('Allow popups for this site to print credentials.'); return; }
+          win.document.write(html);
+          win.document.close();
+          setTimeout(() => { win.focus(); win.print(); }, 400);
         };
 
         const handlePrintTeachers = () => {
@@ -1894,13 +1887,11 @@ export default function SchoolAdminDashboard() {
             <p>School: ${schoolCode} &nbsp;|&nbsp; Total: ${teacherCredentials.length} teacher${teacherCredentials.length !== 1 ? 's' : ''}</p>
             <table><thead><tr><th>#</th><th>Full Name</th><th>Username</th><th>Password</th></tr></thead>
             <tbody>${rows}</tbody></table></body></html>`;
-          const blob = new Blob([html], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
-          const iframe = document.createElement('iframe');
-          iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;';
-          iframe.src = url;
-          document.body.appendChild(iframe);
-          iframe.onload = () => { iframe.contentWindow?.print(); setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 2000); };
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (!win) { alert('Allow popups for this site to print credentials.'); return; }
+          win.document.write(html);
+          win.document.close();
+          setTimeout(() => { win.focus(); win.print(); }, 400);
         };
 
         const loadTeacherCredentials = async () => {
