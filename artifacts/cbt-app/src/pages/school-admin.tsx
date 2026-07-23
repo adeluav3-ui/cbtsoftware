@@ -935,25 +935,26 @@ export default function SchoolAdminDashboard() {
       {/* Results Tab */}
       {activeTab === "Results" && (() => {
         const CLASS_ORDER = ["Pre-School","KG1","KG2","Nursery 1","Nursery 2","Pry 1","Pry 2","Pry 3","Pry 4","Pry 5","JSS1","JSS2","JSS3","SSS1","SSS2","SSS3"];
-        const typeLabel = (t: string | null) => t === "mid_term" ? "Mid-term Test" : t === "exam" ? "Final Exam" : t ?? "Other";
+        const getType = (r: any) => (r.assessmentType && r.assessmentType !== "undefined") ? r.assessmentType : "unknown";
+        const typeLabel = (t: string) => t === "mid_term" ? "Mid-term Test" : t === "exam" ? "Final Exam" : "Unknown";
 
         // Build unique filter options from all results
         const allClasses = [...new Set(results.map(r => r.class).filter(Boolean))].sort((a, b) => CLASS_ORDER.indexOf(a!) - CLASS_ORDER.indexOf(b!));
         const allSubjects = [...new Set(results.filter(r => !resClassFilter || r.class === resClassFilter).map(r => r.subject).filter(Boolean))].sort();
-        const allTypes = [...new Set(results.map(r => (r as any).assessmentType).filter(Boolean))];
+        const allTypes = [...new Set(results.map(r => getType(r)).filter(t => t !== "unknown"))];
 
         // Filtered results matching current dropdowns
         const filtered = results.filter(r =>
           (!resClassFilter || r.class === resClassFilter) &&
           (!resSubjectFilter || r.subject === resSubjectFilter) &&
-          (!resTypeFilter || (r as any).assessmentType === resTypeFilter)
+          (!resTypeFilter || getType(r) === resTypeFilter)
         );
 
         // Group into (class, subject, assessmentType) buckets for summary
         type GroupKey = string;
         const groupMap = new Map<GroupKey, typeof results>();
         for (const r of filtered) {
-          const key = `${r.class}||${r.subject}||${(r as any).assessmentType}`;
+          const key = `${r.class}||${r.subject}||${getType(r)}`;
           if (!groupMap.has(key)) groupMap.set(key, []);
           groupMap.get(key)!.push(r);
         }
