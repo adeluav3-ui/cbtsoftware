@@ -201,7 +201,7 @@ export default function MyResults() {
               <td class="c">${s.midTermScore ?? '—'}</td>
               <td class="c">${s.classActivityScore ?? '—'}</td>
               <td class="c">${s.examScore ?? '—'}</td>
-              <td class="c b">${ok ? `${s.totalScore}/100` : '—'}</td>
+              <td class="c b">${ok ? `${s.totalScore}%` : '—'}</td>
               <td class="c b" style="color:${gc(s.grade)}">${s.grade || '—'}</td>
             </tr>`;
         }).join('');
@@ -290,7 +290,7 @@ export default function MyResults() {
             <th class="c">Mid-Term<br><span style="font-weight:400">/${scheme.midTermTotal}</span></th>
             <th class="c">CA<br><span style="font-weight:400">/${scheme.classActivityTotal}</span></th>
             <th class="c">Exam<br><span style="font-weight:400">/${scheme.examTotal}</span></th>
-            <th class="c">Total<br><span style="font-weight:400">/100</span></th>
+            <th class="c">Total %</th>
             <th class="c">Grade</th>
           </tr></thead>
           <tbody>${subjectRows}</tbody>
@@ -424,7 +424,7 @@ export default function MyResults() {
                                         <th className="px-2 py-2 font-semibold text-center">Mid-Term<br /><span className="font-normal text-xs">/{scheme.midTermTotal}</span></th>
                                         <th className="px-2 py-2 font-semibold text-center">CA<br /><span className="font-normal text-xs">/{scheme.classActivityTotal}</span></th>
                                         <th className="px-2 py-2 font-semibold text-center">Exam<br /><span className="font-normal text-xs">/{scheme.examTotal}</span></th>
-                                        <th className="px-2 py-2 font-semibold text-center">Total<br /><span className="font-normal text-xs">/100</span></th>
+                                        <th className="px-2 py-2 font-semibold text-center">Total %</th>
                                         <th className="px-2 py-2 font-semibold text-center">Grade</th>
                                     </tr>
                                 </thead>
@@ -437,7 +437,7 @@ export default function MyResults() {
                                                 <td className="px-2 py-1.5 text-center">{subject.midTermScore ?? "—"}</td>
                                                 <td className="px-2 py-1.5 text-center">{subject.classActivityScore ?? "—"}</td>
                                                 <td className="px-2 py-1.5 text-center">{subject.examScore ?? "—"}</td>
-                                                <td className="px-2 py-1.5 text-center font-bold">{isComplete ? `${subject.totalScore}/100` : "—"}</td>
+                                                <td className="px-2 py-1.5 text-center font-bold">{isComplete ? `${subject.totalScore}%` : "—"}</td>
                                                 <td className={`px-2 py-1.5 text-center ${getGradeColor(subject.grade)}`}>{subject.grade || "—"}</td>
                                             </tr>
                                         );
