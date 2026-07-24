@@ -240,6 +240,7 @@ router.get("/:studentId/detail", requireSchoolAdmin, async (req: Request<Student
         class: usersTable.class,
         schoolCode: usersTable.schoolCode,
         profilePicture: usersTable.profilePicture,
+        feesFullyPaid: usersTable.feesFullyPaid,
         createdAt: usersTable.createdAt,
       })
       .from(usersTable)
@@ -346,6 +347,36 @@ router.post("/:studentId/reset-password", requireSchoolAdmin, async (req: Reques
     }
 
     res.json({ message: "Password reset successfully", student: updated });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Toggle fees-paid status for a student
+router.patch("/:studentId/fees-status", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { feesFullyPaid } = req.body;
+
+  if (typeof feesFullyPaid !== "boolean") {
+    return res.status(400).json({ error: "feesFullyPaid must be a boolean" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(usersTable)
+      .set({ feesFullyPaid })
+      .where(and(
+        eq(usersTable.id, parseInt(studentId)),
+        eq(usersTable.schoolCode, schoolCode),
+        eq(usersTable.role, "student"),
+      ))
+      .returning({ id: usersTable.id, feesFullyPaid: usersTable.feesFullyPaid });
+
+    if (!updated) return res.status(404).json({ error: "Student not found" });
+    res.json(updated);
     return;
   } catch (err) {
     console.error(err);
@@ -526,6 +557,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
         totalScore: totalScore,
         percentage: percentage,
         grade: grade,
+        teacherComment: existing?.teacherComment ?? null,
       });
     }
 
@@ -560,6 +592,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
           totalScore,
           percentage,
           grade,
+          teacherComment: score.teacherComment ?? null,
         });
       }
     }

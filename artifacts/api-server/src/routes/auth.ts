@@ -67,6 +67,11 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // Block students whose fees have not been fully paid
+    if (user.role === "student" && user.feesFullyPaid === false) {
+      return res.status(403).json({ error: "Fees not fully paid. Please contact school admin to access your account" });
+    }
+
     let schoolName: string | null = null;
     let isDisabled = false;
     if (user.schoolCode) {

@@ -79,10 +79,13 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const [nameValue, setNameValue] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [displayName, setDisplayName] = useState(studentName);
+  const [feesFullyPaid, setFeesFullyPaid] = useState<boolean | null>(null);
+  const [togglingFees, setTogglingFees] = useState(false);
 
   useEffect(() => {
     setDisplayName(studentName);
     setEditingName(false);
+    setFeesFullyPaid(null);
   }, [studentName, studentId]);
 
   const { data, isLoading, refetch: refetchStudent } = useQuery({
@@ -101,6 +104,13 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const profilePicture = data?.profilePicture || null;
   const studentUsername = data?.username || "";
   const studentPassword = data?.password || "";
+
+  // Sync feesFullyPaid from server data (only on first load for this student)
+  useEffect(() => {
+    if (data && feesFullyPaid === null) {
+      setFeesFullyPaid(data.feesFullyPaid ?? true);
+    }
+  }, [data]);
 
   const avgPct = results.length > 0
     ? results.reduce((acc: number, r: any) => acc + (r.percentage ?? 0), 0) / results.length
@@ -165,6 +175,22 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
       }
     } catch (_) {}
     setSavingName(false);
+  };
+
+  const handleToggleFees = async () => {
+    if (!studentId || feesFullyPaid === null) return;
+    const newValue = !feesFullyPaid;
+    setTogglingFees(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/fees-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feesFullyPaid: newValue }),
+        credentials: "include",
+      });
+      if (res.ok) setFeesFullyPaid(newValue);
+    } catch (_) {}
+    setTogglingFees(false);
   };
 
   const getComponentStatus = (score: number | null) => {
@@ -339,6 +365,26 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
                 {passwordMessage}
               </p>
             )}
+          </div>
+
+          {/* School Fees Status */}
+          <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold">School Fees</p>
+              <p className={`text-xs mt-0.5 font-medium ${feesFullyPaid === false ? "text-red-600" : "text-green-600"}`}>
+                {feesFullyPaid === false ? "Not fully paid — account disabled" : "Fully paid"}
+              </p>
+            </div>
+            <button
+              onClick={handleToggleFees}
+              disabled={togglingFees || feesFullyPaid === null}
+              title={feesFullyPaid === false ? "Click to restore access" : "Click to restrict access"}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50
+                ${feesFullyPaid === false ? "bg-red-500" : "bg-green-500"}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform
+                ${feesFullyPaid === false ? "translate-x-0" : "translate-x-5"}`} />
+            </button>
           </div>
         </div>
 

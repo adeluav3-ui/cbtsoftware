@@ -359,15 +359,15 @@ export default function ComprehensiveResults() {
 
         const traitBlock = (list: TraitRating[], label: string) => `
           <div style="flex:1">
-            <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #d1d5db;padding-bottom:2px;margin-bottom:4px">${label}</div>
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #d1d5db;padding-bottom:2px;margin-bottom:4px">${label}</div>
             <table style="width:100%;border-collapse:collapse">
               <thead><tr style="background:#f3f4f6">
-                <th style="padding:2px 4px;text-align:left;font-size:8px;border-bottom:1px solid #e5e7eb">Trait</th>
-                <th style="padding:2px 4px;text-align:center;font-size:8px;border-bottom:1px solid #e5e7eb">Rating</th>
+                <th style="padding:2px 4px;text-align:left;font-size:9px;border-bottom:1px solid #e5e7eb">Trait</th>
+                <th style="padding:2px 4px;text-align:center;font-size:9px;border-bottom:1px solid #e5e7eb">Rating</th>
               </tr></thead>
               <tbody>${list.map(t => `<tr>
-                <td style="padding:2px 4px;font-size:8.5px;border-bottom:1px solid #f3f4f6">${t.traitName}</td>
-                <td style="padding:2px 4px;text-align:center;font-size:8.5px;font-weight:600;color:${rc(t.rating)};border-bottom:1px solid #f3f4f6">
+                <td style="padding:2px 4px;font-size:9.5px;border-bottom:1px solid #f3f4f6">${t.traitName}</td>
+                <td style="padding:2px 4px;text-align:center;font-size:9.5px;font-weight:600;color:${rc(t.rating)};border-bottom:1px solid #f3f4f6">
                   ${t.rating ? `${t.rating} – ${RATING_LABELS[t.rating]}` : '—'}
                 </td>
               </tr>`).join('')}</tbody>
@@ -394,16 +394,16 @@ export default function ComprehensiveResults() {
           <style>
             @page { size: A4 portrait; margin: 0.9cm; }
             * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 9.5px; color: #111; margin: 0; }
+            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; margin: 0; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; font-size: 9px; }
+            th, td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
             thead tr { background: #f3f4f6; }
             th { font-weight: 700; }
             tfoot tr { background: #f3f4f6; border-top: 2px solid #d1d5db; }
             .c { text-align: center; }
             .b { font-weight: 700; }
             .sec { margin-top: 8px; }
-            .sec-title { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin: 0 0 4px; }
+            .sec-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin: 0 0 4px; }
           </style>
         </head><body>
 
@@ -412,21 +412,21 @@ export default function ComprehensiveResults() {
           <div style="display:flex;align-items:center;gap:8px">
             ${logoHtml}
             <div>
-              <div style="font-weight:700;font-size:13px">${schoolInfo.name}</div>
-              <div style="font-size:8.5px;color:#6b7280;margin-top:1px">${schoolInfo.currentTerm} &nbsp;·&nbsp; ${schoolInfo.academicSession}</div>
-              <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:2px">Student Report Card</div>
+              <div style="font-weight:700;font-size:14px">${schoolInfo.name}</div>
+              <div style="font-size:9.5px;color:#6b7280;margin-top:1px">${schoolInfo.currentTerm} &nbsp;·&nbsp; ${schoolInfo.academicSession}</div>
+              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:2px">Student Report Card</div>
             </div>
           </div>
           <div style="text-align:right">
             ${photoHtml}
-            <div style="font-weight:700;font-size:11px;margin-top:4px">${selectedStudent.fullName}</div>
-            <div style="font-size:8.5px;color:#6b7280">${selectedStudent.class}</div>
+            <div style="font-weight:700;font-size:12px;margin-top:4px">${selectedStudent.fullName}</div>
+            <div style="font-size:9.5px;color:#6b7280">${selectedStudent.class}</div>
           </div>
         </div>
 
         <!-- ATTENDANCE -->
         <div style="background:#f9fafb;border-radius:3px;padding:4px 8px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
-          <span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-size:8px">Attendance</span>
+          <span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-size:9px">Attendance</span>
           <span>Days opened: <strong>${attendance.timesSchoolOpened}</strong></span>
           <span>Times present: <strong>${attendance.timesPresent}</strong></span>
           <span>Rate: <strong>${attendancePct}%</strong></span>
@@ -464,11 +464,11 @@ export default function ComprehensiveResults() {
         <!-- NEXT TERM + COMMENT -->
         <div style="display:flex;gap:10px;margin-top:8px;align-items:flex-start">
           <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;padding:5px 8px;white-space:nowrap">
-            <span style="font-weight:700;color:#6b7280;font-size:8.5px">Next Term Begins:</span>
-            <span style="font-weight:600;margin-left:4px;font-size:8.5px">${nextTermStr}</span>
+            <span style="font-weight:700;color:#6b7280;font-size:9.5px">Next Term Begins:</span>
+            <span style="font-weight:600;margin-left:4px;font-size:9.5px">${nextTermStr}</span>
           </div>
-          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:5px 8px;font-style:italic;color:#555;font-size:9px;min-height:28px">
-            <span style="font-weight:700;font-style:normal;color:#6b7280;font-size:8px;text-transform:uppercase">Teacher's Comment: </span>
+          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:5px 8px;font-style:italic;color:#555;font-size:10px;min-height:28px">
+            <span style="font-weight:700;font-style:normal;color:#6b7280;font-size:8.5px;text-transform:uppercase">Teacher's Comment: </span>
             ${comment || 'No comment added yet.'}
           </div>
         </div>
@@ -545,33 +545,42 @@ export default function ComprehensiveResults() {
                             </div>
                         )}
 
-                        {/* Next Term Begins — school-wide setting, editable by teachers */}
-                        {canEdit && (
-                            <div className="mt-4 pt-4 border-t border-border print:hidden">
-                                <h3 className="font-semibold mb-2 text-sm">Next Term Begins</h3>
-                                <input
-                                    type="date"
-                                    value={nextTermBeginsEdit}
-                                    onChange={e => setNextTermBeginsEdit(e.target.value)}
-                                    className="w-full border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:border-primary"
-                                />
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full mt-2 text-xs"
-                                    onClick={handleSaveNextTermBegins}
-                                    isLoading={isSavingNextTerm}
-                                    disabled={nextTermBeginsEdit === (schoolInfo.nextTermBegins || "")}
-                                >
-                                    <Save className="w-3 h-3 mr-1" /> Save Date
-                                </Button>
-                                {schoolInfo.nextTermBegins && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Current: {formatNextTermDate(schoolInfo.nextTermBegins)}
-                                    </p>
-                                )}
-                            </div>
-                        )}
+                        {/* Next Term Begins — school-wide setting, editable by school admin only */}
+                        <div className="mt-4 pt-4 border-t border-border print:hidden">
+                            <h3 className="font-semibold mb-2 text-sm">Next Term Begins</h3>
+                            {user?.role === "school_admin" ? (
+                                <>
+                                    <input
+                                        type="date"
+                                        value={nextTermBeginsEdit}
+                                        onChange={e => setNextTermBeginsEdit(e.target.value)}
+                                        className="w-full border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:border-primary"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={handleSaveNextTermBegins}
+                                        isLoading={isSavingNextTerm}
+                                        disabled={nextTermBeginsEdit === (schoolInfo.nextTermBegins || "")}
+                                    >
+                                        <Save className="w-3 h-3 mr-1" /> Save Date
+                                    </Button>
+                                    {schoolInfo.nextTermBegins && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Current: {formatNextTermDate(schoolInfo.nextTermBegins)}
+                                        </p>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-sm font-medium">
+                                    {schoolInfo.nextTermBegins
+                                        ? formatNextTermDate(schoolInfo.nextTermBegins)
+                                        : <span className="text-muted-foreground italic text-xs">Not yet set by admin</span>
+                                    }
+                                </p>
+                            )}
+                        </div>
                     </Card>
                 </div>
 
