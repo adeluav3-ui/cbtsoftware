@@ -474,16 +474,28 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
         )
       );
 
-    // Build subject scores
-    const subjectMap = new Map();
-
+    // Deduplicate exam subjects case-insensitively (handles "English Language" vs "english language")
+    const canonicalName = new Map<string, string>(); // lowercase -> display name
     for (const exam of studentExams) {
-      const subject = exam.subject;
-      const existing = existingScores.find(s => s.subjectName === subject);
+      const lower = exam.subject.trim().toLowerCase();
+      if (!canonicalName.has(lower)) canonicalName.set(lower, exam.subject.trim());
+    }
+    // Prefer the name stored in subject_scores as the canonical display name
+    for (const score of existingScores) {
+      const lower = score.subjectName.trim().toLowerCase();
+      canonicalName.set(lower, score.subjectName.trim());
+    }
+
+    // Build subject scores — keyed by lowercase name to prevent duplicates
+    const subjectMap = new Map<string, any>();
+
+    for (const [lowerSubject, displaySubject] of canonicalName) {
+      const subject = displaySubject;
+      const existing = existingScores.find(s => s.subjectName.trim().toLowerCase() === lowerSubject);
 
       // Calculate CBT scores for this subject
-      const midTermResult = examResults.find(r => r.subject === subject && r.assessmentType === 'mid_term');
-      const examResult = examResults.find(r => r.subject === subject && r.assessmentType === 'exam');
+      const midTermResult = examResults.find(r => r.subject.trim().toLowerCase() === lowerSubject && r.assessmentType === 'mid_term');
+      const examResult = examResults.find(r => r.subject.trim().toLowerCase() === lowerSubject && r.assessmentType === 'exam');
 
       let midTermCbt: number | null = null;
       let examCbt: number | null = null;
@@ -564,7 +576,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
     // Also include subjects that have manually-entered scores but no CBT exam
     // (covers KG/Nursery/Primary students who don't do CBT)
     for (const score of existingScores) {
-      if (!subjectMap.has(score.subjectName)) {
+      if (!subjectMap.has(score.subjectName.trim().toLowerCase())) {
         const hasMidTerm = score.midTermScore !== null && score.midTermScore !== undefined;
         const hasClassActivity = score.classActivityScore !== null && score.classActivityScore !== undefined;
         const hasExam = score.examScore !== null && score.examScore !== undefined;
@@ -584,7 +596,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
           else grade = 'F';
         }
 
-        subjectMap.set(score.subjectName, {
+        subjectMap.set(score.subjectName.trim().toLowerCase(), {
           subjectName: score.subjectName,
           midTermScore: hasMidTerm ? score.midTermScore : null,
           classActivityScore: hasClassActivity ? score.classActivityScore : null,
