@@ -243,7 +243,9 @@ export default function MyResults() {
           <style>
             @page { size: A4 portrait; margin: 0.9cm; }
             * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; margin: 0; }
+            html, body { height: 100%; margin: 0; }
+            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; display: flex; flex-direction: column; }
+            .page { flex: 1; display: flex; flex-direction: column; }
             table { width: 100%; border-collapse: collapse; }
             th, td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
             thead tr { background: #f3f4f6; }
@@ -253,8 +255,9 @@ export default function MyResults() {
             .b { font-weight: 700; }
             .sec { margin-top: 8px; }
             .sec-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin: 0 0 4px; }
+            .footer-row { display: flex; gap: 10px; margin-top: 8px; flex: 1; align-items: stretch; min-height: 36px; }
           </style>
-        </head><body>
+        </head><body><div class="page">
 
         <!-- HEADER -->
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:8px">
@@ -320,19 +323,19 @@ export default function MyResults() {
           </div>
         </div>
 
-        <!-- NEXT TERM + COMMENT -->
-        <div style="display:flex;gap:10px;margin-top:8px;align-items:flex-start">
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;padding:5px 8px;white-space:nowrap">
+        <!-- NEXT TERM + COMMENT (grows to fill remaining page height) -->
+        <div class="footer-row">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;padding:5px 8px;align-self:flex-start;white-space:nowrap">
             <span style="font-weight:700;color:#6b7280;font-size:9.5px">Next Term Begins:</span>
             <span style="font-weight:600;margin-left:4px;font-size:9.5px">${nextTermStr}</span>
           </div>
-          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:5px 8px;font-style:italic;color:#555;font-size:10px;min-height:28px">
+          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:5px 8px;font-style:italic;color:#555;font-size:10px">
             <span style="font-weight:700;font-style:normal;color:#6b7280;font-size:8.5px;text-transform:uppercase">Teacher's Comment: </span>
             ${teacherComment || 'No comment added yet.'}
           </div>
         </div>
 
-        </body></html>`;
+        </div></body></html>`;
 
         const win = window.open('', '_blank', 'width=900,height=800');
         if (!win) { alert('Allow popups for this site to print your report card.'); return; }
