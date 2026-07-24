@@ -404,7 +404,15 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
     const currentTerm = school?.currentTerm ?? "First Term";
     const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
 
-    // Get all unique subjects from exams taken by this student
+    // Fetch student's current class to scope exam results correctly
+    const [studentRecord] = await db
+      .select({ class: usersTable.class })
+      .from(usersTable)
+      .where(eq(usersTable.id, parseInt(studentId)))
+      .limit(1);
+    const studentClass = studentRecord?.class ?? "";
+
+    // Get unique subjects from exams taken by this student in the current term for their current class only
     const studentExams = await db
       .select({
         subject: examsTable.subject,
@@ -414,7 +422,9 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       .where(
         and(
           eq(resultsTable.studentId, parseInt(studentId)),
-          eq(resultsTable.schoolCode, schoolCode)
+          eq(resultsTable.schoolCode, schoolCode),
+          eq(examsTable.term, currentTerm),
+          eq(examsTable.class, studentClass),
         )
       )
       .groupBy(examsTable.subject);
@@ -456,7 +466,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
 
     const scheme = gradingScheme || defaultScheme;
 
-    // Get CBT scores for mid-term and exams
+    // Get CBT scores for current term and class only
     const examResults = await db
       .select({
         examId: resultsTable.examId,
@@ -470,7 +480,9 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       .where(
         and(
           eq(resultsTable.studentId, parseInt(studentId)),
-          eq(resultsTable.schoolCode, schoolCode)
+          eq(resultsTable.schoolCode, schoolCode),
+          eq(examsTable.term, currentTerm),
+          eq(examsTable.class, studentClass),
         )
       );
 
@@ -561,8 +573,8 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
         }
       }
 
-      subjectMap.set(subject, {
-        subjectName: subject,
+      subjectMap.set(lowerSubject, {
+        subjectName: displaySubject,
         midTermScore: midTermTotalScore,
         classActivityScore: classActivityTotalScore,
         examScore: examTotalScore,
