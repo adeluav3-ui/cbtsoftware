@@ -444,11 +444,21 @@ export default function ComprehensiveResults() {
             <th class="c">Grade</th>
           </tr></thead>
           <tbody>${subjectRows}</tbody>
-          <tfoot><tr>
-            <td colspan="4" class="b">Overall Average</td>
-            <td class="c b">${overallAvg.toFixed(1)}%</td>
-            <td class="c b" style="color:${gc(overallGrade)}">${overallGrade}</td>
-          </tr></tfoot>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="b">Overall Average</td>
+              <td class="c b">${overallAvg.toFixed(1)}%</td>
+              <td class="c b" style="color:${gc(overallGrade)}">${overallGrade}</td>
+            </tr>
+            <tr>
+              <td colspan="6" style="padding:4px 5px">
+                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Promotion Status: </span>
+                <span style="font-weight:700;font-size:10px;color:${overallAvg >= 50 ? '#16a34a' : '#dc2626'};background:${overallAvg >= 50 ? '#dcfce7' : '#fee2e2'};padding:1px 7px;border-radius:4px">
+                  ${overallAvg >= 50 ? 'PROMOTED' : 'REPEAT'}
+                </span>
+              </td>
+            </tr>
+          </tfoot>
         </table>
 
         <!-- TRAITS -->
@@ -687,6 +697,14 @@ export default function ComprehensiveResults() {
                                                     <td colSpan={4} className="px-2 py-2 font-bold">Overall Average</td>
                                                     <td className="px-2 py-2 text-center font-bold">{overallAvg.toFixed(1)}%</td>
                                                     <td className={`px-2 py-2 text-center ${getGradeColor(overallGrade)}`}>{overallGrade}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colSpan={6} className="px-2 py-2">
+                                                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Promotion Status: </span>
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${overallAvg >= 50 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                            {overallAvg >= 50 ? 'PROMOTED' : 'REPEAT'}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             </tfoot>
                                         </table>

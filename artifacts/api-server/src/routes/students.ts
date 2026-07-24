@@ -1225,4 +1225,38 @@ router.post("/:studentId/attendance", requireSchoolStaff, async (req: Request<St
   }
 });
 
+const CLASS_ORDER = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+
+// Manually promote a student to the next class (for students held back after new session)
+router.patch("/:studentId/promote", requireSchoolAdmin, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  try {
+    const [student] = await db
+      .select({ id: usersTable.id, class: usersTable.class })
+      .from(usersTable)
+      .where(and(eq(usersTable.id, parseInt(studentId)), eq(usersTable.schoolCode, schoolCode), eq(usersTable.role, "student")))
+      .limit(1);
+
+    if (!student) return res.status(404).json({ error: "Student not found" });
+
+    const classIdx = CLASS_ORDER.indexOf(student.class ?? "");
+    if (classIdx === -1) return res.status(400).json({ error: "Unknown class" });
+    if (classIdx === CLASS_ORDER.length - 1) return res.status(400).json({ error: "Student is already in the final class" });
+
+    const nextClass = CLASS_ORDER[classIdx + 1];
+    const [updated] = await db
+      .update(usersTable)
+      .set({ class: nextClass })
+      .where(eq(usersTable.id, student.id))
+      .returning({ id: usersTable.id, class: usersTable.class });
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 export default router;

@@ -81,11 +81,14 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const [displayName, setDisplayName] = useState(studentName);
   const [feesFullyPaid, setFeesFullyPaid] = useState<boolean | null>(null);
   const [togglingFees, setTogglingFees] = useState(false);
+  const [promotingStudent, setPromotingStudent] = useState(false);
+  const [studentClass, setStudentClass] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplayName(studentName);
     setEditingName(false);
     setFeesFullyPaid(null);
+    setStudentClass(null);
   }, [studentName, studentId]);
 
   const { data, isLoading, refetch: refetchStudent } = useQuery({
@@ -105,10 +108,11 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
   const studentUsername = data?.username || "";
   const studentPassword = data?.password || "";
 
-  // Sync feesFullyPaid from server data (only on first load for this student)
+  // Sync feesFullyPaid and class from server data (only on first load for this student)
   useEffect(() => {
     if (data && feesFullyPaid === null) {
       setFeesFullyPaid(data.feesFullyPaid ?? true);
+      setStudentClass(data.class ?? null);
     }
   }, [data]);
 
@@ -191,6 +195,23 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
       if (res.ok) setFeesFullyPaid(newValue);
     } catch (_) {}
     setTogglingFees(false);
+  };
+
+  const handlePromote = async () => {
+    if (!studentId) return;
+    setPromotingStudent(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/schools/${schoolCode}/students/${studentId}/promote`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setStudentClass(updated.class ?? null);
+        await refetchStudent();
+      }
+    } catch (_) {}
+    setPromotingStudent(false);
   };
 
   const getComponentStatus = (score: number | null) => {
@@ -385,6 +406,34 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
               <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform
                 ${feesFullyPaid === false ? "translate-x-0" : "translate-x-5"}`} />
             </button>
+          </div>
+
+          {/* Promotion Status */}
+          <div className="mt-3 pt-3 border-t border-border/50">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold">Promotion Status</p>
+                {subjectScores?.length > 0 ? (
+                  <p className={`text-xs mt-0.5 font-bold ${overallAvg >= 50 ? "text-green-600" : "text-red-600"}`}>
+                    {overallAvg >= 50 ? "Promoted" : "Repeat"} ({overallAvg.toFixed(1)}% avg)
+                  </p>
+                ) : (
+                  <p className="text-xs mt-0.5 text-muted-foreground">No subject scores recorded</p>
+                )}
+                {studentClass && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Current class: {studentClass}</p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePromote}
+                isLoading={promotingStudent}
+                className="text-xs shrink-0"
+              >
+                Promote to Next Class
+              </Button>
+            </div>
           </div>
         </div>
 

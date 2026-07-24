@@ -926,6 +926,9 @@ router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request,
       .where(eq(schoolsTable.code, schoolCodeStr))
       .limit(1);
 
+    const prevTerm = school?.currentTerm ?? "Third Term";
+    const prevSession = school?.currentAcademicSession ?? "2025/2026";
+
     // Advance academic session (e.g., 2025/2026 -> 2026/2027)
     let newSession = "2026/2027";
     if (school?.currentAcademicSession) {
@@ -954,29 +957,64 @@ router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request,
         )
       );
 
+    // Compute each student's average percentage from the previous term's subject scores
+    const prevScores = await db
+      .select({ studentId: subjectScoresTable.studentId, percentage: subjectScoresTable.percentage })
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.schoolCode, schoolCodeStr),
+          eq(subjectScoresTable.term, prevTerm),
+          eq(subjectScoresTable.academicSession, prevSession)
+        )
+      );
+
+    const accumulator = new Map<number, { sum: number; count: number }>();
+    for (const s of prevScores) {
+      if (s.percentage !== null) {
+        const curr = accumulator.get(s.studentId) ?? { sum: 0, count: 0 };
+        accumulator.set(s.studentId, { sum: curr.sum + s.percentage, count: curr.count + 1 });
+      }
+    }
+    const avgMap = new Map<number, number>();
+    for (const [id, { sum, count }] of accumulator) {
+      avgMap.set(id, count > 0 ? sum / count : 0);
+    }
+
     let promoted = 0;
     let archived = 0;
+    let retained = 0;
 
     for (const student of students) {
       const currentClassIndex = classOrder.indexOf(student.class ?? "");
       if (currentClassIndex === -1) continue;
 
       if (currentClassIndex === classOrder.length - 1) {
+        // SSS3 graduates regardless of score
         await db.delete(usersTable).where(eq(usersTable.id, student.id));
         archived++;
       } else {
-        const nextClass = classOrder[currentClassIndex + 1];
-        await db
-          .update(usersTable)
-          .set({ class: nextClass })
-          .where(eq(usersTable.id, student.id));
-        promoted++;
+        const avg = avgMap.get(student.id);
+        if (avg !== undefined && avg < 50) {
+          // Student failed — retain in same class
+          retained++;
+        } else {
+          const nextClass = classOrder[currentClassIndex + 1];
+          await db
+            .update(usersTable)
+            .set({ class: nextClass })
+            .where(eq(usersTable.id, student.id));
+          promoted++;
+        }
       }
     }
 
     res.json({
-      message: `New session started. ${promoted} students promoted, ${archived} students graduated and archived. New session: ${newSession}`,
+      message: `New session started. ${promoted} students promoted, ${retained} students retained (avg < 50%), ${archived} students graduated and archived. New session: ${newSession}`,
       academicSession: newSession,
+      promoted,
+      retained,
+      archived,
     });
     return;
   } catch (err) {
