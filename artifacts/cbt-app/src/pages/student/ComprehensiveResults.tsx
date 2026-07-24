@@ -395,7 +395,7 @@ export default function ComprehensiveResults() {
             @page { size: A4 portrait; margin: 0.9cm; }
             * { box-sizing: border-box; }
             html, body { margin: 0; }
-            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; }
+            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; width: 725px; }
             table { width: 100%; border-collapse: collapse; }
             th, td { padding: 0.28em 0.47em; border-bottom: 1px solid #e5e7eb; }
             thead tr { background: #f3f4f6; }
@@ -487,20 +487,20 @@ export default function ComprehensiveResults() {
         <script>
         (function(){
           var b = document.body;
-          var TARGET = 1054;
-          for(var i = 0; i < 12; i++){
+          var TARGET = 1030;
+          for(var i = 0; i < 14; i++){
             var h = b.scrollHeight;
             if(!h) break;
             var cur = parseFloat(b.style.fontSize) || 10.5;
             var nxt = Math.min(16, Math.max(7, cur * TARGET / h));
             b.style.fontSize = nxt + 'px';
-            if(Math.abs(nxt - cur) < 0.03) break;
+            if(Math.abs(nxt - cur) < 0.02) break;
           }
         })();
         </script>
         </body></html>`;
 
-        const win = window.open('', '_blank', 'width=900,height=800');
+        const win = window.open('', '_blank', 'width=800,height=1150');
         if (!win) { alert('Allow popups for this site to print the report card.'); return; }
         win.document.write(html);
         win.document.close();
