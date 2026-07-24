@@ -208,15 +208,15 @@ export default function MyResults() {
 
         const traitBlock = (list: TraitRating[], label: string) => `
           <div style="flex:1">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #d1d5db;padding-bottom:2px;margin-bottom:4px">${label}</div>
+            <div style="font-size:0.86em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;border-bottom:1px solid #d1d5db;padding-bottom:0.2em;margin-bottom:0.38em">${label}</div>
             <table style="width:100%;border-collapse:collapse">
               <thead><tr style="background:#f3f4f6">
-                <th style="padding:2px 4px;text-align:left;font-size:9px;border-bottom:1px solid #e5e7eb">Trait</th>
-                <th style="padding:2px 4px;text-align:center;font-size:9px;border-bottom:1px solid #e5e7eb">Rating</th>
+                <th style="padding:0.2em 0.38em;text-align:left;font-size:0.86em;border-bottom:1px solid #e5e7eb">Trait</th>
+                <th style="padding:0.2em 0.38em;text-align:center;font-size:0.86em;border-bottom:1px solid #e5e7eb">Rating</th>
               </tr></thead>
               <tbody>${list.map(t => `<tr>
-                <td style="padding:2px 4px;font-size:9.5px;border-bottom:1px solid #f3f4f6">${t.traitName}</td>
-                <td style="padding:2px 4px;text-align:center;font-size:9.5px;font-weight:600;color:${rc(t.rating)};border-bottom:1px solid #f3f4f6">
+                <td style="padding:0.2em 0.38em;border-bottom:1px solid #f3f4f6">${t.traitName}</td>
+                <td style="padding:0.2em 0.38em;text-align:center;font-weight:600;color:${rc(t.rating)};border-bottom:1px solid #f3f4f6">
                   ${t.rating ? `${t.rating} – ${RATING_LABELS[t.rating]}` : '—'}
                 </td>
               </tr>`).join('')}</tbody>
@@ -233,52 +233,50 @@ export default function MyResults() {
         })();
 
         const logoHtml = schoolInfo.logoUrl
-            ? `<img src="${schoolInfo.logoUrl}" alt="logo" style="width:44px;height:44px;object-fit:contain">` : '';
+            ? `<img src="${schoolInfo.logoUrl}" alt="logo" style="width:4.19em;height:4.19em;object-fit:contain;flex-shrink:0">` : '';
         const photoHtml = user?.profilePicture
-            ? `<img src="${user.profilePicture}" alt="photo" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid #7c3aed">`
-            : `<div style="width:52px;height:52px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:18px;color:#9ca3af">👤</div>`;
+            ? `<img src="${user.profilePicture}" alt="photo" style="width:4.95em;height:4.95em;border-radius:50%;object-fit:cover;border:2px solid #7c3aed;display:block;margin-left:auto">`
+            : `<div style="width:4.95em;height:4.95em;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:1.71em;color:#9ca3af;margin-left:auto">👤</div>`;
 
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
           <title>Report Card – ${user?.fullName}</title>
           <style>
             @page { size: A4 portrait; margin: 0.9cm; }
             * { box-sizing: border-box; }
-            html, body { height: 100%; margin: 0; }
-            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; display: flex; flex-direction: column; }
-            .page { flex: 1; display: flex; flex-direction: column; }
+            html, body { margin: 0; }
+            body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { padding: 3px 5px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+            th, td { padding: 0.28em 0.47em; border-bottom: 1px solid #e5e7eb; }
             thead tr { background: #f3f4f6; }
             th { font-weight: 700; }
             tfoot tr { background: #f3f4f6; border-top: 2px solid #d1d5db; }
             .c { text-align: center; }
             .b { font-weight: 700; }
-            .sec { margin-top: 8px; }
-            .sec-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; margin: 0 0 4px; }
-            .footer-row { display: flex; gap: 10px; margin-top: 8px; flex: 1; align-items: stretch; min-height: 36px; }
+            .sec { margin-top: 0.76em; }
+            .sec-title { font-size:0.86em; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin:0 0 0.38em; }
           </style>
-        </head><body><div class="page">
+        </head><body>
 
         <!-- HEADER -->
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:7px;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:0.67em;margin-bottom:0.76em">
+          <div style="display:flex;align-items:center;gap:0.76em">
             ${logoHtml}
             <div>
-              <div style="font-weight:700;font-size:14px">${schoolInfo.name}</div>
-              <div style="font-size:9.5px;color:#6b7280;margin-top:1px">${schoolInfo.currentTerm} &nbsp;·&nbsp; ${schoolInfo.academicSession}</div>
-              <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:2px">Student Report Card</div>
+              <div style="font-weight:700;font-size:1.33em">${schoolInfo.name}</div>
+              <div style="font-size:0.9em;color:#6b7280;margin-top:0.1em">${schoolInfo.currentTerm} &nbsp;·&nbsp; ${schoolInfo.academicSession}</div>
+              <div style="font-size:0.81em;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-top:0.19em">Student Report Card</div>
             </div>
           </div>
           <div style="text-align:right">
             ${photoHtml}
-            <div style="font-weight:700;font-size:12px;margin-top:4px">${user?.fullName}</div>
-            <div style="font-size:9.5px;color:#6b7280">${user?.class}</div>
+            <div style="font-weight:700;font-size:1.14em;margin-top:0.38em">${user?.fullName}</div>
+            <div style="font-size:0.9em;color:#6b7280">${user?.class}</div>
           </div>
         </div>
 
         <!-- ATTENDANCE -->
-        <div style="background:#f9fafb;border-radius:3px;padding:4px 8px;margin-bottom:8px;display:flex;gap:14px;align-items:center">
-          <span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-size:9px">Attendance</span>
+        <div style="background:#f9fafb;border-radius:3px;padding:0.38em 0.76em;margin-bottom:0.76em;display:flex;gap:1.33em;align-items:center">
+          <span style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-size:0.86em">Attendance</span>
           <span>Days opened: <strong>${attendance.timesSchoolOpened}</strong></span>
           <span>Times present: <strong>${attendance.timesPresent}</strong></span>
           <span>Rate: <strong>${attendancePct}%</strong></span>
@@ -303,9 +301,9 @@ export default function MyResults() {
               <td class="c b" style="color:${gc(overallGrade)}">${overallGrade}</td>
             </tr>
             <tr>
-              <td colspan="6" style="padding:4px 5px">
-                <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Promotion Status: </span>
-                <span style="font-weight:700;font-size:10px;color:${overallAvg >= 50 ? '#16a34a' : '#dc2626'};background:${overallAvg >= 50 ? '#dcfce7' : '#fee2e2'};padding:1px 7px;border-radius:4px">
+              <td colspan="6" style="padding:0.38em 0.47em">
+                <span style="font-size:0.86em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Promotion Status: </span>
+                <span style="font-weight:700;font-size:0.95em;color:${overallAvg >= 50 ? '#16a34a' : '#dc2626'};background:${overallAvg >= 50 ? '#dcfce7' : '#fee2e2'};padding:0.1em 0.67em;border-radius:4px">
                   ${overallAvg >= 50 ? 'PROMOTED' : 'REPEAT'}
                 </span>
               </td>
@@ -316,32 +314,46 @@ export default function MyResults() {
         <!-- TRAITS -->
         <div class="sec">
           <div class="sec-title">Cognitive, Affective &amp; Psychomotor Assessment</div>
-          <div style="display:flex;gap:10px">
+          <div style="display:flex;gap:0.95em">
             ${traitBlock(cognitiveTraits, 'Cognitive Domain')}
             ${traitBlock(affectiveTraits, 'Affective Domain')}
             ${traitBlock(psychomotorTraits, 'Psychomotor Domain')}
           </div>
         </div>
 
-        <!-- NEXT TERM + COMMENT (grows to fill remaining page height) -->
-        <div class="footer-row">
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;padding:5px 8px;align-self:flex-start;white-space:nowrap">
-            <span style="font-weight:700;color:#6b7280;font-size:9.5px">Next Term Begins:</span>
-            <span style="font-weight:600;margin-left:4px;font-size:9.5px">${nextTermStr}</span>
+        <!-- NEXT TERM + COMMENT -->
+        <div style="display:flex;gap:0.95em;margin-top:0.76em;align-items:flex-start">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;padding:0.47em 0.76em;white-space:nowrap">
+            <span style="font-weight:700;color:#6b7280;font-size:0.9em">Next Term Begins:</span>
+            <span style="font-weight:600;margin-left:0.38em;font-size:0.9em">${nextTermStr}</span>
           </div>
-          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:5px 8px;font-style:italic;color:#555;font-size:10px">
-            <span style="font-weight:700;font-style:normal;color:#6b7280;font-size:8.5px;text-transform:uppercase">Teacher's Comment: </span>
+          <div style="flex:1;border:1px solid #d1d5db;border-radius:3px;padding:0.47em 0.76em;font-style:italic;color:#555;min-height:2.8em">
+            <span style="font-weight:700;font-style:normal;color:#6b7280;font-size:0.81em;text-transform:uppercase">Teacher's Comment: </span>
             ${teacherComment || 'No comment added yet.'}
           </div>
         </div>
 
-        </div></body></html>`;
+        <script>
+        (function(){
+          var b = document.body;
+          var TARGET = 1054;
+          for(var i = 0; i < 12; i++){
+            var h = b.scrollHeight;
+            if(!h) break;
+            var cur = parseFloat(b.style.fontSize) || 10.5;
+            var nxt = Math.min(16, Math.max(7, cur * TARGET / h));
+            b.style.fontSize = nxt + 'px';
+            if(Math.abs(nxt - cur) < 0.03) break;
+          }
+        })();
+        </script>
+        </body></html>`;
 
         const win = window.open('', '_blank', 'width=900,height=800');
         if (!win) { alert('Allow popups for this site to print your report card.'); return; }
         win.document.write(html);
         win.document.close();
-        setTimeout(() => { win.focus(); win.print(); }, 500);
+        setTimeout(() => { win.focus(); win.print(); }, 600);
     };
 
     return (
