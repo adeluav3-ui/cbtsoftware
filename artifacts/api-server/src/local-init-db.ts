@@ -28,6 +28,7 @@ export function initDb(db: Database): void {
       class TEXT,
       profile_picture TEXT,
       generated_password TEXT,
+      fees_fully_paid INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS users_school_code_idx ON users(school_code);
@@ -237,6 +238,7 @@ export function initDb(db: Database): void {
   // SQLite does not support ADD COLUMN IF NOT EXISTS — wrap in try/catch.
   try { db.exec("ALTER TABLE schools ADD COLUMN license_valid_until INTEGER"); } catch {}
   try { db.exec("ALTER TABLE schools ADD COLUMN max_devices INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE users ADD COLUMN fees_fully_paid INTEGER NOT NULL DEFAULT 1"); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS server_config (

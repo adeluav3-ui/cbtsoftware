@@ -214,7 +214,7 @@ function RegisteredDevicesSection({ schoolCode }: { schoolCode: string }) {
   const { data, isLoading, isError, error, refetch } = useQuery<{ devices: RegisteredDevice[]; count: number; max: number | null }>({
     queryKey: ["registered-devices", schoolCode],
     queryFn: async () => {
-      const r = await fetch(`${API}/devices/registered-devices`, { credentials: "include" });
+      const r = await fetch(`${API}/registered-devices`, { credentials: "include" });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         throw new Error(body.error ?? `Server error ${r.status}`);
@@ -229,7 +229,7 @@ function RegisteredDevicesSection({ schoolCode }: { schoolCode: string }) {
   const handleDeregister = async (deviceId: string) => {
     setDeregistering(deviceId);
     try {
-      const res = await fetch(`${API}/devices/registered-devices/${encodeURIComponent(deviceId)}`, {
+      const res = await fetch(`${API}/registered-devices/${encodeURIComponent(deviceId)}`, {
         method: "DELETE",
         credentials: "include",
       });

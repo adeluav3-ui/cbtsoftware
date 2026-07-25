@@ -45,6 +45,7 @@ export const usersTable = sqliteTable("users", {
   class: text("class"),
   profilePicture: text("profile_picture"),
   generatedPassword: text("generated_password"),
+  feesFullyPaid: integer("fees_fully_paid", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, (table) => ({
   schoolCodeIdx: index("users_school_code_idx").on(table.schoolCode),
