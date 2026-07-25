@@ -150,6 +150,12 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Allow blank popups — window.open('', '_blank') is used by print functions
+    // (broadsheet PDF, credentials, report cards write HTML then call .print())
+    if (!url || url === 'about:blank') {
+      return { action: 'allow' };
+    }
+    // Route all real external URLs to the system browser
     shell.openExternal(url);
     return { action: 'deny' };
   });
