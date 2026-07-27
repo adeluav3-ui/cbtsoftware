@@ -19,6 +19,7 @@ export default defineConfig({
     "./src/schema/subjects.ts",
     "./src/schema/student_traits.ts",
     "./src/schema/student_attendance.ts",
+    "./src/schema/device_sessions.ts",
   ],
   dialect: "postgresql",
   dbCredentials: {
