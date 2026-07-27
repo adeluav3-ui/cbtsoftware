@@ -7,7 +7,7 @@ import {
   getMaxDevices,
 } from "../local-device-registry.js";
 import { db, schoolsTable, deviceSessionsTable } from "@workspace/db";
-import { eq, gte, and } from "drizzle-orm";
+import { eq, gte, and, count, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -59,7 +59,8 @@ router.post("/heartbeat", async (req, res) => {
 });
 
 // GET /devices — super admin (all); school_admin in local mode (own school only)
-router.get("/devices", (req, res) => {
+// Returns { devices, totalEverSeen, activeNow }
+router.get("/devices", async (req, res) => {
   if (!req.session.userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -68,13 +69,58 @@ router.get("/devices", (req, res) => {
   const { role, schoolCode } = req.session;
 
   if (role === "super_admin") {
-    res.json(getDevices());
+    if (isLocal) {
+      // Local mode: in-memory store is sufficient (single process, no restarts)
+      const deviceList = getDevices();
+      const activeNow = deviceList.filter(
+        (d) => Date.now() - d.lastSeen.getTime() < 30 * 60 * 1000
+      ).length;
+      res.json({ devices: deviceList, totalEverSeen: deviceList.length, activeNow });
+    } else {
+      // Cloud mode: read from device_sessions DB (in-memory store empties on restarts)
+      const cutoff30 = new Date(Date.now() - 30 * 60 * 1000);
+      const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const [{ value: totalEverSeen }] = await db
+        .select({ value: count() })
+        .from(deviceSessionsTable);
+
+      const [{ value: activeNow }] = await db
+        .select({ value: count() })
+        .from(deviceSessionsTable)
+        .where(gte(deviceSessionsTable.lastSeen, cutoff30));
+
+      const rows = await db
+        .select()
+        .from(deviceSessionsTable)
+        .where(gte(deviceSessionsTable.lastSeen, cutoff24h))
+        .orderBy(desc(deviceSessionsTable.lastSeen))
+        .limit(200);
+
+      const devices = rows.map((r) => ({
+        deviceId: r.deviceId,
+        deviceType: getDeviceType(r.userAgent ?? ""),
+        ipAddress: r.ipAddress,
+        fullName: r.fullName,
+        username: r.username,
+        role: r.role,
+        schoolCode: r.schoolCode,
+        firstSeen: r.firstSeen,
+        lastSeen: r.lastSeen,
+      }));
+
+      res.json({ devices, totalEverSeen, activeNow });
+    }
     return;
   }
+
   if (isLocal && (role === "school_admin" || role === "teacher")) {
-    res.json(getDevices(schoolCode ?? undefined));
+    const deviceList = getDevices(schoolCode ?? undefined);
+    const activeNow = deviceList.length;
+    res.json({ devices: deviceList, totalEverSeen: deviceList.length, activeNow });
     return;
   }
+
   res.status(403).json({ error: "Forbidden" });
 });
 
