@@ -871,6 +871,7 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
           eq(examsTable.schoolCode, schoolCode),
           sql`lower(${examsTable.subject}) = ${subjectLower}`,
           eq(examsTable.assessmentType, 'mid_term'),
+          eq(examsTable.term, currentTerm),
           inArray(resultsTable.studentId, studentIds)
         )
       );
@@ -889,6 +890,7 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
           eq(examsTable.schoolCode, schoolCode),
           sql`lower(${examsTable.subject}) = ${subjectLower}`,
           eq(examsTable.assessmentType, 'exam'),
+          eq(examsTable.term, currentTerm),
           inArray(resultsTable.studentId, studentIds)
         )
       );
@@ -899,7 +901,7 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
       .from(gradingSchemesTable)
       .where(eq(gradingSchemesTable.schoolCode, schoolCode))
       .limit(1);
-    const midTermCbtMax = gradingScheme?.midTermCbt ?? 10;
+    const midTermTotal = gradingScheme?.midTermTotal ?? 20;
     const examCbtMax = gradingScheme?.examCbt ?? 30;
 
     // 5. Merge: stored scores take precedence; CBT results fill in missing components
@@ -912,7 +914,8 @@ router.get("/class-subject-scores", requireSchoolStaff, async (req: Request<Scho
 
       let midTermScore = stored?.midTermScore ?? null;
       if (midTermScore === null && midTermCbt && midTermCbt.totalQuestions > 0) {
-        midTermScore = Math.round((midTermCbt.score / midTermCbt.totalQuestions) * midTermCbtMax);
+        // Scale CBT-only mid-term to the full mid-term total
+        midTermScore = Math.round((midTermCbt.score / midTermCbt.totalQuestions) * midTermTotal);
       }
 
       let examScore = stored?.examScore ?? null;
