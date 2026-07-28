@@ -532,13 +532,15 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       if (existing?.midTermScore !== null && existing?.midTermScore !== undefined) {
         midTermTotalScore = existing.midTermScore;
       } else if (midTermCbt !== null) {
-        midTermTotalScore = midTermCbt;
+        // No manual score yet — scale CBT-only result to the full mid-term total
+        midTermTotalScore = Math.round((midTermCbt / scheme.midTermCbt) * scheme.midTermTotal);
       }
 
       if (existing?.examScore !== null && existing?.examScore !== undefined) {
         examTotalScore = existing.examScore;
       } else if (examCbt !== null) {
-        examTotalScore = examCbt;
+        // No manual score yet — scale CBT-only result to the full exam total
+        examTotalScore = Math.round((examCbt / scheme.examCbt) * scheme.examTotal);
       }
 
       if (existing?.classActivityScore !== null && existing?.classActivityScore !== undefined) {
