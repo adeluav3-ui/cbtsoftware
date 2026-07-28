@@ -539,8 +539,7 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       if (existing?.examScore !== null && existing?.examScore !== undefined) {
         examTotalScore = existing.examScore;
       } else if (examCbt !== null) {
-        // No manual score yet — scale CBT-only result to the full exam total
-        examTotalScore = Math.round((examCbt / scheme.examCbt) * scheme.examTotal);
+        examTotalScore = examCbt;
       }
 
       if (existing?.classActivityScore !== null && existing?.classActivityScore !== undefined) {
