@@ -621,7 +621,11 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
       }
     }
 
-    res.json(Array.from(subjectMap.values()));
+    // Exclude subjects with no scores at all — student is not offering those subjects
+    const subjectList = Array.from(subjectMap.values()).filter(
+      (s) => s.midTermScore !== null || s.classActivityScore !== null || s.examScore !== null
+    );
+    res.json(subjectList);
     return;
   } catch (err) {
     console.error(err);
