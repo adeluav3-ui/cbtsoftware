@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
-import { eq, and, desc, count, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
 
 interface SchoolParams {
@@ -344,11 +344,11 @@ router.post("/admin/login", async (req: Request, res: Response) => {
   }
 });
 
-// Get all subject scores for a school (filtered by current term/session)
+// Get all subject scores for a school (filtered by term/session; optional class filter)
 router.get("/:schoolCode/subject-scores", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
   const schoolCodeStr = String(schoolCode);
-  const { term, academicSession } = req.query;
+  const { term, academicSession, class: className } = req.query;
 
   try {
     const [school] = await db
@@ -360,14 +360,21 @@ router.get("/:schoolCode/subject-scores", requireSchoolAdmin, async (req: Reques
     const filterTerm = (term as string) || school?.currentTerm || "First Term";
     const filterSession = (academicSession as string) || school?.currentAcademicSession || "2025/2026";
 
+    const conditions: any[] = [
+      eq(subjectScoresTable.schoolCode, schoolCodeStr),
+      eq(subjectScoresTable.term, filterTerm),
+      eq(subjectScoresTable.academicSession, filterSession),
+    ];
+
+    if (className && typeof className === 'string') {
+      conditions.push(eq(subjectScoresTable.className, className));
+    }
+
     const scores = await db
       .select()
       .from(subjectScoresTable)
-      .where(and(
-        eq(subjectScoresTable.schoolCode, schoolCodeStr),
-        eq(subjectScoresTable.term, filterTerm),
-        eq(subjectScoresTable.academicSession, filterSession),
-      ));
+      .where(and(...conditions))
+      .limit(5000);
 
     res.json(scores);
     return;
@@ -493,68 +500,94 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
 
   const from = fromName.trim();
   const to = toName.trim();
-  // Build a safe IN list — values come from the hardcoded levelClassMap, not user input
-  const classInList = sql.join(levelClasses.map(c => sql`${c}`), sql`, `);
 
   try {
-    // Step 1: For rows where BOTH fromName and toName exist for the same student+term+session
-    //         AND that student is in this level's classes, coalesce null components into toName.
-    await db.execute(sql`
-      UPDATE subject_scores AS t
-      SET
-        mid_term_score       = COALESCE(t.mid_term_score,       f.mid_term_score),
-        mid_term_cbt_score   = COALESCE(t.mid_term_cbt_score,   f.mid_term_cbt_score),
-        class_activity_score = COALESCE(t.class_activity_score, f.class_activity_score),
-        exam_score           = COALESCE(t.exam_score,           f.exam_score),
-        exam_cbt_score       = COALESCE(t.exam_cbt_score,       f.exam_cbt_score),
-        total_score          = COALESCE(t.total_score,          f.total_score),
-        updated_at           = NOW()
-      FROM subject_scores AS f
-      JOIN users AS u ON u.id = f.student_id
-      WHERE f.school_code        = ${schoolCodeStr}
-        AND f.subject_name       = ${from}
-        AND t.school_code        = ${schoolCodeStr}
-        AND t.subject_name       = ${to}
-        AND t.student_id         = f.student_id
-        AND t.term               = f.term
-        AND t.academic_session   = f.academic_session
-        AND u.class              IN (${classInList})
-    `);
-
-    // Step 2: Rename remaining fromName rows (no matching toName row) for level students → toName
-    await db.execute(sql`
-      UPDATE subject_scores
-      SET subject_name = ${to}, updated_at = NOW()
-      WHERE school_code  = ${schoolCodeStr}
-        AND subject_name = ${from}
-        AND student_id IN (
-          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class IN (${classInList})
+    // Get all student IDs in this level's classes
+    const levelStudents = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.schoolCode, schoolCodeStr),
+          eq(usersTable.role, "student"),
+          inArray(usersTable.class, levelClasses)
         )
-        AND (student_id, term, academic_session) NOT IN (
-          SELECT student_id, term, academic_session
-          FROM subject_scores
-          WHERE school_code = ${schoolCodeStr} AND subject_name = ${to}
-        )
-    `);
+      );
 
-    // Step 3: Delete leftover fromName rows for level students (those already coalesced in step 1)
-    await db.execute(sql`
-      DELETE FROM subject_scores
-      WHERE school_code = ${schoolCodeStr}
-        AND subject_name = ${from}
-        AND student_id IN (
-          SELECT id FROM users WHERE school_code = ${schoolCodeStr} AND class IN (${classInList})
-        )
-    `);
+    if (levelStudents.length > 0) {
+      const levelStudentIds = levelStudents.map(s => s.id);
 
-    // Step 4: Rename exams with fromName subject to toName (only for this level's classes)
-    await db.execute(sql`
-      UPDATE exams
-      SET subject = ${to}
-      WHERE school_code = ${schoolCodeStr}
-        AND subject = ${from}
-        AND class IN (${classInList})
-    `);
+      // Fetch fromName and toName rows for these students
+      const [fromRows, toRows] = await Promise.all([
+        db.select().from(subjectScoresTable).where(
+          and(
+            eq(subjectScoresTable.schoolCode, schoolCodeStr),
+            eq(subjectScoresTable.subjectName, from),
+            inArray(subjectScoresTable.studentId, levelStudentIds)
+          )
+        ),
+        db.select().from(subjectScoresTable).where(
+          and(
+            eq(subjectScoresTable.schoolCode, schoolCodeStr),
+            eq(subjectScoresTable.subjectName, to),
+            inArray(subjectScoresTable.studentId, levelStudentIds)
+          )
+        ),
+      ]);
+
+      // Key by (studentId|term|academicSession) for fast lookup
+      const toMap = new Map(
+        toRows.map(r => [`${r.studentId}|${r.term}|${r.academicSession}`, r])
+      );
+
+      const now = new Date();
+      const toDelete: number[] = [];
+      const toRename: number[] = [];
+
+      for (const fromRow of fromRows) {
+        const key = `${fromRow.studentId}|${fromRow.term}|${fromRow.academicSession}`;
+        const toRow = toMap.get(key);
+
+        if (toRow) {
+          // Both exist — coalesce null fields from fromName into toName, then delete fromName
+          await db.update(subjectScoresTable)
+            .set({
+              midTermScore: toRow.midTermScore ?? fromRow.midTermScore,
+              midTermCbtScore: toRow.midTermCbtScore ?? fromRow.midTermCbtScore,
+              classActivityScore: toRow.classActivityScore ?? fromRow.classActivityScore,
+              examScore: toRow.examScore ?? fromRow.examScore,
+              examCbtScore: toRow.examCbtScore ?? fromRow.examCbtScore,
+              totalScore: toRow.totalScore ?? fromRow.totalScore,
+              updatedAt: now,
+            })
+            .where(eq(subjectScoresTable.id, toRow.id));
+          toDelete.push(fromRow.id);
+        } else {
+          // Only fromName row exists — rename it to toName
+          toRename.push(fromRow.id);
+        }
+      }
+
+      if (toDelete.length > 0) {
+        await db.delete(subjectScoresTable).where(inArray(subjectScoresTable.id, toDelete));
+      }
+      if (toRename.length > 0) {
+        await db.update(subjectScoresTable)
+          .set({ subjectName: to, updatedAt: now })
+          .where(inArray(subjectScoresTable.id, toRename));
+      }
+
+      // Step 4: Rename exams with fromName subject to toName for this level's classes
+      await db.update(examsTable)
+        .set({ subject: to })
+        .where(
+          and(
+            eq(examsTable.schoolCode, schoolCodeStr),
+            eq(examsTable.subject, from),
+            inArray(examsTable.class, levelClasses)
+          )
+        );
+    }
 
     // Step 5: Delete the fromName subject entry from subjects table for this level
     await db
@@ -985,28 +1018,38 @@ router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request,
     let archived = 0;
     let retained = 0;
 
+    const graduateIds: number[] = [];
+    const promotionMap = new Map<string, number[]>(); // targetClass -> [studentIds]
+
     for (const student of students) {
       const currentClassIndex = classOrder.indexOf(student.class ?? "");
       if (currentClassIndex === -1) continue;
 
       if (currentClassIndex === classOrder.length - 1) {
-        // SSS3 graduates regardless of score
-        await db.delete(usersTable).where(eq(usersTable.id, student.id));
+        graduateIds.push(student.id);
         archived++;
       } else {
         const avg = avgMap.get(student.id);
         if (avg !== undefined && avg < 50) {
-          // Student failed — retain in same class
           retained++;
         } else {
           const nextClass = classOrder[currentClassIndex + 1];
-          await db
-            .update(usersTable)
-            .set({ class: nextClass })
-            .where(eq(usersTable.id, student.id));
+          const group = promotionMap.get(nextClass) ?? [];
+          group.push(student.id);
+          promotionMap.set(nextClass, group);
           promoted++;
         }
       }
+    }
+
+    // Bulk delete graduates (one query regardless of count)
+    if (graduateIds.length > 0) {
+      await db.delete(usersTable).where(inArray(usersTable.id, graduateIds));
+    }
+
+    // Bulk promote — one UPDATE per target class (max 15 queries total)
+    for (const [nextClass, ids] of promotionMap) {
+      await db.update(usersTable).set({ class: nextClass }).where(inArray(usersTable.id, ids));
     }
 
     res.json({
@@ -1507,6 +1550,31 @@ router.patch("/:schoolCode/max-devices", requireSuperAdmin, async (req: Request,
 
     if (!updated) return res.status(404).json({ error: "School not found" });
     res.json({ code: updated.code, maxDevices: updated.maxDevices ?? null });
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+router.patch("/:schoolCode/pure-cbt-mode", requireSuperAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  const { pureCbtMode } = req.body;
+
+  if (typeof pureCbtMode !== "boolean") {
+    return res.status(400).json({ error: "pureCbtMode must be a boolean" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(schoolsTable)
+      .set({ pureCbtMode })
+      .where(eq(schoolsTable.code, schoolCodeStr))
+      .returning({ code: schoolsTable.code, pureCbtMode: schoolsTable.pureCbtMode });
+
+    if (!updated) return res.status(404).json({ error: "School not found" });
+    res.json({ code: updated.code, pureCbtMode: updated.pureCbtMode });
     return;
   } catch (err) {
     console.error(err);

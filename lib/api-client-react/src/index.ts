@@ -69,6 +69,8 @@ export interface Question {
     groupImageUrl?: string | null;
     groupTitle?: string | null;
     groupText?: string | null;
+    questionType?: string | null;
+    correctAnswerText?: string | null;
 }
 
 export interface GroupedQuestion {
@@ -326,7 +328,7 @@ export const api = {
         },
 
         addQuestion: async (schoolCode: string, examId: number, data: {
-            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null;
+            text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null;
         }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions`, {
                 method: 'POST',
@@ -337,7 +339,7 @@ export const api = {
             return response.json();
         },
 
-        updateQuestion: async (schoolCode: string, examId: number, questionId: number, data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null }) => {
+        updateQuestion: async (schoolCode: string, examId: number, questionId: number, data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null }) => {
             const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/exams/${examId}/questions/${questionId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -654,7 +656,7 @@ export function useAddQuestion(options?: MutationOptions) {
     return useMutation({
         mutationFn: ({ schoolCode, examId, data }: {
             schoolCode: string; examId: number; data: {
-                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null;
+                text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; groupId?: number | null; groupTitle?: string | null; groupText?: string | null; groupImageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null;
             }
         }) => api.exams.addQuestion(schoolCode, examId, data),
         onSuccess: (_, variables) => {
@@ -668,7 +670,7 @@ export function useAddQuestion(options?: MutationOptions) {
 export function useUpdateQuestion(options?: MutationOptions) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ schoolCode, examId, questionId, data }: { schoolCode: string; examId: number; questionId: number; data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null } }) =>
+        mutationFn: ({ schoolCode, examId, questionId, data }: { schoolCode: string; examId: number; questionId: number; data: { text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null } }) =>
             api.exams.updateQuestion(schoolCode, examId, questionId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: getExamQueryKey(variables.schoolCode, variables.examId) });

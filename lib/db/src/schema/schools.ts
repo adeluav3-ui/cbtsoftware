@@ -15,6 +15,7 @@ export const schoolsTable = pgTable("schools", {
   isDisabled: boolean("is_disabled").notNull().default(false),
   licenseValidUntil: timestamp("license_valid_until"),
   maxDevices: integer("max_devices"),
+  pureCbtMode: boolean("pure_cbt_mode").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

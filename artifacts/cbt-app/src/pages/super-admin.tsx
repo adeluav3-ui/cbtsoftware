@@ -37,6 +37,7 @@ interface School {
   isDisabled?: boolean;
   licenseValidUntil?: string | null;
   maxDevices?: number | null;
+  pureCbtMode?: boolean;
 }
 
 export default function SuperAdminDashboard() {
@@ -90,6 +91,11 @@ export default function SuperAdminDashboard() {
   const [maxDevicesError, setMaxDevicesError] = useState("");
   const [maxDevicesSuccess, setMaxDevicesSuccess] = useState("");
 
+  // Pure CBT mode
+  const [pureCbtMode, setPureCbtMode] = useState(false);
+  const [isTogglingPureCbt, setIsTogglingPureCbt] = useState(false);
+  const [pureCbtSuccess, setPureCbtSuccess] = useState("");
+
   const handleUpdateMaxDevices = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailSchool) return;
@@ -110,6 +116,26 @@ export default function SuperAdminDashboard() {
       }
     } catch { setMaxDevicesError("Network error"); }
     finally { setIsUpdatingMaxDevices(false); }
+  };
+
+  const handleTogglePureCbt = async (enabled: boolean) => {
+    if (!detailSchool) return;
+    setIsTogglingPureCbt(true);
+    setPureCbtSuccess("");
+    try {
+      const res = await fetch(`${API}/schools/${detailSchool.code}/pure-cbt-mode`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ pureCbtMode: enabled }),
+      });
+      if (res.ok) {
+        setPureCbtMode(enabled);
+        setPureCbtSuccess(enabled ? "Pure CBT mode enabled." : "Pure CBT mode disabled.");
+        queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
+      }
+    } catch {}
+    finally { setIsTogglingPureCbt(false); }
   };
 
   const handleExtendLicense = async (e: React.FormEvent) => {
@@ -241,6 +267,8 @@ export default function SuperAdminDashboard() {
     setMaxDevicesInput(school.maxDevices != null ? String(school.maxDevices) : "");
     setMaxDevicesError("");
     setMaxDevicesSuccess("");
+    setPureCbtMode(school.pureCbtMode ?? false);
+    setPureCbtSuccess("");
     if (!overviewCache[school.code]) {
       setOverviewLoading(true);
       try {
@@ -738,6 +766,27 @@ export default function SuperAdminDashboard() {
                 {maxDevicesError && <p className="text-sm text-destructive font-medium">{maxDevicesError}</p>}
                 {maxDevicesSuccess && <p className="text-sm text-green-600 font-medium">{maxDevicesSuccess}</p>}
               </form>
+            </div>
+
+            {/* Pure CBT Mode */}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Exam Mode</p>
+              <div className="flex items-start justify-between gap-4 p-4 bg-muted/20 rounded-xl border border-border">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Pure CBT Mode</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When enabled, exam scores out of the full total (60 marks), mid-term out of 20 marks — no theory input needed. Class activities remain manually entered.
+                  </p>
+                  {pureCbtSuccess && <p className="text-xs text-green-600 font-medium mt-1">{pureCbtSuccess}</p>}
+                </div>
+                <button
+                  onClick={() => handleTogglePureCbt(!pureCbtMode)}
+                  disabled={isTogglingPureCbt}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 mt-0.5 ${pureCbtMode ? "bg-primary" : "bg-muted-foreground/30"}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${pureCbtMode ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
             </div>
 
             {/* Danger zone */}

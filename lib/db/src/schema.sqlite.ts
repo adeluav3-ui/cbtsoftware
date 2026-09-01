@@ -31,6 +31,7 @@ export const schoolsTable = sqliteTable("schools", {
   isDisabled: integer("is_disabled", { mode: "boolean" }).notNull().default(false),
   licenseValidUntil: integer("license_valid_until", { mode: "timestamp" }),
   maxDevices: integer("max_devices"),
+  pureCbtMode: integer("pure_cbt_mode", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -87,6 +88,8 @@ export const questionsTable = sqliteTable("questions", {
   groupImageUrl: text("group_image_url"),
   groupTitle: text("group_title"),
   groupText: text("group_text"),
+  questionType: text("question_type").default("objective"),
+  correctAnswerText: text("correct_answer_text"),
 }, (table) => ({
   examIdIdx: index("questions_exam_id_idx").on(table.examId),
 }));
@@ -106,6 +109,7 @@ export const resultsTable = sqliteTable("results", {
   retakeCount: integer("retake_count").default(0),
   submittedAt: integer("submitted_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 }, (table) => ({
+  uniqueStudentExam: unique().on(table.studentId, table.examId),
   examIdIdx: index("results_exam_id_idx").on(table.examId),
   studentIdIdx: index("results_student_id_idx").on(table.studentId),
   schoolCodeIdx: index("results_school_code_idx").on(table.schoolCode),

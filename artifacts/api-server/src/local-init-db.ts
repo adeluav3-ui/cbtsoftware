@@ -238,7 +238,12 @@ export function initDb(db: Database): void {
   // SQLite does not support ADD COLUMN IF NOT EXISTS — wrap in try/catch.
   try { db.exec("ALTER TABLE schools ADD COLUMN license_valid_until INTEGER"); } catch {}
   try { db.exec("ALTER TABLE schools ADD COLUMN max_devices INTEGER"); } catch {}
+  try { db.exec("ALTER TABLE schools ADD COLUMN pure_cbt_mode INTEGER NOT NULL DEFAULT 0"); } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN fees_fully_paid INTEGER NOT NULL DEFAULT 1"); } catch {}
+  try { db.exec("ALTER TABLE questions ADD COLUMN question_type TEXT DEFAULT 'objective'"); } catch {}
+  try { db.exec("ALTER TABLE questions ADD COLUMN correct_answer_text TEXT"); } catch {}
+  // Unique constraint: one result per student per exam
+  try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS results_student_exam_unique ON results(student_id, exam_id)"); } catch {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS server_config (

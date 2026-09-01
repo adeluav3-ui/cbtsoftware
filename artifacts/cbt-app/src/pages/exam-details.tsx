@@ -37,6 +37,8 @@ export default function TeacherExamDetails() {
   const [imageUrl, setImageUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [qType, setQType] = useState<"objective" | "subjective">("objective");
+  const [correctAnswerText, setCorrectAnswerText] = useState("");
 
   // Group modal state
   const [isGroupModalOpen, setGroupModalOpen] = useState(false);
@@ -64,6 +66,8 @@ export default function TeacherExamDetails() {
   const [editCorrectOpt, setEditCorrectOpt] = useState<"A" | "B" | "C" | "D">("A");
   const [editImageUrl, setEditImageUrl] = useState("");
   const [isEditUploading, setIsEditUploading] = useState(false);
+  const [editQType, setEditQType] = useState<"objective" | "subjective">("objective");
+  const [editCorrectAnswerText, setEditCorrectAnswerText] = useState("");
 
   // Extract available groups from exam data
   const getAvailableGroups = (): GroupMeta[] => {
@@ -223,6 +227,8 @@ export default function TeacherExamDetails() {
         setCorrectOpt("A");
         setImageUrl("");
         setSelectedGroupId(null);
+        setQType("objective");
+        setCorrectAnswerText("");
       }
     }
   });
@@ -243,14 +249,25 @@ export default function TeacherExamDetails() {
     }
   });
 
-  const openEditModal = (q: { id: number; text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null }) => {
+  const openEditModal = (q: { id: number; text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null }) => {
     setEditingQuestionId(q.id);
     setEditQText(q.text);
-    setEditOptA(q.optionA);
-    setEditOptB(q.optionB);
-    setEditOptC(q.optionC);
-    setEditOptD(q.optionD);
-    setEditCorrectOpt(q.correctOption as "A" | "B" | "C" | "D");
+    const qt = q.questionType === "subjective" ? "subjective" : "objective";
+    setEditQType(qt);
+    if (qt === "subjective") {
+      let answers: string[] = [];
+      try { answers = JSON.parse(q.correctAnswerText ?? "[]"); } catch {}
+      setEditCorrectAnswerText(answers.join("\n"));
+      setEditOptA(""); setEditOptB(""); setEditOptC(""); setEditOptD("");
+      setEditCorrectOpt("A");
+    } else {
+      setEditOptA(q.optionA);
+      setEditOptB(q.optionB);
+      setEditOptC(q.optionC);
+      setEditOptD(q.optionD);
+      setEditCorrectOpt(q.correctOption as "A" | "B" | "C" | "D");
+      setEditCorrectAnswerText("");
+    }
     setEditImageUrl(q.imageUrl || "");
     setEditModalOpen(true);
   };
@@ -273,7 +290,17 @@ export default function TeacherExamDetails() {
     if (!editingQuestionId) return;
     updateQuestion({
       schoolCode, examId, questionId: editingQuestionId,
-      data: { text: editQText, optionA: editOptA, optionB: editOptB, optionC: editOptC, optionD: editOptD, correctOption: editCorrectOpt, imageUrl: editImageUrl || null }
+      data: {
+        text: editQText,
+        optionA: editQType === "objective" ? editOptA : "",
+        optionB: editQType === "objective" ? editOptB : "",
+        optionC: editQType === "objective" ? editOptC : "",
+        optionD: editQType === "objective" ? editOptD : "",
+        correctOption: editQType === "objective" ? editCorrectOpt : "",
+        imageUrl: editImageUrl || null,
+        questionType: editQType,
+        correctAnswerText: editQType === "subjective" ? editCorrectAnswerText : null,
+      }
     });
   };
 
@@ -290,16 +317,18 @@ export default function TeacherExamDetails() {
       schoolCode, examId,
       data: {
         text: qText,
-        optionA: optA,
-        optionB: optB,
-        optionC: optC,
-        optionD: optD,
-        correctOption: correctOpt,
+        optionA: qType === "objective" ? optA : "",
+        optionB: qType === "objective" ? optB : "",
+        optionC: qType === "objective" ? optC : "",
+        optionD: qType === "objective" ? optD : "",
+        correctOption: qType === "objective" ? correctOpt : "",
         imageUrl: imageUrl || null,
         groupId: selectedGroupId,
         groupTitle: selectedGroup?.groupTitle || null,
         groupText: selectedGroup?.groupText || null,
         groupImageUrl: selectedGroup?.groupImageUrl || null,
+        questionType: qType,
+        correctAnswerText: qType === "subjective" ? correctAnswerText : null,
       }
     });
   };
@@ -433,13 +462,25 @@ export default function TeacherExamDetails() {
                             {q.imageUrl && (
                               <img src={q.imageUrl} alt="Question" className="mt-2 h-32 object-contain rounded border" />
                             )}
-                            <div className="grid grid-cols-2 gap-2 mt-3">
-                              {['A', 'B', 'C', 'D'].map(opt => (
-                                <div key={opt} className={`text-sm p-2 rounded border ${q.correctOption === opt ? 'bg-green-100 border-green-400 dark:bg-green-900/30 dark:border-green-600' : 'bg-muted/20'}`}>
-                                  <span className="font-bold">{opt}.</span> {q[`option${opt}` as keyof typeof q] as string}
-                                </div>
-                              ))}
-                            </div>
+                            {q.questionType === "subjective" ? (
+                              <div className="mt-3">
+                                <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 mb-2">Subjective</span>
+                                <p className="text-xs text-muted-foreground font-semibold mb-1">Accepted Answers:</p>
+                                <ul className="text-sm space-y-1">
+                                  {(() => { try { return JSON.parse(q.correctAnswerText as string ?? "[]"); } catch { return []; } })().map((a: string, i: number) => (
+                                    <li key={i} className="px-2 py-1 rounded border bg-green-100 border-green-400 dark:bg-green-900/30 dark:border-green-600">{a}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                {['A', 'B', 'C', 'D'].map(opt => (
+                                  <div key={opt} className={`text-sm p-2 rounded border ${q.correctOption === opt ? 'bg-green-100 border-green-400 dark:bg-green-900/30 dark:border-green-600' : 'bg-muted/20'}`}>
+                                    <span className="font-bold">{opt}.</span> {q[`option${opt}` as keyof typeof q] as string}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -487,17 +528,29 @@ export default function TeacherExamDetails() {
                     )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
-                  {['A', 'B', 'C', 'D'].map(optKey => {
-                    const optVal = q[`option${optKey}` as keyof typeof q];
-                    const isCorrect = q.correctOption === optKey;
-                    return (
-                      <div key={optKey} className={`p-3 rounded-xl border ${isCorrect ? 'bg-success/10 border-success/30 text-success-foreground font-semibold' : 'bg-muted/30 border-border/50 text-muted-foreground'}`}>
-                        <span className="font-bold mr-2">{optKey}.</span> {optVal as string}
-                      </div>
-                    );
-                  })}
-                </div>
+                {q.questionType === "subjective" ? (
+                  <div className="pl-11 mt-2">
+                    <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 mb-2">Subjective</span>
+                    <p className="text-xs text-muted-foreground font-semibold mb-1">Accepted Answers:</p>
+                    <div className="space-y-1">
+                      {(() => { try { return JSON.parse((q as any).correctAnswerText ?? "[]"); } catch { return []; } })().map((a: string, i: number) => (
+                        <div key={i} className="p-2 rounded-xl border bg-success/10 border-success/30 text-success-foreground text-sm font-semibold">{a}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
+                    {['A', 'B', 'C', 'D'].map(optKey => {
+                      const optVal = q[`option${optKey}` as keyof typeof q];
+                      const isCorrect = q.correctOption === optKey;
+                      return (
+                        <div key={optKey} className={`p-3 rounded-xl border ${isCorrect ? 'bg-success/10 border-success/30 text-success-foreground font-semibold' : 'bg-muted/30 border-border/50 text-muted-foreground'}`}>
+                          <span className="font-bold mr-2">{optKey}.</span> {optVal as string}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </Card>
             );
           }
@@ -516,6 +569,19 @@ export default function TeacherExamDetails() {
       {/* Add Question Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setModalOpen(false)} title="Add New Question">
         <form onSubmit={handleAdd} className="space-y-4">
+          <div>
+            <Label>Question Type</Label>
+            <div className="flex gap-2 mt-1">
+              {(['objective', 'subjective'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setQType(t)}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold capitalize transition-colors ${qType === t ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                >{t}</button>
+              ))}
+            </div>
+          </div>
           <div>
             <Label>Question Text</Label>
             <textarea
@@ -561,21 +627,37 @@ export default function TeacherExamDetails() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
-            <div><Label>Option B</Label><Input value={optB} onChange={e => setOptB(e.target.value)} required /></div>
-            <div><Label>Option C</Label><Input value={optC} onChange={e => setOptC(e.target.value)} required /></div>
-            <div><Label>Option D</Label><Input value={optD} onChange={e => setOptD(e.target.value)} required /></div>
-          </div>
-          <div>
-            <Label>Correct Option</Label>
-            <Select value={correctOpt} onChange={e => setCorrectOpt(e.target.value as "A" | "B" | "C" | "D")}>
-              <option value="A">Option A</option>
-              <option value="B">Option B</option>
-              <option value="C">Option C</option>
-              <option value="D">Option D</option>
-            </Select>
-          </div>
+          {qType === "objective" ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Option A</Label><Input value={optA} onChange={e => setOptA(e.target.value)} required /></div>
+                <div><Label>Option B</Label><Input value={optB} onChange={e => setOptB(e.target.value)} required /></div>
+                <div><Label>Option C</Label><Input value={optC} onChange={e => setOptC(e.target.value)} required /></div>
+                <div><Label>Option D</Label><Input value={optD} onChange={e => setOptD(e.target.value)} required /></div>
+              </div>
+              <div>
+                <Label>Correct Option</Label>
+                <Select value={correctOpt} onChange={e => setCorrectOpt(e.target.value as "A" | "B" | "C" | "D")}>
+                  <option value="A">Option A</option>
+                  <option value="B">Option B</option>
+                  <option value="C">Option C</option>
+                  <option value="D">Option D</option>
+                </Select>
+              </div>
+            </>
+          ) : (
+            <div>
+              <Label>Accepted Answers <span className="text-muted-foreground text-xs">(one per line)</span></Label>
+              <textarea
+                value={correctAnswerText}
+                onChange={e => setCorrectAnswerText(e.target.value)}
+                placeholder={"photosynthesis\nphoto-synthesis"}
+                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-24 text-sm"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Case-insensitive. Internal spaces matter ("photo synthesis" ≠ "photosynthesis").</p>
+            </div>
+          )}
           <Button type="submit" className="w-full mt-4" isLoading={isPending}>Save Question</Button>
         </form>
       </Modal>
@@ -647,6 +729,19 @@ export default function TeacherExamDetails() {
       <Modal isOpen={isEditModalOpen} onClose={() => setEditModalOpen(false)} title="Edit Question">
         <form onSubmit={handleEditSubmit} className="space-y-4">
           <div>
+            <Label>Question Type</Label>
+            <div className="flex gap-2 mt-1">
+              {(['objective', 'subjective'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setEditQType(t)}
+                  className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold capitalize transition-colors ${editQType === t ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:border-primary/50'}`}
+                >{t}</button>
+              ))}
+            </div>
+          </div>
+          <div>
             <Label>Question Text</Label>
             <textarea
               value={editQText}
@@ -670,21 +765,37 @@ export default function TeacherExamDetails() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Option A</Label><Input value={editOptA} onChange={e => setEditOptA(e.target.value)} required /></div>
-            <div><Label>Option B</Label><Input value={editOptB} onChange={e => setEditOptB(e.target.value)} required /></div>
-            <div><Label>Option C</Label><Input value={editOptC} onChange={e => setEditOptC(e.target.value)} required /></div>
-            <div><Label>Option D</Label><Input value={editOptD} onChange={e => setEditOptD(e.target.value)} required /></div>
-          </div>
-          <div>
-            <Label>Correct Option</Label>
-            <Select value={editCorrectOpt} onChange={e => setEditCorrectOpt(e.target.value as "A" | "B" | "C" | "D")}>
-              <option value="A">Option A</option>
-              <option value="B">Option B</option>
-              <option value="C">Option C</option>
-              <option value="D">Option D</option>
-            </Select>
-          </div>
+          {editQType === "objective" ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Option A</Label><Input value={editOptA} onChange={e => setEditOptA(e.target.value)} required /></div>
+                <div><Label>Option B</Label><Input value={editOptB} onChange={e => setEditOptB(e.target.value)} required /></div>
+                <div><Label>Option C</Label><Input value={editOptC} onChange={e => setEditOptC(e.target.value)} required /></div>
+                <div><Label>Option D</Label><Input value={editOptD} onChange={e => setEditOptD(e.target.value)} required /></div>
+              </div>
+              <div>
+                <Label>Correct Option</Label>
+                <Select value={editCorrectOpt} onChange={e => setEditCorrectOpt(e.target.value as "A" | "B" | "C" | "D")}>
+                  <option value="A">Option A</option>
+                  <option value="B">Option B</option>
+                  <option value="C">Option C</option>
+                  <option value="D">Option D</option>
+                </Select>
+              </div>
+            </>
+          ) : (
+            <div>
+              <Label>Accepted Answers <span className="text-muted-foreground text-xs">(one per line)</span></Label>
+              <textarea
+                value={editCorrectAnswerText}
+                onChange={e => setEditCorrectAnswerText(e.target.value)}
+                placeholder={"photosynthesis\nphoto-synthesis"}
+                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-24 text-sm"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Case-insensitive. Internal spaces matter ("photo synthesis" ≠ "photosynthesis").</p>
+            </div>
+          )}
           <Button type="submit" className="w-full mt-4" isLoading={isUpdatePending}>Save Changes</Button>
         </form>
       </Modal>

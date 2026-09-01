@@ -133,18 +133,17 @@ export interface Question {
   optionB: string;
   optionC: string;
   optionD: string;
-  correctOption: QuestionCorrectOption;
+  correctOption: string;
+  schoolCode?: string;
+  imageUrl?: string | null;
+  groupId?: number | null;
+  groupOrder?: number | null;
+  groupImageUrl?: string | null;
+  groupTitle?: string | null;
+  groupText?: string | null;
+  questionType?: string | null;
+  correctAnswerText?: string | null;
 }
-
-export type CreateQuestionRequestCorrectOption =
-  (typeof CreateQuestionRequestCorrectOption)[keyof typeof CreateQuestionRequestCorrectOption];
-
-export const CreateQuestionRequestCorrectOption = {
-  A: "A",
-  B: "B",
-  C: "C",
-  D: "D",
-} as const;
 
 export interface CreateQuestionRequest {
   text: string;
@@ -152,7 +151,14 @@ export interface CreateQuestionRequest {
   optionB: string;
   optionC: string;
   optionD: string;
-  correctOption: CreateQuestionRequestCorrectOption;
+  correctOption: string;
+  imageUrl?: string | null;
+  groupId?: number | null;
+  groupTitle?: string | null;
+  groupText?: string | null;
+  groupImageUrl?: string | null;
+  questionType?: string | null;
+  correctAnswerText?: string | null;
 }
 
 export interface ExamWithQuestions {

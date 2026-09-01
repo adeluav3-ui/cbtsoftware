@@ -100,40 +100,62 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                         Q{i + 1}. {ans.questionText}
                       </p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {OPTION_KEYS.map((_key, idx) => {
-                        const label = OPTION_LABELS[idx];
-                        const optionKey = `option${label}`;
-                        const value = ans[optionKey];
-                        const isStudentPick = ans.selectedOption === label;
-                        const isCorrectOption = ans.correctOption === label;
-                        return (
-                          <div
-                            key={label}
-                            className={`text-sm rounded-lg px-3 py-2 border transition-all ${isCorrectOption && isStudentPick
-                                ? "bg-green-100 border-green-400 font-bold"
-                                : isCorrectOption
-                                  ? "bg-green-50 border-green-300 font-semibold text-green-800"
-                                  : isStudentPick
-                                    ? "bg-red-100 border-red-400 font-bold text-red-800"
-                                    : "bg-background border-border/40"
-                              }`}
-                          >
-                            <span className="font-mono mr-1">{label}.</span> {value}
-                            {isCorrectOption && (
-                              <span className="ml-1 text-green-700 text-xs font-semibold"> ✓ Correct</span>
-                            )}
-                            {isStudentPick && !isCorrectOption && (
-                              <span className="ml-1 text-red-700 text-xs font-semibold"> ✗ Picked</span>
-                            )}
+                    {ans.correctOption?.startsWith("[") ? (
+                      // Subjective question
+                      <div className="space-y-2">
+                        <div className={`text-sm rounded-lg px-3 py-2 border ${isCorrect ? "bg-green-100 border-green-400" : skipped ? "bg-yellow-50 border-yellow-300" : "bg-red-100 border-red-400"}`}>
+                          <span className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Student answered: </span>
+                          {skipped ? <span className="italic text-muted-foreground">No answer</span> : <span className="font-medium">{ans.selectedOption}</span>}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground font-semibold mb-1">Accepted answers:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {(() => { try { return JSON.parse(ans.correctOption); } catch { return []; } })().map((a: string, ai: number) => (
+                              <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-300 font-medium">{a}</span>
+                            ))}
                           </div>
-                        );
-                      })}
-                    </div>
-                    {skipped && (
-                      <p className="text-xs text-yellow-700 mt-2 font-medium">
-                        Student did not answer this question.
-                      </p>
+                        </div>
+                        {skipped && <p className="text-xs text-yellow-700 mt-1 font-medium">Student did not answer this question.</p>}
+                      </div>
+                    ) : (
+                      // Objective question
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {OPTION_KEYS.map((_key, idx) => {
+                            const label = OPTION_LABELS[idx];
+                            const optionKey = `option${label}`;
+                            const value = ans[optionKey];
+                            const isStudentPick = ans.selectedOption === label;
+                            const isCorrectOption = ans.correctOption === label;
+                            return (
+                              <div
+                                key={label}
+                                className={`text-sm rounded-lg px-3 py-2 border transition-all ${isCorrectOption && isStudentPick
+                                    ? "bg-green-100 border-green-400 font-bold"
+                                    : isCorrectOption
+                                      ? "bg-green-50 border-green-300 font-semibold text-green-800"
+                                      : isStudentPick
+                                        ? "bg-red-100 border-red-400 font-bold text-red-800"
+                                        : "bg-background border-border/40"
+                                  }`}
+                              >
+                                <span className="font-mono mr-1">{label}.</span> {value}
+                                {isCorrectOption && (
+                                  <span className="ml-1 text-green-700 text-xs font-semibold"> ✓ Correct</span>
+                                )}
+                                {isStudentPick && !isCorrectOption && (
+                                  <span className="ml-1 text-red-700 text-xs font-semibold"> ✗ Picked</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {skipped && (
+                          <p className="text-xs text-yellow-700 mt-2 font-medium">
+                            Student did not answer this question.
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 );

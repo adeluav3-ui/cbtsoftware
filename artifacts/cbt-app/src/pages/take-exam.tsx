@@ -250,26 +250,38 @@ export default function TakeExam() {
               </div>
 
               {/* Options */}
-              <div className="space-y-2 md:space-y-3">
-                {['A', 'B', 'C', 'D'].map(optKey => {
-                  const val = q[`option${optKey}` as keyof Question];
-                  const isSelected = answers[q.id.toString()] === optKey;
-                  return (
-                    <button
-                      key={optKey}
-                      onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optKey }))}
-                      className={`w-full text-left p-3 md:p-4 rounded-xl border-2 transition-all flex items-center gap-2 md:gap-3 ${isSelected ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border bg-background hover:border-primary/40'
-                        }`}
-                    >
-                      <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-sm md:text-base shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted'
-                        }`}>
-                        {optKey}
-                      </div>
-                      <span className="text-sm md:text-lg">{val as string}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {(q as any).questionType === "subjective" ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Type your answer below. Spelling and case do not matter, but spacing inside the word does.</p>
+                  <textarea
+                    value={answers[q.id.toString()] ?? ""}
+                    onChange={e => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                    placeholder="Type your answer here..."
+                    className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-28 text-sm md:text-base"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2 md:space-y-3">
+                  {['A', 'B', 'C', 'D'].map(optKey => {
+                    const val = q[`option${optKey}` as keyof Question];
+                    const isSelected = answers[q.id.toString()] === optKey;
+                    return (
+                      <button
+                        key={optKey}
+                        onClick={() => setAnswers(prev => ({ ...prev, [q.id]: optKey }))}
+                        className={`w-full text-left p-3 md:p-4 rounded-xl border-2 transition-all flex items-center gap-2 md:gap-3 ${isSelected ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border bg-background hover:border-primary/40'
+                          }`}
+                      >
+                        <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-sm md:text-base shrink-0 ${isSelected ? 'bg-primary text-white' : 'bg-muted'
+                          }`}>
+                          {optKey}
+                        </div>
+                        <span className="text-sm md:text-lg">{val as string}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Navigation Buttons */}
               <div className="flex justify-between gap-3 mt-6 md:mt-10 pt-4 md:pt-6 border-t">

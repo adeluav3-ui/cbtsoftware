@@ -36,6 +36,8 @@ export const questionsTable = pgTable("questions", {
   groupImageUrl: text("group_image_url"),
   groupTitle: text("group_title"),
   groupText: text("group_text"),
+  questionType: text("question_type").default("objective"), // "objective" | "subjective"
+  correctAnswerText: text("correct_answer_text"), // JSON array of accepted answers for subjective
 }, (table) => ({
   examIdIdx: index("questions_exam_id_idx").on(table.examId),
 }));

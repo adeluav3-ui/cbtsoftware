@@ -11,7 +11,7 @@ import {
   subjectScoresTable,
   schoolsTable,
 } from "@workspace/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, count } from "drizzle-orm";
 
 interface SchoolParams {
   schoolCode: string;
@@ -84,10 +84,24 @@ router.get("/", requireAuth, async (req: RequestWithSession, res: Response) => {
         assessmentType: examsTable.assessmentType,
         term: examsTable.term,
         createdAt: examsTable.createdAt,
-        questionCount: sql<number>`(SELECT COUNT(*) FROM questions WHERE questions.exam_id = exams.id)`.as("question_count"),
+        questionCount: count(questionsTable.id),
       })
       .from(examsTable)
+      .leftJoin(questionsTable, eq(questionsTable.examId, examsTable.id))
       .where(and(...conditions))
+      .groupBy(
+        examsTable.id,
+        examsTable.title,
+        examsTable.subject,
+        examsTable.class,
+        examsTable.durationMinutes,
+        examsTable.isActive,
+        examsTable.schoolCode,
+        examsTable.teacherId,
+        examsTable.assessmentType,
+        examsTable.term,
+        examsTable.createdAt,
+      )
       .orderBy(examsTable.createdAt);
 
     const exams = (pageNum && limitNum)
@@ -199,6 +213,12 @@ router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Respon
 
     if (!exam) {
       return res.status(404).json({ error: "Exam not found" });
+    }
+
+    // #11: Students can only access active exams
+    const sessionRole = (req as any).session?.role;
+    if (sessionRole === 'student' && !exam.isActive) {
+      return res.status(403).json({ error: "This exam is not currently active." });
     }
 
     // Order by the effective position of each question/group in the overall
@@ -538,10 +558,18 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder, groupTitle, groupText, groupImageUrl } = req.body;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder, groupTitle, groupText, groupImageUrl, questionType, correctAnswerText } = req.body;
 
-  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
-    return res.status(400).json({ error: "All question fields are required" });
+  const qType = questionType === "subjective" ? "subjective" : "objective";
+
+  if (!text) {
+    return res.status(400).json({ error: "Question text is required" });
+  }
+  if (qType === "objective" && (!optionA || !optionB || !optionC || !optionD || !correctOption)) {
+    return res.status(400).json({ error: "All options and correct option are required for objective questions" });
+  }
+  if (qType === "subjective" && !correctAnswerText) {
+    return res.status(400).json({ error: "At least one accepted answer is required for subjective questions" });
   }
 
   try {
@@ -559,16 +587,21 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
       finalGroupOrder = existingInGroup[0]?.count || 0;
     }
 
+    // For subjective: store accepted answers as JSON array; options are empty
+    const acceptedAnswers = qType === "subjective"
+      ? JSON.stringify((correctAnswerText as string).split("\n").map((a: string) => a.trim()).filter(Boolean))
+      : null;
+
     const [question] = await db
       .insert(questionsTable)
       .values({
         examId: examIdNum,
         text,
-        optionA,
-        optionB,
-        optionC,
-        optionD,
-        correctOption,
+        optionA: qType === "objective" ? optionA : "",
+        optionB: qType === "objective" ? optionB : "",
+        optionC: qType === "objective" ? optionC : "",
+        optionD: qType === "objective" ? optionD : "",
+        correctOption: qType === "objective" ? correctOption : "",
         schoolCode: schoolCodeStr,
         imageUrl: imageUrl || null,
         groupId: groupId || null,
@@ -576,6 +609,8 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
         groupTitle: groupId ? (groupTitle || null) : null,
         groupText: groupId ? (groupText || null) : null,
         groupImageUrl: groupId ? (groupImageUrl || null) : null,
+        questionType: qType,
+        correctAnswerText: acceptedAnswers,
       })
       .returning();
 
@@ -588,24 +623,46 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   }
 });
 
-// Delete question
+// Edit question
 router.patch("/:examId/questions/:questionId", requireSchoolStaff, async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
   const examIdNum = toNumber(examId);
   const questionIdNum = toNumber(questionId);
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl } = req.body;
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, questionType, correctAnswerText } = req.body;
 
-  if (!text || !optionA || !optionB || !optionC || !optionD || !correctOption) {
-    return res.status(400).json({ error: "All question fields are required" });
+  const qType = questionType === "subjective" ? "subjective" : "objective";
+
+  if (!text) {
+    return res.status(400).json({ error: "Question text is required" });
   }
-  if (!["A", "B", "C", "D"].includes(correctOption)) {
+  if (qType === "objective" && (!optionA || !optionB || !optionC || !optionD || !correctOption)) {
+    return res.status(400).json({ error: "All options and correct option are required for objective questions" });
+  }
+  if (qType === "objective" && !["A", "B", "C", "D"].includes(correctOption)) {
     return res.status(400).json({ error: "correctOption must be A, B, C, or D" });
   }
+  if (qType === "subjective" && !correctAnswerText) {
+    return res.status(400).json({ error: "At least one accepted answer is required for subjective questions" });
+  }
+
+  const acceptedAnswers = qType === "subjective"
+    ? JSON.stringify((correctAnswerText as string).split("\n").map((a: string) => a.trim()).filter(Boolean))
+    : null;
 
   try {
     const [updated] = await db
       .update(questionsTable)
-      .set({ text, optionA, optionB, optionC, optionD, correctOption, imageUrl: imageUrl || null })
+      .set({
+        text,
+        optionA: qType === "objective" ? optionA : "",
+        optionB: qType === "objective" ? optionB : "",
+        optionC: qType === "objective" ? optionC : "",
+        optionD: qType === "objective" ? optionD : "",
+        correctOption: qType === "objective" ? correctOption : "",
+        imageUrl: imageUrl || null,
+        questionType: qType,
+        correctAnswerText: acceptedAnswers,
+      })
       .where(and(eq(questionsTable.id, questionIdNum), eq(questionsTable.examId, examIdNum)))
       .returning();
 
@@ -848,161 +905,160 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
       return res.status(404).json({ error: "Exam not found" });
     }
 
-    const questions = await db
-      .select()
-      .from(questionsTable)
-      .where(eq(questionsTable.examId, examIdNum));
+    // #4: Exam must be active
+    if (!exam.isActive) {
+      return res.status(403).json({ error: "This exam is not currently active." });
+    }
+
+    const studentIdNum = parseInt(String(studentId), 10);
+
+    // Fetch student and school in parallel before grading
+    const [[student], questions, [gradingScheme], [school]] = await Promise.all([
+      db.select({ id: usersTable.id, class: usersTable.class })
+        .from(usersTable).where(eq(usersTable.id, studentIdNum)).limit(1),
+      db.select().from(questionsTable).where(eq(questionsTable.examId, examIdNum)),
+      db.select().from(gradingSchemesTable).where(eq(gradingSchemesTable.schoolCode, schoolCodeStr)).limit(1),
+      db.select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession, pureCbtMode: schoolsTable.pureCbtMode })
+        .from(schoolsTable).where(eq(schoolsTable.code, schoolCodeStr)).limit(1),
+    ]);
+
+    // #12: Student must belong to the exam's class
+    const studentClass = student?.class ?? "Unknown";
+    if (student && student.class !== exam.class) {
+      return res.status(403).json({ error: "This exam is not for your class." });
+    }
 
     let cbtScore = 0;
     for (const q of questions) {
       const studentAnswer = answers[q.id.toString()];
-      if (studentAnswer && studentAnswer === q.correctOption) {
-        cbtScore++;
+      if (q.questionType === "subjective") {
+        // Case-insensitive match; internal whitespace is significant
+        const normalized = (studentAnswer ?? "").trim().toLowerCase();
+        if (normalized) {
+          let acceptedAnswers: string[] = [];
+          try { acceptedAnswers = JSON.parse(q.correctAnswerText ?? "[]"); } catch {}
+          if (acceptedAnswers.some((a: string) => a.trim().toLowerCase() === normalized)) cbtScore++;
+        }
+      } else {
+        if (studentAnswer === q.correctOption) cbtScore++;
       }
     }
 
     const totalQuestions = questions.length;
     const cbtPercentage = totalQuestions > 0 ? (cbtScore / totalQuestions) * 100 : 0;
 
-    const [gradingScheme] = await db
-      .select()
-      .from(gradingSchemesTable)
-      .where(eq(gradingSchemesTable.schoolCode, schoolCodeStr))
-      .limit(1);
-
     const defaultScheme = {
-      midTermTotal: 20,
-      midTermCbt: 10,
-      midTermTheory: 10,
-      examTotal: 60,
-      examCbt: 30,
-      examTheory: 30,
+      midTermTotal: 20, midTermCbt: 10, midTermTheory: 10,
+      examTotal: 60, examCbt: 30, examTheory: 30,
       classActivityTotal: 20,
     };
-
     const scheme = gradingScheme || defaultScheme;
+    const pureCbtMode = school?.pureCbtMode ?? false;
 
     let componentTotal = 0;
     let componentCbt = 0;
-
     if (exam.assessmentType === 'mid_term') {
-      componentTotal = scheme.midTermTotal;
-      componentCbt = scheme.midTermCbt;
+      componentTotal = scheme.midTermTotal; componentCbt = scheme.midTermCbt;
     } else if (exam.assessmentType === 'exam') {
-      componentTotal = scheme.examTotal;
-      componentCbt = scheme.examCbt;
+      componentTotal = scheme.examTotal; componentCbt = scheme.examCbt;
     } else {
-      componentTotal = scheme.classActivityTotal;
-      componentCbt = 0;
+      componentTotal = scheme.classActivityTotal; componentCbt = 0;
     }
 
-    const scaledCbtScore = componentCbt > 0 ? (cbtPercentage / 100) * componentCbt : 0;
-
-    // Duplicate submission guard
-    const [existingResult] = await db
-      .select({ id: resultsTable.id })
-      .from(resultsTable)
-      .where(and(eq(resultsTable.examId, examIdNum), eq(resultsTable.studentId, parseInt(String(studentId), 10))))
-      .limit(1);
-    if (existingResult) {
-      return res.status(409).json({ error: "You have already submitted this exam." });
-    }
-
-    const [student] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, parseInt(String(studentId), 10)))
-      .limit(1);
-
-    const studentClass = student?.class ?? "Unknown";
-
-    // Fetch school for current term/session
-    const [school] = await db
-      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
-      .from(schoolsTable)
-      .where(eq(schoolsTable.code, schoolCodeStr))
-      .limit(1);
+    // In pure CBT mode the CBT score scales to the full component total (no theory portion)
+    const effectiveCbtMax = pureCbtMode ? componentTotal : componentCbt;
+    const scaledCbtScore = effectiveCbtMax > 0 ? (cbtPercentage / 100) * effectiveCbtMax : 0;
+    const roundedCbt = Math.round(scaledCbtScore);
     const currentTerm = school?.currentTerm ?? "First Term";
     const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
 
-    const [result] = await db
-      .insert(resultsTable)
-      .values({
-        examId: examIdNum,
-        studentId: parseInt(String(studentId), 10),
-        fullName,
-        class: studentClass,
-        score: cbtScore,
-        totalQuestions,
-        percentage: (cbtScore / totalQuestions) * 100,
-        schoolCode: schoolCodeStr,
-      })
-      .returning();
-
-    if (questions.length > 0) {
-      type Question = typeof questionsTable.$inferSelect;
-      await db.insert(resultAnswersTable).values(
-        questions.map((q: Question) => ({
-          resultId: result.id,
-          questionId: q.id,
-          questionText: q.text,
-          optionA: q.optionA,
-          optionB: q.optionB,
-          optionC: q.optionC,
-          optionD: q.optionD,
-          correctOption: q.correctOption,
-          selectedOption: answers[q.id.toString()] ?? null,
-          isCorrect: (answers[q.id.toString()] ?? null) === q.correctOption,
-          schoolCode: schoolCodeStr,
-        }))
-      );
-    }
-
-    const roundedCbt = Math.round(scaledCbtScore);
     const scoreValues: any = {
-      studentId: parseInt(String(studentId), 10),
-      subjectName: exam.subject,
-      className: studentClass,
-      schoolCode: schoolCodeStr,
-      term: currentTerm,
-      academicSession: currentAcademicSession,
+      studentId: studentIdNum, subjectName: exam.subject,
+      className: studentClass, schoolCode: schoolCodeStr,
+      term: currentTerm, academicSession: currentAcademicSession,
     };
     const scoreUpdate: any = { updatedAt: new Date() };
-
     if (exam.assessmentType === 'mid_term') {
-      scoreValues.midTermScore = roundedCbt;
-      scoreValues.midTermCbtScore = roundedCbt;
-      scoreUpdate.midTermScore = roundedCbt;
-      scoreUpdate.midTermCbtScore = roundedCbt;
+      scoreValues.midTermScore = roundedCbt; scoreValues.midTermCbtScore = roundedCbt;
+      scoreUpdate.midTermScore = roundedCbt; scoreUpdate.midTermCbtScore = roundedCbt;
     } else if (exam.assessmentType === 'exam') {
-      scoreValues.examScore = roundedCbt;
-      scoreValues.examCbtScore = roundedCbt;
-      scoreUpdate.examScore = roundedCbt;
-      scoreUpdate.examCbtScore = roundedCbt;
+      scoreValues.examScore = roundedCbt; scoreValues.examCbtScore = roundedCbt;
+      scoreUpdate.examScore = roundedCbt; scoreUpdate.examCbtScore = roundedCbt;
     } else if (exam.assessmentType === 'class_activity') {
       scoreValues.classActivityScore = roundedCbt;
       scoreUpdate.classActivityScore = roundedCbt;
     }
 
-    await db
-      .insert(subjectScoresTable)
-      .values(scoreValues)
-      .onConflictDoUpdate({
-        target: [subjectScoresTable.studentId, subjectScoresTable.subjectName, subjectScoresTable.term, subjectScoresTable.academicSession],
-        set: scoreUpdate,
-      });
+    // #9: Wrap result + answers + subject scores in one transaction.
+    // The unique constraint on (student_id, exam_id) is the final race guard —
+    // concurrent duplicates will get a conflict error from the DB.
+    const result = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(resultsTable)
+        .values({
+          examId: examIdNum, studentId: studentIdNum, fullName,
+          class: studentClass, score: cbtScore, totalQuestions,
+          percentage: totalQuestions > 0 ? (cbtScore / totalQuestions) * 100 : 0,
+          schoolCode: schoolCodeStr,
+        })
+        .returning();
+
+      if (questions.length > 0) {
+        type Question = typeof questionsTable.$inferSelect;
+        await tx.insert(resultAnswersTable).values(
+          questions.map((q: Question) => {
+            const studentAnswer = answers[q.id.toString()] ?? null;
+            if (q.questionType === "subjective") {
+              const normalized = (studentAnswer ?? "").trim().toLowerCase();
+              let acceptedAnswers: string[] = [];
+              try { acceptedAnswers = JSON.parse(q.correctAnswerText ?? "[]"); } catch {}
+              const isCorrect = normalized
+                ? acceptedAnswers.some((a: string) => a.trim().toLowerCase() === normalized)
+                : false;
+              return {
+                resultId: inserted.id, questionId: q.id, questionText: q.text,
+                optionA: "", optionB: "", optionC: "", optionD: "",
+                correctOption: q.correctAnswerText ?? "[]",
+                selectedOption: studentAnswer,
+                isCorrect,
+                schoolCode: schoolCodeStr,
+              };
+            }
+            return {
+              resultId: inserted.id, questionId: q.id, questionText: q.text,
+              optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD,
+              correctOption: q.correctOption,
+              selectedOption: studentAnswer,
+              isCorrect: studentAnswer === q.correctOption,
+              schoolCode: schoolCodeStr,
+            };
+          })
+        );
+      }
+
+      await tx
+        .insert(subjectScoresTable)
+        .values(scoreValues)
+        .onConflictDoUpdate({
+          target: [subjectScoresTable.studentId, subjectScoresTable.subjectName, subjectScoresTable.term, subjectScoresTable.academicSession],
+          set: scoreUpdate,
+        });
+
+      return inserted;
+    });
 
     res.json({
       ...result,
-      examTitle: exam.title,
-      subject: exam.subject,
+      examTitle: exam.title, subject: exam.subject,
       assessmentType: exam.assessmentType,
-      cbtScore: cbtScore,
-      scaledScore: roundedCbt,
-      totalPossible: componentTotal,
+      cbtScore, scaledScore: roundedCbt, totalPossible: componentTotal,
     });
     return;
-  } catch (err) {
+  } catch (err: any) {
+    // Unique constraint violation = duplicate submission
+    if (err?.code === '23505' || err?.message?.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: "You have already submitted this exam." });
+    }
     console.error(err);
     res.status(500).json({ error: "Server error" });
     return;
