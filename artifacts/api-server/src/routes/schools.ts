@@ -1030,7 +1030,12 @@ router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request,
         archived++;
       } else {
         const avg = avgMap.get(student.id);
-        if (avg !== undefined && avg < 50) {
+        // JSS3 sits WAEC (external exam) — no internal scores, always promote across all schools
+        // TMGS2026 one-time: didn't use result system in 2025/2026, promote all this transition only
+        const forcePromote =
+          student.class === "JSS3" ||
+          (schoolCodeStr === "TMGS2026" && prevSession === "2025/2026");
+        if (!forcePromote && avg !== undefined && avg < 50) {
           retained++;
         } else {
           const nextClass = classOrder[currentClassIndex + 1];
