@@ -51,39 +51,39 @@ export function LicenseLock({ error, licenseValidUntil }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-gray-900/95 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center space-y-5">
+    <div className="fixed inset-0 z-[9999] bg-foreground/90 flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-card rounded-2xl shadow-2xl border border-border/50 p-8 text-center space-y-5">
         {error === "CLOCK_TAMPER" ? (
           <>
-            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-              <Clock className="w-8 h-8 text-red-600" />
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8 text-destructive" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Clock Tamper Detected</h1>
-            <p className="text-gray-600 text-sm leading-relaxed">
+            <h1 className="text-2xl font-bold text-foreground">Clock Tamper Detected</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
               The server's system clock appears to have been set back. This
               protection prevents exam fraud. Please correct the system time and
               restart the server.
             </p>
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 font-medium">
+            <div className="bg-destructive/8 border border-destructive/20 rounded-xl p-4 text-sm text-destructive font-medium">
               Contact your system administrator or CBT Software support to
               resolve this issue.
             </div>
           </>
         ) : (
           <>
-            <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mx-auto">
-              <Calendar className="w-8 h-8 text-orange-600" />
+            <div className="w-16 h-16 rounded-full bg-warning/10 flex items-center justify-center mx-auto">
+              <Calendar className="w-8 h-8 text-warning" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">License Expired</h1>
+            <h1 className="text-2xl font-bold text-foreground">License Expired</h1>
             {licenseValidUntil && (
-              <p className="text-gray-500 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Expired on{" "}
-                <span className="font-semibold">
+                <span className="font-semibold text-foreground">
                   {format(new Date(licenseValidUntil), "MMMM d, yyyy")}
                 </span>
               </p>
             )}
-            <p className="text-gray-600 text-sm leading-relaxed">
+            <p className="text-muted-foreground text-sm leading-relaxed">
               Your CBT Software license has expired. Contact your administrator
               to renew it, then upload the license patch file below to restore
               access without losing any data.
@@ -91,16 +91,18 @@ export function LicenseLock({ error, licenseValidUntil }: Props) {
 
             {/* License patch upload — only shown in local mode */}
             {IS_LOCAL && (
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-left space-y-3">
-                <p className="text-xs font-semibold text-orange-800 uppercase tracking-wide flex items-center gap-1.5">
+              <div className="bg-warning/8 border border-warning/25 rounded-xl p-4 text-left space-y-3">
+                <p className="text-xs font-semibold text-warning-foreground uppercase tracking-wide flex items-center gap-1.5">
                   <Upload className="w-3.5 h-3.5" />
                   Upload License Patch
                 </p>
-                <p className="text-xs text-orange-700 leading-relaxed">
-                  Your administrator will send you a <span className="font-mono font-semibold">cbt-license-*.json</span> file. Upload it here to renew without losing exam data.
+                <p className="text-xs text-warning-foreground/80 leading-relaxed">
+                  Your administrator will send you a{" "}
+                  <span className="font-mono font-semibold">cbt-license-*.json</span>{" "}
+                  file. Upload it here to renew without losing exam data.
                 </p>
                 <label className="block cursor-pointer">
-                  <span className={`inline-block px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${busy ? "opacity-50 cursor-not-allowed bg-white border-orange-300 text-orange-700" : "bg-white border-orange-300 text-orange-700 hover:bg-orange-50"}`}>
+                  <span className={`inline-block px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${busy ? "opacity-50 cursor-not-allowed bg-card border-warning/30 text-warning" : "bg-card border-warning/30 text-warning hover:bg-warning/5"}`}>
                     {busy ? "Applying…" : "Choose license patch file (.json)"}
                   </span>
                   <input
@@ -112,10 +114,10 @@ export function LicenseLock({ error, licenseValidUntil }: Props) {
                   />
                 </label>
                 {!schoolCode && (
-                  <p className="text-xs text-orange-600">Loading session…</p>
+                  <p className="text-xs text-muted-foreground">Loading session…</p>
                 )}
                 {patchStatus && (
-                  <p className={`text-xs font-semibold ${patchStatus.startsWith("Error") ? "text-red-600" : "text-green-700"}`}>
+                  <p className={`text-xs font-semibold ${patchStatus.startsWith("Error") ? "text-destructive" : "text-secondary"}`}>
                     {patchStatus}
                   </p>
                 )}
@@ -123,7 +125,7 @@ export function LicenseLock({ error, licenseValidUntil }: Props) {
             )}
 
             {!IS_LOCAL && (
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-700 font-medium">
+              <div className="bg-warning/8 border border-warning/25 rounded-xl p-4 text-sm text-warning-foreground font-medium">
                 Contact CBT Software support to renew your license and restore
                 access.
               </div>

@@ -61,12 +61,12 @@ function StatusBarInner() {
     <>
       {/* ── Persistent status strip ─────────────────────────────────── */}
       <div
-        className="fixed top-0 left-0 right-0 z-[200] flex items-center gap-3 px-4 bg-gray-950 text-white border-b border-gray-800 shadow-lg select-none"
+        className="fixed top-0 left-0 right-0 z-[200] flex items-center gap-3 px-4 bg-foreground text-primary-foreground border-b border-border/20 shadow-lg select-none"
         style={{ height: "44px" }}
       >
         {/* Connection indicator */}
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${online ? "bg-green-400" : "bg-red-400"}`}
+          className={`w-2 h-2 rounded-full shrink-0 ${online ? "bg-secondary" : "bg-destructive"}`}
           title={online ? "Server running" : "Server unreachable"}
         />
 
@@ -75,20 +75,20 @@ function StatusBarInner() {
           {online ? (
             <>
               <span
-                className="font-mono font-bold text-green-300 text-sm whitespace-nowrap tracking-tight"
+                className="font-mono font-bold text-secondary text-sm whitespace-nowrap tracking-tight"
                 title="Primary address — share this with students"
               >
                 {data.localHostname}:{data.port}
               </span>
-              <span className="text-gray-500 text-[10px] whitespace-nowrap hidden sm:inline">
+              <span className="text-primary-foreground/40 text-[10px] whitespace-nowrap hidden sm:inline">
                 if that doesn&apos;t work:{" "}
-                <span className="font-mono text-gray-400">
+                <span className="font-mono text-primary-foreground/60">
                   {data.ip}:{data.port}
                 </span>
               </span>
             </>
           ) : (
-            <span className="text-red-300 text-xs font-semibold flex items-center gap-1.5">
+            <span className="text-destructive text-xs font-semibold flex items-center gap-1.5">
               <WifiOff className="w-3.5 h-3.5 shrink-0" />
               Network unreachable
             </span>
@@ -102,7 +102,7 @@ function StatusBarInner() {
             title="Expand QR code for students to scan"
             className="shrink-0 cursor-pointer hover:opacity-70 transition-opacity"
           >
-            <img src={data.qrDataUrl} alt="QR" className="w-8 h-8 rounded bg-white p-0.5" />
+            <img src={data.qrDataUrl} alt="QR" className="w-8 h-8 rounded bg-card p-0.5" />
           </button>
         )}
 
@@ -111,7 +111,7 @@ function StatusBarInner() {
           onClick={() => doRefresh()}
           disabled={refreshing}
           title="Re-detect network address and refresh mDNS registration"
-          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-800 hover:bg-gray-700 active:bg-gray-600 transition-colors disabled:opacity-40 text-[11px] font-medium"
+          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-foreground/10 hover:bg-primary-foreground/20 active:bg-primary-foreground/30 transition-colors disabled:opacity-40 text-[11px] font-medium"
         >
           <RefreshCw className={`w-3 h-3 shrink-0 ${refreshing ? "animate-spin" : ""}`} />
           <span className="hidden sm:inline">{refreshing ? "…" : "Refresh"}</span>
@@ -125,19 +125,19 @@ function StatusBarInner() {
           onClick={() => setQrOpen(false)}
         >
           <div
-            className="relative bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4"
+            className="relative bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-border/50 text-center space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setQrOpen(false)}
-              className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors"
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-muted-foreground" />
             </button>
 
             <div>
-              <h2 className="font-bold text-gray-800 text-lg">Connect Students</h2>
-              <p className="text-xs text-gray-500 mt-1">
+              <h2 className="font-bold text-foreground text-lg">Connect Students</h2>
+              <p className="text-xs text-muted-foreground mt-1">
                 Scan the QR code or open the URL in any browser on the same Wi‑Fi network.
               </p>
             </div>
@@ -145,32 +145,36 @@ function StatusBarInner() {
             <img
               src={data.qrDataUrl}
               alt="QR code for student connection"
-              className="mx-auto w-56 h-56 rounded-xl border border-gray-200"
+              className="mx-auto w-56 h-56 rounded-xl border border-border"
             />
 
             <div className="text-left space-y-2">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-wide mb-0.5">
+              <div className="bg-primary/8 border border-primary/20 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-primary font-semibold uppercase tracking-wide mb-0.5">
                   Primary (recommended)
                 </p>
-                <p className="font-mono text-sm text-blue-700 font-bold break-all">
+                <p className="font-mono text-sm text-primary font-bold break-all">
                   {data.joinUrl}
                 </p>
               </div>
-              <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-0.5">
+              <div className="bg-muted border border-border rounded-xl px-3 py-2">
+                <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-0.5">
                   Fallback — if primary doesn&apos;t resolve
                 </p>
-                <p className="font-mono text-sm text-gray-600 break-all">
+                <p className="font-mono text-sm text-foreground break-all">
                   {data.joinUrlFallback}
                 </p>
               </div>
             </div>
 
             {/* Honest network stability note */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-3 text-left">
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                <span className="font-semibold">If the network changes during an exam</span>, students already connected may need to reload their page. Exam data is always saved on this computer — only the connection needs refreshing. The .local address usually self-heals when a device reconnects to Wi‑Fi, but tell students to reload if their page stops responding.
+            <div className="bg-warning/8 border border-warning/25 rounded-xl px-3 py-3 text-left">
+              <p className="text-[11px] text-warning-foreground leading-relaxed">
+                <span className="font-semibold">If the network changes during an exam</span>,
+                students already connected may need to reload their page. Exam data is always
+                saved on this computer — only the connection needs refreshing. The .local address
+                usually self-heals when a device reconnects to Wi‑Fi, but tell students to reload
+                if their page stops responding.
               </p>
             </div>
           </div>
