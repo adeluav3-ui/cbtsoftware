@@ -1,8 +1,9 @@
-import React, { InputHTMLAttributes, SelectHTMLAttributes, useState, forwardRef, TextareaHTMLAttributes } from "react";
+import React, { InputHTMLAttributes, SelectHTMLAttributes, useState, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { X, Eye, EyeOff } from "lucide-react";
+import { X, Eye, EyeOff, Loader2 } from "lucide-react";
+import { getGradeColor } from "../lib/grade";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,7 +16,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <textarea
         className={cn(
-          "flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex min-h-20 w-full rounded-xl border-2 border-border bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         ref={ref}
@@ -50,7 +51,12 @@ export function Button({
       disabled={isLoading || props.disabled}
       {...props}
     >
-      {isLoading ? "Loading..." : children}
+      {isLoading ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {children}
+        </>
+      ) : children}
     </button>
   );
 }
@@ -139,7 +145,7 @@ export function Badge({ children, variant = "default", className }: { children: 
       variant === "default" && "bg-muted text-muted-foreground",
       variant === "success" && "bg-secondary/15 text-secondary",
       variant === "destructive" && "bg-destructive/15 text-destructive",
-      variant === "warning" && "bg-accent/15 text-accent",
+      variant === "warning" && "bg-warning/15 text-warning",
       variant === "outline" && "border border-border bg-transparent text-muted-foreground",
       className
     )}>
@@ -180,6 +186,17 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: { isOpe
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+export function GradeBadge({ grade, className }: { grade: string; className?: string }) {
+  return (
+    <span
+      className={cn("inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold text-white", className)}
+      style={{ backgroundColor: getGradeColor(grade) }}
+    >
+      {grade?.toUpperCase() ?? "–"}
+    </span>
   );
 }
 

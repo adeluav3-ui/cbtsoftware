@@ -41,7 +41,16 @@
   --color-border: hsl(214 32% 91%);
   --color-input: hsl(214 32% 91%);
   --color-ring: hsl(224 64% 33%);
-  
+
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-foreground: hsl(28 60% 20%);
+
+  --grade-a: hsl(142 71% 35%);
+  --grade-b: hsl(217 91% 45%);
+  --grade-c: hsl(173 80% 31%);
+  --grade-d: hsl(38 92% 45%);
+  --grade-f: hsl(0 84% 60%);
+
   --radius: 1rem;
 }
 
