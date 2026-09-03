@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Modal, Badge, Button, Input } from "@/components/ui-elements";
+import { Modal, Badge, Button, Input, CustomTabs } from "@/components/ui-elements";
 import { ChevronDown, ChevronRight, CheckCircle, XCircle, MinusCircle, Save, Clock, Upload, User, RefreshCw, Eye, EyeOff, Pencil, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
@@ -438,26 +438,13 @@ export function StudentDetailModal({ studentId, studentName, schoolCode, onClose
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-border">
-          <button
-            onClick={() => setActiveTab("exams")}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "exams"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            Exam History
-          </button>
-          <button
-            onClick={() => setActiveTab("subjects")}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "subjects"
-              ? "border-b-2 border-primary text-primary"
-              : "text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            Subject Scores
-          </button>
+        <CustomTabs
+          tabs={["Exam History", "Subject Scores"]}
+          activeTab={activeTab === "exams" ? "Exam History" : "Subject Scores"}
+          onChange={t => setActiveTab(t === "Exam History" ? "exams" : "subjects")}
+        />
 
+        <div>
           {/* Exam History Tab */}
           {activeTab === "exams" && (
             <>

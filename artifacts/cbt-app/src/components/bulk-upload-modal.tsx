@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Modal, Button, Badge } from "@/components/ui-elements";
+import { Modal, Button, Badge, CustomTabs } from "@/components/ui-elements";
 import { Upload, ClipboardList, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -174,24 +174,11 @@ export function BulkUploadModal({ isOpen, onClose, onUpload, isPending }: BulkUp
             <div className="space-y-4">
 
                 {/* Tab switcher */}
-                <div className="flex gap-2 border-b border-border pb-3">
-                    <button
-                        onClick={() => { setActiveTab("file"); reset(); }}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === "file" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                            }`}
-                    >
-                        <Upload className="w-4 h-4 inline mr-2" />
-                        Excel / CSV
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab("paste"); reset(); }}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === "paste" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                            }`}
-                    >
-                        <ClipboardList className="w-4 h-4 inline mr-2" />
-                        Paste Text
-                    </button>
-                </div>
+                <CustomTabs
+                    tabs={["Excel / CSV", "Paste Text"]}
+                    activeTab={activeTab === "file" ? "Excel / CSV" : "Paste Text"}
+                    onChange={t => { setActiveTab(t === "Excel / CSV" ? "file" : "paste"); reset(); }}
+                />
 
                 {/* File upload tab */}
                 {activeTab === "file" && !parseResult && (

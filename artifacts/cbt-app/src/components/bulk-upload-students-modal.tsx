@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Button, Label, Select, Textarea, Input } from "@/components/ui-elements";
+import { Modal, Button, Label, Select, Textarea, Input, CustomTabs } from "@/components/ui-elements";
 import { Upload, FileText, Download, UserPlus } from "lucide-react";
 
 interface BulkUploadStudentsModalProps {
@@ -209,22 +209,11 @@ export function BulkUploadStudentsModal({ isOpen, onClose, schoolCode, onSuccess
         <Modal isOpen={isOpen} onClose={onClose} title="Bulk Upload Students" size="lg">
             <div className="space-y-4">
                 {/* Method Selection */}
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => setUploadMethod("paste")}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-colors ${uploadMethod === "paste" ? "border-primary bg-primary/10" : "border-border"}`}
-                    >
-                        <FileText className="w-5 h-5 mx-auto mb-1" />
-                        <span className="text-sm font-medium">Paste Names</span>
-                    </button>
-                    <button
-                        onClick={() => setUploadMethod("csv")}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-colors ${uploadMethod === "csv" ? "border-primary bg-primary/10" : "border-border"}`}
-                    >
-                        <Upload className="w-5 h-5 mx-auto mb-1" />
-                        <span className="text-sm font-medium">Upload CSV</span>
-                    </button>
-                </div>
+                <CustomTabs
+                    tabs={["Paste Names", "Upload CSV"]}
+                    activeTab={uploadMethod === "paste" ? "Paste Names" : "Upload CSV"}
+                    onChange={t => setUploadMethod(t === "Paste Names" ? "paste" : "csv")}
+                />
 
                 {/* Class Selection */}
                 <div>

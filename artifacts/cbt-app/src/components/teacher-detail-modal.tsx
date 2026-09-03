@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Modal, Badge, Button, Input } from "@/components/ui-elements";
+import { Modal, Badge, Button, Input, CustomTabs } from "@/components/ui-elements";
 import { BookOpen, Users, ChevronDown, ChevronRight, Key, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -110,26 +110,11 @@ export function TeacherDetailModal({ teacherId, teacherName, schoolCode, onClose
           </div>
 
           {/* Section toggle */}
-          <div className="flex gap-2 border-b border-border pb-2 flex-wrap">
-            <button
-              onClick={() => setActiveSection("exams")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === "exams" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <BookOpen className="w-4 h-4 inline mr-1.5" />Exams & Questions
-            </button>
-            <button
-              onClick={() => setActiveSection("students")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === "students" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Users className="w-4 h-4 inline mr-1.5" />Student Results
-            </button>
-            <button
-              onClick={() => setActiveSection("credentials")}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === "credentials" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-            >
-              <Key className="w-4 h-4 inline mr-1.5" />Credentials
-            </button>
-          </div>
+          <CustomTabs
+            tabs={["Exams & Questions", "Student Results", "Credentials"]}
+            activeTab={activeSection === "exams" ? "Exams & Questions" : activeSection === "students" ? "Student Results" : "Credentials"}
+            onChange={t => setActiveSection(t === "Exams & Questions" ? "exams" : t === "Student Results" ? "students" : "credentials")}
+          />
 
           <div className="max-h-[55vh] overflow-y-auto space-y-3 pr-1">
             {activeSection === "exams" && (
