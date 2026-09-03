@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListExams, useListResults } from "@workspace/api-client-react";
 import { Card, Button, Badge, Modal, Input } from "@/components/ui-elements";
+import { getGradeColor } from "@/lib/grade";
 import { useLocation } from "wouter";
 import { Clock, CheckCircle2, PlayCircle, RotateCcw, ClipboardList, BookOpen, TrendingUp } from "lucide-react";
 
@@ -169,7 +170,7 @@ export default function StudentDashboard() {
             ? completed.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completed.length
             : 0;
           const grade = avg >= gradeScheme.gradeAMin ? 'A' : avg >= gradeScheme.gradeBMin ? 'B' : avg >= gradeScheme.gradeCMin ? 'C' : avg >= gradeScheme.gradeDMin ? 'D' : 'F';
-          const gradeColor = avg >= gradeScheme.gradeAMin ? "text-green-600" : avg >= gradeScheme.gradeBMin ? "text-blue-600" : avg >= gradeScheme.gradeCMin ? "text-yellow-600" : avg >= gradeScheme.gradeDMin ? "text-orange-600" : "text-destructive";
+          const gradeColorStyle = { color: getGradeColor(grade) };
 
           return (
             <Card className="p-4 md:p-6">
@@ -181,15 +182,15 @@ export default function StudentDashboard() {
                 </div>
                 <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
                   <p className="text-xs text-muted-foreground">Completed</p>
-                  <p className="text-2xl font-bold text-green-600">{completed.length}</p>
+                  <p className="text-2xl font-bold text-secondary">{completed.length}</p>
                 </div>
                 <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
                   <p className="text-xs text-muted-foreground">Avg Score</p>
-                  <p className={`text-2xl font-bold ${gradeColor}`}>{completed.length > 0 ? `${avg.toFixed(0)}%` : "—"}</p>
+                  <p className="text-2xl font-bold" style={completed.length > 0 ? gradeColorStyle : {}}>{completed.length > 0 ? `${avg.toFixed(0)}%` : "—"}</p>
                 </div>
                 <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
                   <p className="text-xs text-muted-foreground">Grade</p>
-                  <p className={`text-2xl font-bold ${gradeColor}`}>{completed.length > 0 ? grade : "—"}</p>
+                  <p className="text-2xl font-bold" style={completed.length > 0 ? gradeColorStyle : {}}>{completed.length > 0 ? grade : "—"}</p>
                 </div>
               </div>
 
@@ -199,15 +200,15 @@ export default function StudentDashboard() {
                   const complete = s.midTermScore !== null && s.classActivityScore !== null && s.examScore !== null;
                   const pct = s.percentage ?? null;
                   const g = s.grade ?? null;
-                  const gc = pct !== null ? (pct >= 70 ? "text-green-600" : pct >= 60 ? "text-blue-600" : pct >= 50 ? "text-yellow-600" : pct >= 40 ? "text-orange-600" : "text-destructive") : "text-muted-foreground";
+                  const gcStyle = (pct !== null && g) ? { color: getGradeColor(g) } : {};
                   return (
                     <div key={s.subjectName} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/20">
                       <span className="font-medium text-sm">{s.subjectName}</span>
                       <div className="flex items-center gap-3 text-sm">
                         {complete ? (
                           <>
-                            <span className={`font-bold ${gc}`}>{s.totalScore}/100</span>
-                            <span className={`font-bold w-6 text-center ${gc}`}>{g}</span>
+                            <span className="font-bold" style={gcStyle}>{s.totalScore}/100</span>
+                            <span className="font-bold w-6 text-center" style={gcStyle}>{g}</span>
                           </>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Pending</span>

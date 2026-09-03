@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { Card, Button, Textarea } from "@/components/ui-elements";
+import { getGradeColor } from "@/lib/grade";
 import { ArrowLeft, Download, Printer, Save, User, School, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SubjectResult {
@@ -264,16 +265,8 @@ export default function ComprehensiveResults() {
         }
     };
 
-    const getGradeColor = (grade?: string | null) => {
-        switch (grade) {
-            case 'A': return "text-green-600 font-bold";
-            case 'B': return "text-blue-600 font-bold";
-            case 'C': return "text-yellow-600 font-bold";
-            case 'D': return "text-orange-600 font-bold";
-            case 'F': return "text-red-600 font-bold";
-            default: return "text-muted-foreground";
-        }
-    };
+    const gradeStyle = (grade?: string | null): React.CSSProperties =>
+        grade ? { color: getGradeColor(grade) } : {};
 
     const overallAvg = (() => {
         const done = subjects.filter(s => s.percentage !== null);
@@ -310,7 +303,7 @@ export default function ComprehensiveResults() {
                             <td className="py-1">{trait.traitName}</td>
                             <td className="text-center py-1">
                                 {trait.rating ? (
-                                    <span className={`font-semibold ${trait.rating >= 4 ? 'text-green-600' : trait.rating >= 3 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                    <span className={`font-semibold ${trait.rating >= 4 ? 'text-secondary' : trait.rating >= 3 ? 'text-warning' : 'text-destructive'}`}>
                                         {trait.rating} – {RATING_LABELS[trait.rating]}
                                     </span>
                                 ) : "—"}
@@ -702,7 +695,7 @@ export default function ComprehensiveResults() {
                                                             <td className="px-2 py-1.5 text-center">{subject.classActivityScore ?? "—"}</td>
                                                             <td className="px-2 py-1.5 text-center">{subject.examScore ?? "—"}</td>
                                                             <td className="px-2 py-1.5 text-center font-bold">{isComplete ? `${subject.totalScore}%` : "—"}</td>
-                                                            <td className={`px-2 py-1.5 text-center ${getGradeColor(subject.grade)}`}>{subject.grade || "—"}</td>
+                                                            <td className="px-2 py-1.5 text-center font-bold" style={gradeStyle(subject.grade)}>{subject.grade || "—"}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -711,12 +704,12 @@ export default function ComprehensiveResults() {
                                                 <tr>
                                                     <td colSpan={4} className="px-2 py-2 font-bold">Overall Average</td>
                                                     <td className="px-2 py-2 text-center font-bold">{overallAvg.toFixed(1)}%</td>
-                                                    <td className={`px-2 py-2 text-center ${getGradeColor(overallGrade)}`}>{overallGrade}</td>
+                                                    <td className="px-2 py-2 text-center font-bold" style={gradeStyle(overallGrade)}>{overallGrade}</td>
                                                 </tr>
                                                 <tr>
                                                     <td colSpan={6} className="px-2 py-2">
                                                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Promotion Status: </span>
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${overallAvg >= 50 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${overallAvg >= 50 ? 'bg-secondary/15 text-secondary' : 'bg-destructive/15 text-destructive'}`}>
                                                             {overallAvg >= 50 ? 'PROMOTED' : 'REPEAT'}
                                                         </span>
                                                     </td>

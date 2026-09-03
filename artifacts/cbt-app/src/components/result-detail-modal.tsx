@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "@/components/ui-elements";
+import { getGradeColor } from "@/lib/grade";
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
 
 interface ResultDetailModalProps {
@@ -58,13 +59,7 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
             {data.grade && (
               <div className="text-center">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Grade</p>
-                <p className={`font-bold text-3xl ${
-                  data.grade === "A" ? "text-green-600" :
-                  data.grade === "B" ? "text-blue-600" :
-                  data.grade === "C" ? "text-yellow-600" :
-                  data.grade === "D" ? "text-orange-600" :
-                  "text-destructive"
-                }`}>{data.grade}</p>
+                <p className="font-bold text-3xl" style={{ color: getGradeColor(data.grade) }}>{data.grade}</p>
               </div>
             )}
           </div>
@@ -82,17 +77,17 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                   <div
                     key={ans.id}
                     className={`rounded-xl border p-4 ${skipped
-                        ? "border-yellow-300 bg-yellow-50/40"
+                        ? "border-warning/40 bg-warning/8"
                         : isCorrect
-                          ? "border-green-300 bg-green-50/40"
-                          : "border-red-300 bg-red-50/40"
+                          ? "border-secondary/40 bg-secondary/8"
+                          : "border-destructive/40 bg-destructive/8"
                       }`}
                   >
                     <div className="flex items-start gap-2 mb-3">
                       {skipped ? (
-                        <MinusCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                        <MinusCircle className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" />
                       ) : isCorrect ? (
-                        <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                        <CheckCircle className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
                       ) : (
                         <XCircle className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" />
                       )}
@@ -103,7 +98,7 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                     {ans.correctOption?.startsWith("[") ? (
                       // Subjective question
                       <div className="space-y-2">
-                        <div className={`text-sm rounded-lg px-3 py-2 border ${isCorrect ? "bg-green-100 border-green-400" : skipped ? "bg-yellow-50 border-yellow-300" : "bg-red-100 border-red-400"}`}>
+                        <div className={`text-sm rounded-lg px-3 py-2 border ${isCorrect ? "bg-secondary/10 border-secondary/40" : skipped ? "bg-warning/8 border-warning/30" : "bg-destructive/10 border-destructive/40"}`}>
                           <span className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">Student answered: </span>
                           {skipped ? <span className="italic text-muted-foreground">No answer</span> : <span className="font-medium">{ans.selectedOption}</span>}
                         </div>
@@ -111,11 +106,11 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                           <p className="text-xs text-muted-foreground font-semibold mb-1">Accepted answers:</p>
                           <div className="flex flex-wrap gap-1">
                             {(() => { try { return JSON.parse(ans.correctOption); } catch { return []; } })().map((a: string, ai: number) => (
-                              <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-300 font-medium">{a}</span>
+                              <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-secondary/10 text-secondary border border-secondary/30 font-medium">{a}</span>
                             ))}
                           </div>
                         </div>
-                        {skipped && <p className="text-xs text-yellow-700 mt-1 font-medium">Student did not answer this question.</p>}
+                        {skipped && <p className="text-xs text-warning-foreground mt-1 font-medium">Student did not answer this question.</p>}
                       </div>
                     ) : (
                       // Objective question
@@ -131,27 +126,27 @@ export function ResultDetailModal({ resultId, schoolCode, onClose }: ResultDetai
                               <div
                                 key={label}
                                 className={`text-sm rounded-lg px-3 py-2 border transition-all ${isCorrectOption && isStudentPick
-                                    ? "bg-green-100 border-green-400 font-bold"
+                                    ? "bg-secondary/15 border-secondary/50 font-bold"
                                     : isCorrectOption
-                                      ? "bg-green-50 border-green-300 font-semibold text-green-800"
+                                      ? "bg-secondary/8 border-secondary/30 font-semibold text-secondary"
                                       : isStudentPick
-                                        ? "bg-red-100 border-red-400 font-bold text-red-800"
+                                        ? "bg-destructive/10 border-destructive/40 font-bold text-destructive"
                                         : "bg-background border-border/40"
                                   }`}
                               >
                                 <span className="font-mono mr-1">{label}.</span> {value}
                                 {isCorrectOption && (
-                                  <span className="ml-1 text-green-700 text-xs font-semibold"> ✓ Correct</span>
+                                  <span className="ml-1 text-secondary text-xs font-semibold"> ✓ Correct</span>
                                 )}
                                 {isStudentPick && !isCorrectOption && (
-                                  <span className="ml-1 text-red-700 text-xs font-semibold"> ✗ Picked</span>
+                                  <span className="ml-1 text-destructive text-xs font-semibold"> ✗ Picked</span>
                                 )}
                               </div>
                             );
                           })}
                         </div>
                         {skipped && (
-                          <p className="text-xs text-yellow-700 mt-2 font-medium">
+                          <p className="text-xs text-warning-foreground mt-2 font-medium">
                             Student did not answer this question.
                           </p>
                         )}
