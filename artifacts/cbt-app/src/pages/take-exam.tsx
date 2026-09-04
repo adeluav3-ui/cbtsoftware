@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useGetExam, useSubmitExam, Question, GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal } from "@/components/ui-elements";
-import { Clock, AlertCircle, CheckCircle2, Layers } from "lucide-react";
+import { Clock, AlertCircle, CheckCircle2, Layers, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 
@@ -163,7 +163,12 @@ export default function TakeExam() {
   };
 
   if (isNaN(examId)) return <div className="h-screen flex items-center justify-center text-sm text-destructive">Invalid exam link.</div>;
-  if (isLoading || !exam) return <div className="h-screen flex items-center justify-center text-sm">Loading exam...</div>;
+  if (isLoading || !exam) return (
+    <div className="h-screen flex items-center justify-center gap-3 text-muted-foreground">
+      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <span className="text-sm font-medium">Loading exam…</span>
+    </div>
+  );
 
   if (!hasStarted) {
     return (
