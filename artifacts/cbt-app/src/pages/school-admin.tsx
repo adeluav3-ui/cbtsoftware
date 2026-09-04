@@ -928,9 +928,41 @@ export default function SchoolAdminDashboard() {
         </div>
       </div>
 
-      <div className="mb-6 overflow-x-auto pb-2">
+      {/* Mobile: horizontal scrollable tabs */}
+      <div className="md:hidden mb-6 overflow-x-auto pb-2">
         <CustomTabs tabs={["Teachers", "Students", "Results", "Upload Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Devices", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
       </div>
+
+      <div className="flex gap-6">
+        {/* Desktop: grouped sidebar */}
+        <aside className="hidden md:block w-48 shrink-0">
+          <Card className="p-3 sticky top-20">
+            {([
+              { label: "People", items: ["Teachers", "Students", "Credentials"] },
+              { label: "Academics", items: ["Subjects", "Exams", "Entrance Exam", "Staff Interview"] },
+              { label: "Results", items: ["Results", "Upload Results", "Broadsheet"] },
+              { label: "System", items: ["Devices", "Local Server"] },
+            ] as { label: string; items: string[] }[]).map(group => (
+              <div key={group.label} className="mb-4 last:mb-0">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">{group.label}</p>
+                <div className="space-y-0.5">
+                  {group.items.map(item => (
+                    <button
+                      key={item}
+                      onClick={() => setActiveTab(item)}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === item ? "bg-primary text-primary-foreground font-medium" : "text-foreground hover:bg-muted"}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </Card>
+        </aside>
+
+        {/* Content area */}
+        <div className="flex-1 min-w-0">
 
       {/* Teachers Tab */}
       {activeTab === "Teachers" && (
@@ -2235,6 +2267,9 @@ export default function SchoolAdminDashboard() {
           </div>
         );
       })()}
+
+        </div>{/* end content area */}
+      </div>{/* end flex gap-6 */}
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">
