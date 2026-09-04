@@ -9,6 +9,7 @@ import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, Schoo
 import { TeacherDetailModal } from "@/components/teacher-detail-modal";
 import { StudentDetailModal } from "@/components/student-detail-modal";
 import { ResultDetailModal } from "@/components/result-detail-modal";
+import { ConfirmDialog } from "@/components/feedback";
 import { format } from "date-fns";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
 import { ClassResultsView } from "@/components/class-results-modal";
@@ -77,6 +78,7 @@ export default function SchoolAdminDashboard() {
   const [newSubjectLevel, setNewSubjectLevel] = useState<"kg" | "nursery" | "primary" | "junior" | "senior">("kg");
   const [subjectError, setSubjectError] = useState("");
   const [isAddingSubject, setIsAddingSubject] = useState(false);
+  const [confirmDeleteSubjectId, setConfirmDeleteSubjectId] = useState<number | null>(null);
 
   // Term management state
   const [termModalOpen, setTermModalOpen] = useState(false);
@@ -357,10 +359,6 @@ export default function SchoolAdminDashboard() {
 
   // Delete subject
   const handleDeleteSubject = async (subjectId: number) => {
-    if (!confirm("Are you sure you want to delete this subject? This will affect all exams that use this subject.")) {
-      return;
-    }
-
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/subjects/${subjectId}`, {
         method: "DELETE",
@@ -1333,7 +1331,7 @@ export default function SchoolAdminDashboard() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteSubject(subject.id)}
+                            onClick={() => setConfirmDeleteSubjectId(subject.id)}
                             className="text-destructive hover:text-destructive"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -2598,6 +2596,15 @@ export default function SchoolAdminDashboard() {
         }}
       />
       <ResultDetailModal resultId={selectedResultId} schoolCode={schoolCode} onClose={() => setSelectedResultId(null)} />
+      <ConfirmDialog
+        variant="standard"
+        open={confirmDeleteSubjectId !== null}
+        onClose={() => setConfirmDeleteSubjectId(null)}
+        onConfirm={() => { handleDeleteSubject(confirmDeleteSubjectId!); setConfirmDeleteSubjectId(null); }}
+        title="Delete Subject"
+        description="Delete this subject? All associated scores and data will be lost. This cannot be undone."
+        confirmLabel="Delete"
+      />
     </DashboardLayout>
   );
 }

@@ -9,6 +9,7 @@ import { getGetExamQueryKey } from "@workspace/api-client-react";
 import { ArrowLeft, Plus, Trash2, Pencil, HelpCircle, Radio, EyeOff, Upload, Layers, Eye } from "lucide-react";
 import { BulkUploadModal } from "@/components/bulk-upload-modal";
 import { ExamPreviewModal } from "@/components/exam-preview-modal";
+import { ConfirmDialog, toast } from "@/components/feedback";
 
 interface GroupMeta {
   groupId: number;
@@ -69,6 +70,9 @@ export default function TeacherExamDetails() {
   const [editQType, setEditQType] = useState<"objective" | "subjective">("objective");
   const [editCorrectAnswerText, setEditCorrectAnswerText] = useState("");
 
+  // Confirm delete state
+  const [confirmDeleteQId, setConfirmDeleteQId] = useState<number | null>(null);
+
   // Extract available groups from exam data
   const getAvailableGroups = (): GroupMeta[] => {
     if (!exam?.questions) return [];
@@ -125,7 +129,7 @@ export default function TeacherExamDetails() {
     try {
       setImageUrl(await uploadToBackend(file));
     } catch {
-      alert("Failed to upload image. Please try again.");
+      toast.error("Failed to upload image. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -138,7 +142,7 @@ export default function TeacherExamDetails() {
     try {
       setGroupImageUrl(await uploadToBackend(file));
     } catch {
-      alert("Failed to upload group image. Please try again.");
+      toast.error("Failed to upload group image. Please try again.");
     } finally {
       setIsUploadingGroupImage(false);
     }
@@ -153,7 +157,7 @@ export default function TeacherExamDetails() {
 
   const createGroup = async () => {
     if (!groupTitle.trim()) {
-      alert("Group title is required.");
+      toast.error("Group title is required.");
       return;
     }
     setCreatingGroup(true);
@@ -174,7 +178,7 @@ export default function TeacherExamDetails() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        alert(`Failed to create group: ${errorData.error || "Unknown error"}`);
+        toast.error(`Failed to create group: ${errorData.error || "Unknown error"}`);
         return;
       }
 
@@ -198,7 +202,7 @@ export default function TeacherExamDetails() {
       closeGroupModal();
     } catch (err) {
       console.error("Failed to create group:", err);
-      alert("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
     } finally {
       setCreatingGroup(false);
     }
@@ -279,7 +283,7 @@ export default function TeacherExamDetails() {
     try {
       setEditImageUrl(await uploadToBackend(file));
     } catch {
-      alert("Failed to upload image. Please try again.");
+      toast.error("Failed to upload image. Please try again.");
     } finally {
       setIsEditUploading(false);
     }
@@ -451,7 +455,7 @@ export default function TeacherExamDetails() {
                                   <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
+                                  onClick={() => setConfirmDeleteQId(q.id)}
                                   className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
                                   title="Delete question"
                                 >
@@ -810,6 +814,16 @@ export default function TeacherExamDetails() {
           durationMinutes: exam.durationMinutes,
           questions: (exam.questions as GroupedQuestion[]) ?? [],
         }}
+      />
+
+      <ConfirmDialog
+        variant="standard"
+        open={confirmDeleteQId !== null}
+        onClose={() => setConfirmDeleteQId(null)}
+        onConfirm={() => { deleteQuestion({ schoolCode, examId, questionId: confirmDeleteQId! }); setConfirmDeleteQId(null); }}
+        title="Delete Question"
+        description="Delete this question? This cannot be undone."
+        confirmLabel="Delete"
       />
     </DashboardLayout>
   );

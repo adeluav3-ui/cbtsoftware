@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck } from "lucide-react";
+import { ConfirmDialog } from "@/components/feedback";
 
 const API = import.meta.env.VITE_API_URL as string;
 
@@ -72,9 +73,7 @@ export default function SuperAdminDashboard() {
 
   // Delete confirmation modal
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [deleteInput, setDeleteInput] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
 
   // Disable/enable school
   const [togglingCode, setTogglingCode] = useState<string | null>(null);
@@ -310,28 +309,18 @@ export default function SuperAdminDashboard() {
   };
 
   const openDeleteConfirm = () => {
-    setDeleteInput("");
-    setDeleteError("");
     setIsDeleteOpen(true);
   };
 
   const handleDeleteSchool = async () => {
     if (!detailSchool) return;
-    if (deleteInput !== detailSchool.code) {
-      setDeleteError("School code does not match");
-      return;
-    }
     setIsDeleting(true);
-    setDeleteError("");
     try {
       const res = await fetch(`${API}/schools/${detailSchool.code}`, {
         method: "DELETE",
         credentials: "include",
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setDeleteError(data.error || "Failed to delete school");
-      } else {
+      if (res.ok) {
         queryClient.invalidateQueries({ queryKey: getListSchoolsQueryKey() });
         setIsDeleteOpen(false);
         setDetailSchool(null);
@@ -342,7 +331,7 @@ export default function SuperAdminDashboard() {
         });
       }
     } catch {
-      setDeleteError("Network error. Please try again.");
+      // errors surface via the ConfirmDialog's loading state
     } finally {
       setIsDeleting(false);
     }
@@ -820,45 +809,17 @@ export default function SuperAdminDashboard() {
         )}
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Confirm School Deletion">
-        <div className="space-y-5">
-          <div className="flex gap-3 p-4 bg-destructive/10 rounded-xl border border-destructive/20">
-            <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-destructive text-sm">This action is permanent and irreversible.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                All data for <span className="font-semibold">{detailSchool?.name || detailSchool?.code}</span> will be permanently deleted:
-                teachers, students, all exams, all results, and all scores.
-              </p>
-            </div>
-          </div>
-          <div>
-            <Label>Type the school code <span className="font-mono font-bold">{detailSchool?.code}</span> to confirm</Label>
-            <Input
-              value={deleteInput}
-              onChange={e => { setDeleteInput(e.target.value); setDeleteError(""); }}
-              placeholder={detailSchool?.code}
-              className="font-mono mt-2"
-            />
-          </div>
-          {deleteError && (
-            <p className="text-sm text-destructive font-medium">{deleteError}</p>
-          )}
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setIsDeleteOpen(false)} type="button">Cancel</Button>
-            <Button
-              variant="outline"
-              className="border-destructive text-destructive hover:bg-destructive hover:text-white"
-              onClick={handleDeleteSchool}
-              isLoading={isDeleting}
-              disabled={deleteInput !== detailSchool?.code}
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete Forever
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        variant="type-to-confirm"
+        open={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleDeleteSchool}
+        title="Confirm School Deletion"
+        description={`All data for "${detailSchool?.name || detailSchool?.code}" will be permanently deleted: teachers, students, all exams, all results, and all scores. This action is permanent and irreversible.`}
+        confirmText={detailSchool?.code ?? ""}
+        confirmLabel="Delete Forever"
+        isLoading={isDeleting}
+      />
 
       {/* Change Password modal */}
       <Modal isOpen={isChangePwOpen} onClose={() => setIsChangePwOpen(false)} title="Change Super Admin Password">

@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap, ArrowRightLeft } from "lucide-react";
 import { ResultDetailModal } from "@/components/result-detail-modal";
+import { ConfirmDialog } from "@/components/feedback";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
 import { StudentResultsModal } from "@/components/student-results-modal";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
@@ -68,6 +69,10 @@ export default function TeacherDashboard() {
   // Class results modal (for KG/Nursery/Primary bulk score entry)
   const [classResultsModalOpen, setClassResultsModalOpen] = useState(false);
   const [classResultsDefaultClass, setClassResultsDefaultClass] = useState("KG1");
+
+  // Confirm dialogs
+  const [confirmExam, setConfirmExam] = useState<{ id: number; title: string } | null>(null);
+  const [confirmStudent, setConfirmStudent] = useState<{ id: number; name: string } | null>(null);
 
   // Transfer exam to class
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -283,7 +288,7 @@ export default function TeacherDashboard() {
                     <ArrowRightLeft size={14} />
                   </button>
                   <button
-                    onClick={() => { if (window.confirm(`Delete "${exam.title}"? This cannot be undone.`)) deleteExam({ schoolCode, examId: exam.id }); }}
+                    onClick={() => setConfirmExam({ id: exam.id, title: exam.title })}
                     className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                     title="Delete"
                   >
@@ -390,7 +395,7 @@ export default function TeacherDashboard() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Remove ${s.fullName} from the student list? This cannot be undone.`)) deleteStudent({ schoolCode, studentId: s.id });
+                            setConfirmStudent({ id: s.id, name: s.fullName });
                           }}
                           className="p-1"
                         >
@@ -621,6 +626,26 @@ export default function TeacherDashboard() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        variant="standard"
+        open={!!confirmExam}
+        onClose={() => setConfirmExam(null)}
+        onConfirm={() => { deleteExam({ schoolCode, examId: confirmExam!.id }); setConfirmExam(null); }}
+        title="Delete Exam"
+        description={`Delete "${confirmExam?.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+      />
+
+      <ConfirmDialog
+        variant="standard"
+        open={!!confirmStudent}
+        onClose={() => setConfirmStudent(null)}
+        onConfirm={() => { deleteStudent({ schoolCode, studentId: confirmStudent!.id }); setConfirmStudent(null); }}
+        title="Remove Student"
+        description={`Remove ${confirmStudent?.name} from the student list? This cannot be undone.`}
+        confirmLabel="Remove"
+      />
     </DashboardLayout>
   );
 }
