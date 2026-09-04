@@ -463,7 +463,7 @@ export default function TeacherDashboard() {
                         <td className="px-3 py-2 text-center">{completedSubjects.length}</td>
                         <td className="px-3 py-2 text-center font-bold">
                           {completedSubjects.length > 0 ? (
-                            <span className={overallAvg >= 70 ? "text-green-600" : "text-destructive"}>{overallAvg.toFixed(0)}%</span>
+                            <span className={overallAvg >= 70 ? "text-secondary" : "text-destructive"}>{overallAvg.toFixed(0)}%</span>
                           ) : "—"}
                         </td>
                         <td className="px-3 py-2 text-center" onClick={e => e.stopPropagation()}>
@@ -550,7 +550,7 @@ export default function TeacherDashboard() {
               ))}
             </Select>
             {subjects.length === 0 && eClass && (
-              <p className="text-xs text-yellow-600 mt-1">No subjects added for this class level. Ask the school admin to add subjects.</p>
+              <p className="text-xs text-warning mt-1">No subjects added for this class level. Ask the school admin to add subjects.</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">

@@ -427,7 +427,7 @@ export default function SuperAdminDashboard() {
                         variant="outline"
                         size="sm"
                         isLoading={togglingCode === school.code}
-                        className={school.isDisabled ? "border-green-500/40 text-green-600 hover:bg-green-500 hover:text-white" : "border-destructive/40 text-destructive hover:bg-destructive hover:text-white"}
+                        className={school.isDisabled ? "border-secondary/40 text-secondary hover:bg-secondary hover:text-secondary-foreground" : "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"}
                         onClick={() => handleToggleDisabled(school)}
                       >
                         {school.isDisabled
@@ -488,7 +488,7 @@ export default function SuperAdminDashboard() {
                   {devices.map((d) => {
                     const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
                     const status = secAgo < 90 ? "active" : secAgo < 300 ? "idle" : "offline";
-                    const statusColor = status === "active" ? "bg-green-500" : status === "idle" ? "bg-yellow-400" : "bg-gray-400";
+                    const statusColor = status === "active" ? "bg-secondary" : status === "idle" ? "bg-warning" : "bg-muted-foreground/40";
                     return (
                       <tr key={d.deviceId} className="border-b border-border/50 hover:bg-muted/10">
                         <td className="px-4 py-3">
@@ -624,17 +624,17 @@ export default function SuperAdminDashboard() {
               ) : overview ? (
                 <div className="grid grid-cols-3 gap-3">
                   <div className="flex flex-col items-center p-4 bg-muted/30 rounded-xl border border-border">
-                    <Users className="w-5 h-5 text-blue-500 mb-2" />
+                    <Users className="w-5 h-5 text-primary mb-2" />
                     <span className="text-2xl font-bold">{overview.teachers}</span>
                     <span className="text-xs text-muted-foreground mt-1">Teachers</span>
                   </div>
                   <div className="flex flex-col items-center p-4 bg-muted/30 rounded-xl border border-border">
-                    <GraduationCap className="w-5 h-5 text-green-500 mb-2" />
+                    <GraduationCap className="w-5 h-5 text-secondary mb-2" />
                     <span className="text-2xl font-bold">{overview.students}</span>
                     <span className="text-xs text-muted-foreground mt-1">Students</span>
                   </div>
                   <div className="flex flex-col items-center p-4 bg-muted/30 rounded-xl border border-border">
-                    <BookOpen className="w-5 h-5 text-purple-500 mb-2" />
+                    <BookOpen className="w-5 h-5 text-accent mb-2" />
                     <span className="text-2xl font-bold">{overview.exams}</span>
                     <span className="text-xs text-muted-foreground mt-1">Exams</span>
                   </div>
@@ -670,7 +670,7 @@ export default function SuperAdminDashboard() {
                   </Button>
                 </div>
                 {resetError && <p className="text-sm text-destructive font-medium">{resetError}</p>}
-                {resetSuccess && <p className="text-sm text-green-600 font-medium">{resetSuccess}</p>}
+                {resetSuccess && <p className="text-sm text-secondary font-medium">{resetSuccess}</p>}
               </form>
             </div>
 
@@ -702,7 +702,7 @@ export default function SuperAdminDashboard() {
                   </Button>
                 </div>
                 {licenseError && <p className="text-sm text-destructive font-medium">{licenseError}</p>}
-                {licenseSuccess && <p className="text-sm text-green-600 font-medium">{licenseSuccess}</p>}
+                {licenseSuccess && <p className="text-sm text-secondary font-medium">{licenseSuccess}</p>}
               </form>
               {detailSchool.licenseValidUntil && (
                 <div className="mt-4 pt-3 border-t border-border">
@@ -753,7 +753,7 @@ export default function SuperAdminDashboard() {
                   </Button>
                 </div>
                 {maxDevicesError && <p className="text-sm text-destructive font-medium">{maxDevicesError}</p>}
-                {maxDevicesSuccess && <p className="text-sm text-green-600 font-medium">{maxDevicesSuccess}</p>}
+                {maxDevicesSuccess && <p className="text-sm text-secondary font-medium">{maxDevicesSuccess}</p>}
               </form>
             </div>
 
@@ -766,14 +766,14 @@ export default function SuperAdminDashboard() {
                   <p className="text-xs text-muted-foreground mt-1">
                     When enabled, exam scores out of the full total (60 marks), mid-term out of 20 marks — no theory input needed. Class activities remain manually entered.
                   </p>
-                  {pureCbtSuccess && <p className="text-xs text-green-600 font-medium mt-1">{pureCbtSuccess}</p>}
+                  {pureCbtSuccess && <p className="text-xs text-secondary font-medium mt-1">{pureCbtSuccess}</p>}
                 </div>
                 <button
                   onClick={() => handleTogglePureCbt(!pureCbtMode)}
                   disabled={isTogglingPureCbt}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 mt-0.5 ${pureCbtMode ? "bg-primary" : "bg-muted-foreground/30"}`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${pureCbtMode ? "translate-x-6" : "translate-x-1"}`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${pureCbtMode ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
             </div>
@@ -833,7 +833,7 @@ export default function SuperAdminDashboard() {
             <PasswordInput id="cp-new" value={cpNew} onChange={e => setCpNew(e.target.value)} required autoComplete="new-password" />
           </div>
           {cpError && <p className="text-sm text-destructive">{cpError}</p>}
-          {cpSuccess && <p className="text-sm text-green-600 font-semibold">{cpSuccess}</p>}
+          {cpSuccess && <p className="text-sm text-secondary font-semibold">{cpSuccess}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setIsChangePwOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={cpLoading}>{cpLoading ? "Saving…" : "Change Password"}</Button>

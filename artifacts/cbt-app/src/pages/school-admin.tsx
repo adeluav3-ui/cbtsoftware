@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/feedback";
 import { format } from "date-fns";
 import { BulkUploadStudentsModal } from "@/components/bulk-upload-students-modal";
 import { ClassResultsView } from "@/components/class-results-modal";
+import { getGradeColor } from "@/lib/grade";
 
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
@@ -1227,7 +1228,7 @@ export default function SchoolAdminDashboard() {
                           <td className="px-4 py-3 font-semibold text-primary">{r.fullName}</td>
                           <td className="px-4 py-3 font-bold">{r.score} / {r.totalQuestions}</td>
                           <td className="px-4 py-3">
-                            <span className={`font-semibold ${(r.percentage ?? 0) >= 50 ? "text-green-600" : "text-destructive"}`}>
+                            <span className={`font-semibold ${(r.percentage ?? 0) >= 50 ? "text-secondary" : "text-destructive"}`}>
                               {(r.percentage ?? 0).toFixed(1)}%
                             </span>
                           </td>
@@ -1265,13 +1266,13 @@ export default function SchoolAdminDashboard() {
                           <td className="px-4 py-3"><Badge>{cls}</Badge></td>
                           <td className="px-4 py-3 font-medium">{subj}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${type === "mid_term" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${type === "mid_term" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
                               {typeLabel(type)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center font-semibold">{rows.length}</td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`font-bold ${avgPct >= 50 ? "text-green-600" : "text-destructive"}`}>{avgPct.toFixed(1)}%</span>
+                            <span className={`font-bold ${avgPct >= 50 ? "text-secondary" : "text-destructive"}`}>{avgPct.toFixed(1)}%</span>
                           </td>
                         </tr>
                       ))}
@@ -1551,9 +1552,9 @@ export default function SchoolAdminDashboard() {
                 <h2 className="text-lg font-bold flex items-center gap-2"><BookOpen className="w-5 h-5" /> Manage Exams</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Publish or unpublish exams set by teachers.
-                  <span className="ml-2 text-green-600 font-semibold">{publishedCount} Published</span>
+                  <span className="ml-2 text-secondary font-semibold">{publishedCount} Published</span>
                   <span className="mx-1 text-muted-foreground">·</span>
-                  <span className="text-yellow-600 font-semibold">{draftCount} Draft</span>
+                  <span className="text-warning font-semibold">{draftCount} Draft</span>
                 </p>
               </div>
             </div>
@@ -1599,7 +1600,7 @@ export default function SchoolAdminDashboard() {
                       {filteredExams.map(exam => {
                         const atype = (exam as any).assessmentType ?? "exam";
                         const atypeLabel = atype === "mid_term" ? "Mid-term" : atype === "exam" ? "Final Exam" : "CA";
-                        const atypeColor = atype === "mid_term" ? "bg-blue-100 text-blue-700" : atype === "exam" ? "bg-purple-100 text-purple-700" : "bg-green-100 text-green-700";
+                        const atypeColor = atype === "mid_term" ? "bg-primary/10 text-primary" : atype === "exam" ? "bg-accent/10 text-accent" : "bg-secondary/10 text-secondary";
                         return (
                         <tr key={exam.id} className="border-b border-border/50 hover:bg-muted/10 transition-colors">
                           <td className="px-4 py-3 font-semibold">{exam.title}</td>
@@ -1739,7 +1740,7 @@ export default function SchoolAdminDashboard() {
                           {specialResultsData.results.map((r: any) => (
                             <tr key={r.resultId} className="border-b border-border/40 transition-colors hover:bg-muted/20">
                               <td className="px-3 py-2 text-center">
-                                <span className={`font-bold text-xs ${r.rank === 1 ? "text-yellow-600" : r.rank === 2 ? "text-slate-500" : r.rank === 3 ? "text-orange-600" : "text-muted-foreground"}`}>
+                                <span className={`font-bold text-xs ${r.rank === 1 ? "text-warning" : r.rank === 2 ? "text-muted-foreground" : r.rank === 3 ? "text-accent" : "text-muted-foreground"}`}>
                                   #{r.rank}
                                 </span>
                               </td>
@@ -1749,12 +1750,12 @@ export default function SchoolAdminDashboard() {
                               </td>
                               <td className="px-3 py-2 text-center font-medium">{r.score}/{r.totalQuestions}</td>
                               <td className="px-3 py-2 text-center font-bold">
-                                <span className={r.percentage >= 70 ? "text-green-600" : r.percentage >= 50 ? "text-yellow-600" : "text-destructive"}>
+                                <span className={r.percentage >= 70 ? "text-secondary" : r.percentage >= 50 ? "text-warning" : "text-destructive"}>
                                   {r.percentage.toFixed(1)}%
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-center">
-                                <span className={`font-bold text-sm ${r.grade === "A" ? "text-green-600" : r.grade === "B" ? "text-blue-600" : r.grade === "C" ? "text-yellow-600" : r.grade === "D" ? "text-orange-600" : "text-destructive"}`}>
+                                <span className="font-bold text-sm" style={{ color: getGradeColor(r.grade) }}>
                                   {r.grade}
                                 </span>
                               </td>
@@ -1845,7 +1846,7 @@ export default function SchoolAdminDashboard() {
                           return (
                             <td key={subj} className="px-2 py-2 text-center">
                               {score !== null && score !== undefined ? (
-                                <span className={score >= 70 ? "text-green-600 font-bold" : score >= 50 ? "text-blue-600" : "text-destructive"}>
+                                <span className={score >= 70 ? "text-secondary font-bold" : score >= 50 ? "text-primary" : "text-destructive"}>
                                   {score}
                                 </span>
                               ) : <span className="text-muted-foreground">—</span>}
@@ -2097,7 +2098,7 @@ export default function SchoolAdminDashboard() {
                     {cloudDevicesData.devices.map(d => {
                       const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
                       const DeviceIcon = d.deviceType === "phone" ? Smartphone : d.deviceType === "tablet" ? Tablet : Monitor;
-                      const iconColor = secAgo < 90 ? "text-green-500" : secAgo < 300 ? "text-yellow-500" : "text-gray-400";
+                      const iconColor = secAgo < 90 ? "text-secondary" : secAgo < 300 ? "text-warning" : "text-muted-foreground";
                       return (
                         <tr key={d.deviceId} className="border-b border-border/30 hover:bg-muted/20">
                           <td className="py-2 pr-3">
@@ -2220,7 +2221,7 @@ export default function SchoolAdminDashboard() {
                     <tbody>
                       {localDevices.map(d => {
                         const secAgo = (Date.now() - new Date(d.lastSeen).getTime()) / 1000;
-                        const dot = secAgo < 90 ? "bg-green-500" : secAgo < 300 ? "bg-yellow-400" : "bg-gray-400";
+                        const dot = secAgo < 90 ? "bg-secondary" : secAgo < 300 ? "bg-warning" : "bg-muted-foreground/40";
                         return (
                           <tr key={d.deviceId} className="border-b border-border/30">
                             <td className="py-1.5 pr-4 font-medium flex items-center gap-1.5">
@@ -2241,14 +2242,14 @@ export default function SchoolAdminDashboard() {
               )}
             </Card>
 
-            <Card className="p-5 space-y-3 border-amber-200 bg-amber-50/40">
-              <h3 className="font-semibold text-amber-900">App Display Issues?</h3>
-              <p className="text-sm text-amber-800">
+            <Card className="p-5 space-y-3 border-warning/30 bg-warning/5">
+              <h3 className="font-semibold text-warning-foreground">App Display Issues?</h3>
+              <p className="text-sm text-warning-foreground/80">
                 If the app looks wrong — missing fonts, broken layout, or stuck on an old version — clear the cached app files and reload. This does not affect exam data or results.
               </p>
               <Button
                 variant="outline"
-                className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                className="border-warning/40 text-warning-foreground hover:bg-warning/10"
                 onClick={async () => {
                   if ('serviceWorker' in navigator) {
                     const regs = await navigator.serviceWorker.getRegistrations();
@@ -2353,7 +2354,7 @@ export default function SchoolAdminDashboard() {
               </Select>
             </div>
             {reassignResult && (
-              <p className={`text-sm font-medium ${reassignResult.startsWith("Error") ? "text-destructive" : "text-green-600"}`}>
+              <p className={`text-sm font-medium ${reassignResult.startsWith("Error") ? "text-destructive" : "text-secondary"}`}>
                 {reassignResult}
               </p>
             )}
