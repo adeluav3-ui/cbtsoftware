@@ -255,7 +255,7 @@ export default function ExamResults() {
                                         {exam.assessmentType !== 'class_activity' && (
                                             <td className="px-4 py-3 text-center">
                                                 {isTheoryLocked ? (
-                                                    <span className="text-green-600 font-medium">✓ {result.theoryScore} entered</span>
+                                                    <span className="text-secondary font-medium">✓ {result.theoryScore} entered</span>
                                                 ) : isEditing ? (
                                                     <Input
                                                         type="number"
@@ -279,7 +279,7 @@ export default function ExamResults() {
                                         {exam.assessmentType === 'class_activity' && (
                                             <td className="px-4 py-3 text-center">
                                                 {isActivityLocked ? (
-                                                    <span className="text-green-600 font-medium">✓ {result.classActivityScore} entered</span>
+                                                    <span className="text-secondary font-medium">✓ {result.classActivityScore} entered</span>
                                                 ) : isEditing ? (
                                                     <Input
                                                         type="number"
@@ -368,7 +368,7 @@ export default function ExamResults() {
                 {exam.assessmentType === 'class_activity'
                     ? "Enter class activity scores above. Final percentage will appear in the student's overall results when all components are complete."
                     : "CBT scores are auto-graded. Enter theory scores above. Final percentage will appear in the student's overall results when all components are complete."}
-                <p className="mt-1 text-yellow-600">✓ Scores that have been entered cannot be changed. Contact admin if correction is needed.</p>
+                <p className="mt-1 text-warning">✓ Scores that have been entered cannot be changed. Contact admin if correction is needed.</p>
             </div>
         </DashboardLayout>
     );
