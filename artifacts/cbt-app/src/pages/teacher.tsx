@@ -395,7 +395,7 @@ export default function TeacherDashboard() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setConfirmStudent({ id: s.id, name: s.fullName });
+                            setConfirmStudent({ id: s.id, name: s.fullName || s.username });
                           }}
                           className="p-1"
                         >
