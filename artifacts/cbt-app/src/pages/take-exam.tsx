@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useGetExam, useSubmitExam, Question, GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal } from "@/components/ui-elements";
+import { ConfirmDialog } from "@/components/feedback";
 import { Clock, AlertCircle, CheckCircle2, Layers, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { ResultDetailModal } from "@/components/result-detail-modal";
@@ -30,6 +31,7 @@ export default function TakeExam() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
   // Use exam questions in teacher's original order — no shuffling
   const orderedExamItems = useMemo<GroupedQuestion[]>(
@@ -327,9 +329,7 @@ export default function TakeExam() {
               })}
             </div>
             <div className="mt-4 pt-3 border-t">
-              <Button variant="destructive" size="sm" className="w-full" onClick={() => {
-                if (confirm("Are you sure you want to submit?")) handleFinalSubmit();
-              }}>
+              <Button variant="destructive" size="sm" className="w-full" onClick={() => setConfirmSubmitOpen(true)}>
                 Submit Exam
               </Button>
             </div>
@@ -358,6 +358,16 @@ export default function TakeExam() {
       </Modal>
 
       <ResultDetailModal resultId={showReview ? submittedResultId : null} schoolCode={schoolCode} onClose={() => setShowReview(false)} />
+
+      <ConfirmDialog
+        variant="standard"
+        open={confirmSubmitOpen}
+        onClose={() => setConfirmSubmitOpen(false)}
+        onConfirm={() => { setConfirmSubmitOpen(false); handleFinalSubmit(); }}
+        title="Submit Exam"
+        description="Are you sure you want to submit? You won't be able to change your answers after submission."
+        confirmLabel="Submit"
+      />
     </div>
   );
 }
