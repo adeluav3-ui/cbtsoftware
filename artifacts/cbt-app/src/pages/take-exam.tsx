@@ -227,7 +227,7 @@ export default function TakeExam() {
               </div>
 
               {/* Group Context — shown on every question in the group */}
-              {currentContext.groupId && (currentContext.groupText || currentContext.groupImage) && (
+              {currentContext.groupId && (
                 <div className="mb-5 p-4 bg-muted/30 rounded-xl border border-primary/20">
                   <div className="flex items-center gap-2 mb-2 text-primary">
                     <Layers className="w-4 h-4" />
