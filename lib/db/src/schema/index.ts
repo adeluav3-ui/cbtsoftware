@@ -4,6 +4,7 @@ export * from "./users.js";
 // local-mode imports compile cleanly against the shared schema path.
 export { serverConfigTable } from "../schema.sqlite.js";
 export * from "./exams.js";
+export * from "./question_groups.js";
 export * from "./results.js";
 export * from "./result_answers.js";
 export * from "./grading_schemes.js";

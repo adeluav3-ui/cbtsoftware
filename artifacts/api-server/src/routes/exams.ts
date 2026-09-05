@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import {
   examsTable,
   questionsTable,
+  questionGroupsTable,
   resultsTable,
   resultAnswersTable,
   usersTable,
@@ -160,7 +161,7 @@ router.post("/", requireSchoolStaff, async (req: RequestWithSession, res: Respon
   }
 });
 
-// Create a new group for an exam
+// Create a new group for an exam — persists immediately (fixes bugs #1 and #2)
 router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParams>, res: Response) => {
   const { examId } = req.params;
   const examIdNum = toNumber(examId);
@@ -171,23 +172,101 @@ router.post("/:examId/groups", requireSchoolStaff, async (req: Request<ExamParam
   }
 
   try {
-    const [maxGroup] = await db
-      .select({ maxId: sql<number>`COALESCE(MAX(group_id), 0)` })
+    // displayOrder: position after all current questions so new groups appear at end
+    const [maxQ] = await db
+      .select({ maxId: sql<number>`COALESCE(MAX(id), 0)` })
       .from(questionsTable)
       .where(eq(questionsTable.examId, examIdNum));
 
-    const newGroupId = (maxGroup?.maxId || 0) + 1;
+    const [group] = await db
+      .insert(questionGroupsTable)
+      .values({
+        examId: examIdNum,
+        title: groupTitle.trim(),
+        passageText: groupText?.trim() || null,
+        imageUrl: groupImageUrl || null,
+        displayOrder: (maxQ?.maxId || 0) + 1,
+      })
+      .returning();
 
     res.json({
       success: true,
-      groupId: newGroupId,
-      groupImageUrl: groupImageUrl || null,
-      groupTitle: groupTitle.trim(),
-      groupText: groupText?.trim() || null,
+      groupId: group.id,
+      groupImageUrl: group.imageUrl,
+      groupTitle: group.title,
+      groupText: group.passageText,
     });
     return;
   } catch (err) {
     console.error("Error creating group:", err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Edit group metadata (fixes bug #6 — no way to edit title/text/image after creation)
+router.patch("/:examId/groups/:groupId", requireSchoolStaff, async (req: Request<ExamParams & { groupId: string }>, res: Response) => {
+  const { examId, groupId } = req.params as any;
+  const examIdNum = toNumber(examId);
+  const groupIdNum = toNumber(groupId);
+  const { groupTitle, groupText, groupImageUrl } = req.body;
+
+  if (!groupTitle || !groupTitle.trim()) {
+    return res.status(400).json({ error: "Group title is required" });
+  }
+
+  try {
+    const [updated] = await db
+      .update(questionGroupsTable)
+      .set({
+        title: groupTitle.trim(),
+        passageText: groupText?.trim() || null,
+        imageUrl: groupImageUrl || null,
+      })
+      .where(and(eq(questionGroupsTable.id, groupIdNum), eq(questionGroupsTable.examId, examIdNum)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Group not found" });
+
+    res.json({ success: true, groupId: updated.id, groupTitle: updated.title, groupText: updated.passageText, groupImageUrl: updated.imageUrl });
+    return;
+  } catch (err) {
+    console.error("Error updating group:", err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Delete group — orphans its questions (sets questionGroupId = null), does NOT delete questions
+router.delete("/:examId/groups/:groupId", requireSchoolStaff, async (req: Request<ExamParams & { groupId: string }>, res: Response) => {
+  const { examId, groupId } = req.params as any;
+  const examIdNum = toNumber(examId);
+  const groupIdNum = toNumber(groupId);
+
+  try {
+    // Verify group belongs to this exam
+    const [existing] = await db
+      .select()
+      .from(questionGroupsTable)
+      .where(and(eq(questionGroupsTable.id, groupIdNum), eq(questionGroupsTable.examId, examIdNum)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Group not found" });
+
+    await db.transaction(async (tx) => {
+      // Orphan questions — they become standalone, not deleted
+      await tx
+        .update(questionsTable)
+        .set({ questionGroupId: null })
+        .where(and(eq(questionsTable.examId, examIdNum), eq(questionsTable.questionGroupId, groupIdNum)));
+
+      await tx.delete(questionGroupsTable).where(eq(questionGroupsTable.id, groupIdNum));
+    });
+
+    res.json({ message: "Group deleted. Questions are now ungrouped." });
+    return;
+  } catch (err) {
+    console.error("Error deleting group:", err);
     res.status(500).json({ error: "Server error" });
     return;
   }
@@ -221,60 +300,91 @@ router.get("/:examId", requireAuth, async (req: Request<ExamParams>, res: Respon
       return res.status(403).json({ error: "This exam is not currently active." });
     }
 
-    // Order by the effective position of each question/group in the overall
-    // list. For standalone questions this is their own id. For grouped
-    // questions this is the minimum id of any question in that group —
-    // i.e. when the group was first "used". This preserves the creation
-    // order regardless of whether group_id (which is a small integer) is
-    // numerically less than standalone question ids (which grow large).
-    // Without this, ORDER BY group_id would put all groups before all
-    // standalone questions because NULL sorts last in Postgres ASC order.
+    // Join question_groups for group metadata and display_order sort key.
+    // Prefer question_group_id (new FK) for grouping; fall back to legacy group_id
+    // for any questions that haven't been migrated yet.
     const questions = await db
-      .select()
+      .select({
+        id: questionsTable.id,
+        examId: questionsTable.examId,
+        text: questionsTable.text,
+        optionA: questionsTable.optionA,
+        optionB: questionsTable.optionB,
+        optionC: questionsTable.optionC,
+        optionD: questionsTable.optionD,
+        correctOption: questionsTable.correctOption,
+        schoolCode: questionsTable.schoolCode,
+        imageUrl: questionsTable.imageUrl,
+        groupOrder: questionsTable.groupOrder,
+        questionGroupId: questionsTable.questionGroupId,
+        questionType: questionsTable.questionType,
+        correctAnswerText: questionsTable.correctAnswerText,
+        // legacy fields kept for backward compat during transition
+        legacyGroupId: questionsTable.groupId,
+        legacyGroupTitle: questionsTable.groupTitle,
+        legacyGroupText: questionsTable.groupText,
+        legacyGroupImageUrl: questionsTable.groupImageUrl,
+        // from question_groups join
+        qgTitle: questionGroupsTable.title,
+        qgPassageText: questionGroupsTable.passageText,
+        qgImageUrl: questionGroupsTable.imageUrl,
+      })
       .from(questionsTable)
+      .leftJoin(questionGroupsTable, eq(questionsTable.questionGroupId, questionGroupsTable.id))
       .where(eq(questionsTable.examId, examIdNum))
       .orderBy(
-        sql`CASE WHEN questions.group_id IS NULL THEN questions.id ELSE (SELECT MIN(q2.id) FROM questions q2 WHERE q2.group_id = questions.group_id AND q2.exam_id = ${examIdNum}) END`,
+        sql`CASE
+          WHEN ${questionsTable.questionGroupId} IS NOT NULL
+            THEN (SELECT display_order FROM question_groups WHERE id = ${questionsTable.questionGroupId})
+          WHEN ${questionsTable.groupId} IS NOT NULL
+            THEN (SELECT MIN(q2.id) FROM questions q2 WHERE q2.group_id = ${questionsTable.groupId} AND q2.exam_id = ${examIdNum})
+          ELSE ${questionsTable.id}
+        END`,
         questionsTable.groupOrder,
         questionsTable.id
       );
 
+    // Build GroupedQuestion[] from flat result.
+    // Group key: "new:<questionGroupId>" or "old:<legacyGroupId>" — prevents collisions.
     const groupedResult: any[] = [];
     let currentGroup: any = null;
-    let currentGroupId: number | null = null;
+    let currentGroupKey: string | null = null;
 
     for (const q of questions) {
-      if (q.groupId !== null && q.groupId !== currentGroupId) {
-        if (currentGroup) {
-          groupedResult.push(currentGroup);
-        }
+      const groupKey = q.questionGroupId !== null
+        ? `new:${q.questionGroupId}`
+        : q.legacyGroupId !== null
+          ? `old:${q.legacyGroupId}`
+          : null;
+
+      const bareQ = {
+        id: q.id, examId: q.examId, text: q.text,
+        optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD,
+        correctOption: q.correctOption, schoolCode: q.schoolCode,
+        imageUrl: q.imageUrl, groupOrder: q.groupOrder,
+        questionGroupId: q.questionGroupId,
+        questionType: q.questionType, correctAnswerText: q.correctAnswerText,
+      };
+
+      if (groupKey !== null && groupKey !== currentGroupKey) {
+        if (currentGroup) groupedResult.push(currentGroup);
         currentGroup = {
           isGroup: true,
-          groupId: q.groupId,
-          groupImageUrl: q.groupImageUrl,
-          groupTitle: q.groupTitle,
-          groupText: q.groupText,
-          questions: [q],
+          groupId: q.questionGroupId ?? q.legacyGroupId,
+          groupTitle: q.qgTitle ?? q.legacyGroupTitle,
+          groupText: q.qgPassageText ?? q.legacyGroupText,
+          groupImageUrl: q.qgImageUrl ?? q.legacyGroupImageUrl,
+          questions: [bareQ],
         };
-        currentGroupId = q.groupId;
-      } else if (q.groupId !== null && q.groupId === currentGroupId) {
-        currentGroup.questions.push(q);
+        currentGroupKey = groupKey;
+      } else if (groupKey !== null && groupKey === currentGroupKey) {
+        currentGroup.questions.push(bareQ);
       } else {
-        if (currentGroup) {
-          groupedResult.push(currentGroup);
-          currentGroup = null;
-          currentGroupId = null;
-        }
-        groupedResult.push({
-          isGroup: false,
-          question: q,
-        });
+        if (currentGroup) { groupedResult.push(currentGroup); currentGroup = null; currentGroupKey = null; }
+        groupedResult.push({ isGroup: false, question: bareQ });
       }
     }
-
-    if (currentGroup) {
-      groupedResult.push(currentGroup);
-    }
+    if (currentGroup) groupedResult.push(currentGroup);
 
     res.json({ ...exam, questions: groupedResult });
     return;
@@ -489,7 +599,8 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
-  const { questions, groupId, groupTitle, groupText, groupImageUrl } = req.body;
+  // groupId is now a question_groups.id FK (not the legacy exam-scoped int)
+  const { questions, groupId } = req.body;
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
     return res.status(400).json({ error: "Questions array is required" });
@@ -513,12 +624,7 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
       const existingInGroup = await db
         .select({ count: sql<number>`count(*)` })
         .from(questionsTable)
-        .where(
-          and(
-            eq(questionsTable.examId, examIdNum),
-            eq(questionsTable.groupId, groupId)
-          )
-        );
+        .where(and(eq(questionsTable.examId, examIdNum), eq(questionsTable.questionGroupId, groupId)));
       startOrder = existingInGroup[0]?.count || 0;
     }
 
@@ -535,11 +641,8 @@ router.post("/:examId/questions/bulk", requireSchoolStaff, async (req: Request<E
           correctOption: String(q.correctOption),
           schoolCode: schoolCodeStr,
           imageUrl: q.imageUrl || null,
-          groupId: groupId || null,
+          questionGroupId: groupId || null,
           groupOrder: groupId ? startOrder + idx : 0,
-          groupTitle: groupId ? (groupTitle || null) : null,
-          groupText: groupId ? (groupText || null) : null,
-          groupImageUrl: groupId ? (groupImageUrl || null) : null,
         }))
       )
       .returning();
@@ -558,7 +661,8 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   const { schoolCode, examId } = req.params;
   const schoolCodeStr = toString(schoolCode);
   const examIdNum = toNumber(examId);
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, groupOrder, groupTitle, groupText, groupImageUrl, questionType, correctAnswerText } = req.body;
+  // groupId is now a question_groups.id FK (not the legacy exam-scoped int)
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, groupId, questionType, correctAnswerText } = req.body;
 
   const qType = questionType === "subjective" ? "subjective" : "objective";
 
@@ -573,21 +677,15 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   }
 
   try {
-    let finalGroupOrder = groupOrder || 0;
+    let finalGroupOrder = 0;
     if (groupId) {
       const existingInGroup = await db
         .select({ count: sql<number>`count(*)` })
         .from(questionsTable)
-        .where(
-          and(
-            eq(questionsTable.examId, examIdNum),
-            eq(questionsTable.groupId, groupId)
-          )
-        );
+        .where(and(eq(questionsTable.examId, examIdNum), eq(questionsTable.questionGroupId, groupId)));
       finalGroupOrder = existingInGroup[0]?.count || 0;
     }
 
-    // For subjective: store accepted answers as JSON array; options are empty
     const acceptedAnswers = qType === "subjective"
       ? JSON.stringify((correctAnswerText as string).split("\n").map((a: string) => a.trim()).filter(Boolean))
       : null;
@@ -604,11 +702,8 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
         correctOption: qType === "objective" ? correctOption : "",
         schoolCode: schoolCodeStr,
         imageUrl: imageUrl || null,
-        groupId: groupId || null,
+        questionGroupId: groupId || null,
         groupOrder: finalGroupOrder,
-        groupTitle: groupId ? (groupTitle || null) : null,
-        groupText: groupId ? (groupText || null) : null,
-        groupImageUrl: groupId ? (groupImageUrl || null) : null,
         questionType: qType,
         correctAnswerText: acceptedAnswers,
       })
@@ -623,12 +718,13 @@ router.post("/:examId/questions", requireSchoolStaff, async (req: Request<ExamPa
   }
 });
 
-// Edit question
+// Edit question — accepts optional groupId to move into/out of a group (fixes bug #5)
 router.patch("/:examId/questions/:questionId", requireSchoolStaff, async (req: Request<QuestionParams>, res: Response) => {
   const { examId, questionId } = req.params;
   const examIdNum = toNumber(examId);
   const questionIdNum = toNumber(questionId);
-  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, questionType, correctAnswerText } = req.body;
+  // groupId: number → move to that group_groups.id; null → remove from group; undefined → no change
+  const { text, optionA, optionB, optionC, optionD, correctOption, imageUrl, questionType, correctAnswerText, groupId } = req.body;
 
   const qType = questionType === "subjective" ? "subjective" : "objective";
 
@@ -650,19 +746,48 @@ router.patch("/:examId/questions/:questionId", requireSchoolStaff, async (req: R
     : null;
 
   try {
+    const setValues: Record<string, any> = {
+      text,
+      optionA: qType === "objective" ? optionA : "",
+      optionB: qType === "objective" ? optionB : "",
+      optionC: qType === "objective" ? optionC : "",
+      optionD: qType === "objective" ? optionD : "",
+      correctOption: qType === "objective" ? correctOption : "",
+      imageUrl: imageUrl || null,
+      questionType: qType,
+      correctAnswerText: acceptedAnswers,
+    };
+
+    // groupId explicitly included in body → update group assignment
+    if ("groupId" in req.body) {
+      const newGroupId = groupId ?? null;
+      setValues.questionGroupId = newGroupId;
+
+      // Recalculate groupOrder if moving into a (different) group
+      if (newGroupId !== null) {
+        const [existing] = await db
+          .select({ questionGroupId: questionsTable.questionGroupId })
+          .from(questionsTable)
+          .where(and(eq(questionsTable.id, questionIdNum), eq(questionsTable.examId, examIdNum)))
+          .limit(1);
+
+        if (!existing) return res.status(404).json({ error: "Question not found" });
+
+        if (existing.questionGroupId !== newGroupId) {
+          const [cnt] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(questionsTable)
+            .where(and(eq(questionsTable.examId, examIdNum), eq(questionsTable.questionGroupId, newGroupId)));
+          setValues.groupOrder = cnt?.count ?? 0;
+        }
+      } else {
+        setValues.groupOrder = 0;
+      }
+    }
+
     const [updated] = await db
       .update(questionsTable)
-      .set({
-        text,
-        optionA: qType === "objective" ? optionA : "",
-        optionB: qType === "objective" ? optionB : "",
-        optionC: qType === "objective" ? optionC : "",
-        optionD: qType === "objective" ? optionD : "",
-        correctOption: qType === "objective" ? correctOption : "",
-        imageUrl: imageUrl || null,
-        questionType: qType,
-        correctAnswerText: acceptedAnswers,
-      })
+      .set(setValues)
       .where(and(eq(questionsTable.id, questionIdNum), eq(questionsTable.examId, examIdNum)))
       .returning();
 

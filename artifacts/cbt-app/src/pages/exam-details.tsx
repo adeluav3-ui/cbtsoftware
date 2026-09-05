@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
-import { useGetExam, useAddQuestion, useUpdateQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions, type GroupedQuestion } from "@workspace/api-client-react";
+import { useGetExam, useAddQuestion, useUpdateQuestion, useDeleteQuestion, useToggleExamStatus, useBulkAddQuestions, useUpdateGroup, useDeleteGroup, type GroupedQuestion } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Select, Badge } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetExamQueryKey } from "@workspace/api-client-react";
@@ -49,6 +49,15 @@ export default function TeacherExamDetails() {
   const [isUploadingGroupImage, setIsUploadingGroupImage] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
 
+  // Edit Group modal state
+  const [isEditGroupModalOpen, setEditGroupModalOpen] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editGroupTitle, setEditGroupTitle] = useState("");
+  const [editGroupText, setEditGroupText] = useState("");
+  const [editGroupImageUrl, setEditGroupImageUrl] = useState("");
+  const [isEditGroupUploading, setIsEditGroupUploading] = useState(false);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<number | null>(null);
+
   // Bulk upload modal state
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [bulkGroupMeta, setBulkGroupMeta] = useState<GroupMeta | null>(null);
@@ -69,6 +78,7 @@ export default function TeacherExamDetails() {
   const [isEditUploading, setIsEditUploading] = useState(false);
   const [editQType, setEditQType] = useState<"objective" | "subjective">("objective");
   const [editCorrectAnswerText, setEditCorrectAnswerText] = useState("");
+  const [editSelectedGroupId, setEditSelectedGroupId] = useState<number | null>(null);
 
   // Confirm delete state
   const [confirmDeleteQId, setConfirmDeleteQId] = useState<number | null>(null);
@@ -253,8 +263,9 @@ export default function TeacherExamDetails() {
     }
   });
 
-  const openEditModal = (q: { id: number; text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null }) => {
+  const openEditModal = (q: { id: number; text: string; optionA: string; optionB: string; optionC: string; optionD: string; correctOption: string; imageUrl?: string | null; questionType?: string | null; correctAnswerText?: string | null }, currentGroupId?: number | null) => {
     setEditingQuestionId(q.id);
+    setEditSelectedGroupId(currentGroupId ?? null);
     setEditQText(q.text);
     const qt = q.questionType === "subjective" ? "subjective" : "objective";
     setEditQType(qt);
@@ -304,6 +315,66 @@ export default function TeacherExamDetails() {
         imageUrl: editImageUrl || null,
         questionType: editQType,
         correctAnswerText: editQType === "subjective" ? editCorrectAnswerText : null,
+        groupId: editSelectedGroupId,
+      }
+    });
+  };
+
+  const { mutate: updateGroup, isPending: isUpdateGroupPending } = useUpdateGroup({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) });
+        closeEditGroupModal();
+      }
+    }
+  });
+
+  const { mutate: deleteGroup } = useDeleteGroup({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetExamQueryKey(schoolCode, examId) })
+    }
+  });
+
+  const openEditGroupModal = (group: GroupMeta) => {
+    setEditingGroupId(group.groupId);
+    setEditGroupTitle(group.groupTitle);
+    setEditGroupText(group.groupText || "");
+    setEditGroupImageUrl(group.groupImageUrl || "");
+    setEditGroupModalOpen(true);
+  };
+
+  const closeEditGroupModal = () => {
+    setEditGroupModalOpen(false);
+    setEditingGroupId(null);
+    setEditGroupTitle("");
+    setEditGroupText("");
+    setEditGroupImageUrl("");
+  };
+
+  const handleEditGroupImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsEditGroupUploading(true);
+    try {
+      setEditGroupImageUrl(await uploadToBackend(file));
+    } catch {
+      toast.error("Failed to upload image. Please try again.");
+    } finally {
+      setIsEditGroupUploading(false);
+    }
+  };
+
+  const handleEditGroupSubmit = () => {
+    if (!editingGroupId || !editGroupTitle.trim()) {
+      toast.error("Group title is required.");
+      return;
+    }
+    updateGroup({
+      schoolCode, examId, groupId: editingGroupId,
+      data: {
+        groupTitle: editGroupTitle.trim(),
+        groupText: editGroupText.trim() || null,
+        groupImageUrl: editGroupImageUrl || null,
       }
     });
   };
@@ -422,6 +493,20 @@ export default function TeacherExamDetails() {
                     {item.groupImageUrl && (
                       <img src={item.groupImageUrl} alt="Group" className="h-10 w-10 object-cover rounded border" />
                     )}
+                    <button
+                      onClick={() => openEditGroupModal(meta || { groupId: item.groupId!, groupTitle: title, groupText: item.groupText || null, groupImageUrl: item.groupImageUrl || null })}
+                      className="p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded transition-colors"
+                      title="Edit group"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteGroupId(item.groupId!)}
+                      className="p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
+                      title="Delete group"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -448,7 +533,7 @@ export default function TeacherExamDetails() {
                               <p className="font-medium flex-1">{q.text}</p>
                               <div className="flex items-center gap-1 shrink-0">
                                 <button
-                                  onClick={() => openEditModal(q)}
+                                  onClick={() => openEditModal(q, item.groupId)}
                                   className="p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded transition-colors"
                                   title="Edit question"
                                 >
@@ -715,6 +800,49 @@ export default function TeacherExamDetails() {
         </div>
       </Modal>
 
+      {/* Edit Group Modal */}
+      <Modal isOpen={isEditGroupModalOpen} onClose={closeEditGroupModal} title="Edit Question Group">
+        <div className="space-y-4">
+          <div>
+            <Label>Group Title <span className="text-destructive">*</span></Label>
+            <Input
+              value={editGroupTitle}
+              onChange={e => setEditGroupTitle(e.target.value)}
+              placeholder="e.g. Reading Passage A"
+              required
+            />
+          </div>
+          <div>
+            <Label>Passage / Instruction Text (Optional)</Label>
+            <textarea
+              value={editGroupText}
+              onChange={e => setEditGroupText(e.target.value)}
+              placeholder="e.g. Read the following passage..."
+              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all min-h-24 text-sm"
+            />
+          </div>
+          <div>
+            <Label>Group Image (Optional)</Label>
+            <div className="mt-1 flex items-center gap-4">
+              <label className={`cursor-pointer px-4 py-2 rounded-lg border-2 border-dashed border-border hover:border-primary transition-colors text-sm ${isEditGroupUploading ? 'opacity-50' : ''}`}>
+                {editGroupImageUrl ? 'Replace Image' : 'Upload Image'}
+                <input type="file" accept="image/*" onChange={handleEditGroupImageUpload} disabled={isEditGroupUploading} className="hidden" />
+              </label>
+              {editGroupImageUrl && (
+                <div className="relative">
+                  <img src={editGroupImageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
+                  <button type="button" onClick={() => setEditGroupImageUrl("")} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full w-5 h-5 text-xs">×</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={closeEditGroupModal} className="flex-1">Cancel</Button>
+            <Button onClick={handleEditGroupSubmit} isLoading={isUpdateGroupPending} className="flex-1">Save Changes</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Bulk upload modal */}
       <BulkUploadModal
         isOpen={isBulkModalOpen}
@@ -768,6 +896,20 @@ export default function TeacherExamDetails() {
                 </div>
               )}
             </div>
+          </div>
+          <div>
+            <Label>Group Assignment</Label>
+            <Select
+              value={editSelectedGroupId?.toString() || ""}
+              onChange={e => setEditSelectedGroupId(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">No Group (Individual Question)</option>
+              {availableGroups.map((g) => (
+                <option key={g.groupId} value={g.groupId}>
+                  {g.groupTitle}
+                </option>
+              ))}
+            </Select>
           </div>
           {editQType === "objective" ? (
             <>
@@ -824,6 +966,16 @@ export default function TeacherExamDetails() {
         title="Delete Question"
         description="Delete this question? This cannot be undone."
         confirmLabel="Delete"
+      />
+
+      <ConfirmDialog
+        variant="standard"
+        open={confirmDeleteGroupId !== null}
+        onClose={() => setConfirmDeleteGroupId(null)}
+        onConfirm={() => { deleteGroup({ schoolCode, examId, groupId: confirmDeleteGroupId! }); setConfirmDeleteGroupId(null); }}
+        title="Delete Group"
+        description="Delete this group? Questions inside will become ungrouped — they will not be deleted."
+        confirmLabel="Delete Group"
       />
     </DashboardLayout>
   );

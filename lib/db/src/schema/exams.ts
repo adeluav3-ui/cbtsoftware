@@ -31,11 +31,12 @@ export const questionsTable = pgTable("questions", {
   correctOption: text("correct_option").notNull(), // A, B, C, D
   schoolCode: text("school_code").notNull(),
   imageUrl: text("image_url"),
-  groupId: integer("group_id"),
+  groupId: integer("group_id"),           // legacy exam-scoped int — kept for backward compat
   groupOrder: integer("group_order").default(0),
-  groupImageUrl: text("group_image_url"),
-  groupTitle: text("group_title"),
-  groupText: text("group_text"),
+  groupImageUrl: text("group_image_url"), // legacy denormalized — kept for backward compat
+  groupTitle: text("group_title"),        // legacy denormalized — kept for backward compat
+  groupText: text("group_text"),          // legacy denormalized — kept for backward compat
+  questionGroupId: integer("question_group_id"), // FK → question_groups.id (nullable = ungrouped)
   questionType: text("question_type").default("objective"), // "objective" | "subjective"
   correctAnswerText: text("correct_answer_text"), // JSON array of accepted answers for subjective
 }, (table) => ({
