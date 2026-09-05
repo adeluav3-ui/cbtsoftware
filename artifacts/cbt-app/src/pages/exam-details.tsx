@@ -602,7 +602,7 @@ export default function TeacherExamDetails() {
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => deleteQuestion({ schoolCode, examId, questionId: q.id })}
+                          onClick={() => setConfirmDeleteQId(q.id)}
                           className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors"
                           title="Delete question"
                         >
