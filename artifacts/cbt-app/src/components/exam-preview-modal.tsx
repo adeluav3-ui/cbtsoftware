@@ -155,35 +155,50 @@ export function ExamPreviewModal({ isOpen, onClose, exam }: Props) {
                 )}
               </div>
 
-              {/* Options — correct answer highlighted green */}
-              <div className="space-y-2 md:space-y-3">
-                {(['A', 'B', 'C', 'D'] as const).map(optKey => {
-                  const val = q[`option${optKey}` as keyof Question] as string;
-                  const isCorrect = q.correctOption === optKey;
-                  return (
-                    <div
-                      key={optKey}
-                      className={`w-full text-left p-3 md:p-4 rounded-xl border-2 flex items-center gap-2 md:gap-3 ${
-                        isCorrect
-                          ? 'border-green-500 bg-green-500/10'
-                          : 'border-border bg-background'
-                      }`}
-                    >
-                      <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                        isCorrect ? 'bg-green-500 text-white' : 'bg-muted'
-                      }`}>
-                        {isCorrect ? <CheckCircle2 className="w-4 h-4" /> : optKey}
+              {/* Options — subjective shows accepted answers; objective highlights correct */}
+              {q.questionType === "subjective" ? (
+                <div className="space-y-2">
+                  <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Subjective</span>
+                  <p className="text-xs text-muted-foreground font-semibold mb-1">Accepted Answers:</p>
+                  <div className="space-y-1">
+                    {(() => { try { return JSON.parse((q as any).correctAnswerText ?? "[]"); } catch { return []; } })().map((a: string, i: number) => (
+                      <div key={i} className="p-3 rounded-xl border-2 border-green-500 bg-green-500/10 text-sm font-semibold flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                        {a}
                       </div>
-                      <span className={`text-sm md:text-lg flex-1 ${isCorrect ? 'font-semibold' : ''}`}>
-                        {val}
-                      </span>
-                      {isCorrect && (
-                        <span className="text-xs font-bold text-green-600 shrink-0">Correct</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 md:space-y-3">
+                  {(['A', 'B', 'C', 'D'] as const).map(optKey => {
+                    const val = q[`option${optKey}` as keyof Question] as string;
+                    const isCorrect = q.correctOption === optKey;
+                    return (
+                      <div
+                        key={optKey}
+                        className={`w-full text-left p-3 md:p-4 rounded-xl border-2 flex items-center gap-2 md:gap-3 ${
+                          isCorrect
+                            ? 'border-green-500 bg-green-500/10'
+                            : 'border-border bg-background'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                          isCorrect ? 'bg-green-500 text-white' : 'bg-muted'
+                        }`}>
+                          {isCorrect ? <CheckCircle2 className="w-4 h-4" /> : optKey}
+                        </div>
+                        <span className={`text-sm md:text-lg flex-1 ${isCorrect ? 'font-semibold' : ''}`}>
+                          {val}
+                        </span>
+                        {isCorrect && (
+                          <span className="text-xs font-bold text-green-600 shrink-0">Correct</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Navigation */}
               <div className="flex justify-between gap-3 mt-6 md:mt-10 pt-4 md:pt-6 border-t">
