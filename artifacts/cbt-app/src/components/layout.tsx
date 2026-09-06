@@ -191,7 +191,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
   // Sidebar content — isMobileView enables accordion behavior for school_admin category groups
   const SidebarContent = ({ isMobileView = false }: { isMobileView?: boolean }) => (
     <>
-      <div>
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Logo area */}
         <div className={cn("p-4 pb-3 transition-all duration-300", collapsed && "px-2 flex justify-center")}>
           {collapsed ? (
@@ -314,7 +314,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
       </div>
 
       {/* Bottom user section with profile picture */}
-      <div className={cn("p-3 border-t border-border/50 bg-muted/20", collapsed && "px-2")}>
+      <div className={cn("shrink-0 p-3 border-t border-border/50 bg-muted/20", collapsed && "px-2")}>
         {!collapsed && (
           <div className="flex items-center mb-3">
             {/* Profile Picture */}
