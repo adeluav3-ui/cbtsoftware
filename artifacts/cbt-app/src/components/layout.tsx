@@ -32,27 +32,28 @@ function OfflineBanner() {
 }
 
 const SCHOOL_ADMIN_CATEGORIES = [
-  { label: "People",    icon: Users,         defaultPath: "/school-admin/people/teachers",      items: [
+  { label: "People",    icon: Users,         defaultPath: "/school-admin/people/teachers",   items: [
     { title: "Teachers",    path: "/school-admin/people/teachers" },
     { title: "Students",    path: "/school-admin/people/students" },
     { title: "Credentials", path: "/school-admin/people/credentials" },
   ]},
-  { label: "Academics", icon: BookOpen,       defaultPath: "/school-admin/academics/subjects",    items: [
+  { label: "Academics", icon: BookOpen,       defaultPath: "/school-admin/academics/subjects", items: [
     { title: "Subjects",        path: "/school-admin/academics/subjects" },
     { title: "Exams",           path: "/school-admin/academics/exams" },
     { title: "Entrance Exam",   path: "/school-admin/academics/entrance-exam" },
     { title: "Staff Interview", path: "/school-admin/academics/staff-interview" },
   ]},
-  { label: "Results",   icon: ClipboardList,  defaultPath: "/school-admin/results/results",       items: [
-    { title: "Results",         path: "/school-admin/results/results" },
-    { title: "Upload Results",  path: "/school-admin/results/upload-results" },
-    { title: "Broadsheet",      path: "/school-admin/results/broadsheet" },
+  { label: "Results",   icon: ClipboardList,  defaultPath: "/school-admin/results/results",   items: [
+    { title: "Results",        path: "/school-admin/results/results" },
+    { title: "Upload Results", path: "/school-admin/results/upload-results" },
+    { title: "Broadsheet",     path: "/school-admin/results/broadsheet" },
   ]},
-  { label: "System",    icon: Monitor,        defaultPath: "/school-admin/system/devices",        items: [
+  { label: "System",    icon: Monitor,        defaultPath: "/school-admin/system/devices",    items: [
     { title: "Devices",      path: "/school-admin/system/devices" },
     { title: "Local Server", path: "/school-admin/system/local-server" },
+    ...(IS_LOCAL ? [{ title: "Network Info", path: "/local-info" }] : []),
   ]},
-] as const;
+];
 
 export function DashboardLayout({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) {
   const { user, isLoading, refetch, setUser } = useAuth();
