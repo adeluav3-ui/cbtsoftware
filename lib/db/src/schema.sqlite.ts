@@ -88,6 +88,7 @@ export const questionsTable = sqliteTable("questions", {
   groupImageUrl: text("group_image_url"),
   groupTitle: text("group_title"),
   groupText: text("group_text"),
+  questionGroupId: integer("question_group_id"),
   questionType: text("question_type").default("objective"),
   correctAnswerText: text("correct_answer_text"),
 }, (table) => ({
@@ -244,6 +245,19 @@ export const deviceSessionsTable = sqliteTable("device_sessions", {
   firstSeen: integer("first_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   lastSeen: integer("last_seen", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+// ── question_groups ───────────────────────────────────────────────────────────
+export const questionGroupsTable = sqliteTable("question_groups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  examId: integer("exam_id").notNull(),
+  title: text("title").notNull(),
+  passageText: text("passage_text"),
+  imageUrl: text("image_url"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+}, (table) => ({
+  examIdIdx: index("question_groups_exam_id_idx").on(table.examId),
+}));
 
 // ── server_config ─────────────────────────────────────────────────────────────
 // Key-value store for local-server operational state.

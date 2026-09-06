@@ -25,6 +25,7 @@ export const {
   usersTable,
   examsTable,
   questionsTable,
+  questionGroupsTable,
   resultsTable,
   resultAnswersTable,
   gradingSchemesTable,

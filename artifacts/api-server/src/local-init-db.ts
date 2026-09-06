@@ -246,6 +246,21 @@ export function initDb(db: Database): void {
   try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS results_student_exam_unique ON results(student_id, exam_id)"); } catch {}
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS question_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      exam_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      passage_text TEXT,
+      image_url TEXT,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS question_groups_exam_id_idx ON question_groups(exam_id);
+  `);
+
+  try { db.exec("ALTER TABLE questions ADD COLUMN question_group_id INTEGER"); } catch {}
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS server_config (
       key TEXT PRIMARY KEY,
       value TEXT

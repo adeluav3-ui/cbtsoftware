@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import {
-  schoolsTable, usersTable, examsTable, questionsTable,
+  schoolsTable, usersTable, examsTable, questionsTable, questionGroupsTable,
   resultsTable, resultAnswersTable, gradingSchemesTable, subjectsTable,
   subjectScoresTable, deviceSessionsTable, serverConfigTable,
 } from "@workspace/db/schema";
@@ -37,13 +37,18 @@ router.get("/local-export", requireAuth, async (req, res) => {
   ]);
 
   const examIds = exams.map((e) => e.id);
-  const questions = examIds.length > 0
-    ? await db.select().from(questionsTable).where(inArray(questionsTable.examId, examIds))
-    : [];
+  const [questions, questionGroups] = await Promise.all([
+    examIds.length > 0
+      ? db.select().from(questionsTable).where(inArray(questionsTable.examId, examIds))
+      : Promise.resolve([]),
+    examIds.length > 0
+      ? db.select().from(questionGroupsTable).where(inArray(questionGroupsTable.examId, examIds))
+      : Promise.resolve([]),
+  ]);
 
   const date = new Date().toISOString().slice(0, 10);
   res.setHeader("Content-Disposition", `attachment; filename="cbt-school-${schoolCode}-${date}.json"`);
-  res.json({ exportedAt: new Date().toISOString(), version: 1, school, users, exams, questions, subjects, gradingSchemes });
+  res.json({ exportedAt: new Date().toISOString(), version: 1, school, users, exams, questions, questionGroups, subjects, gradingSchemes });
 });
 
 // ISO 8601 date strings → Date objects so SQLite's timestamp columns don't
@@ -88,7 +93,7 @@ router.post("/import-school", async (req, res) => {
   }
 
   const { schoolCode } = req.params as { schoolCode: string };
-  const { school, users = [], exams = [], questions = [], subjects = [], gradingSchemes = [] } = req.body;
+  const { school, users = [], exams = [], questions = [], questionGroups = [], subjects = [], gradingSchemes = [] } = req.body;
 
   if (!school?.code) {
     res.status(400).json({ error: "Invalid export data — missing school.code" });
@@ -113,6 +118,7 @@ router.post("/import-school", async (req, res) => {
   if (subjects.length)       await db.insert(subjectsTable).values(subjects.map(parseDates) as any).onConflictDoNothing();
   if (gradingSchemes.length) await db.insert(gradingSchemesTable).values(gradingSchemes.map(parseDates) as any).onConflictDoNothing();
   if (exams.length)          await db.insert(examsTable).values(exams.map(parseDates) as any).onConflictDoNothing();
+  if (questionGroups.length) await db.insert(questionGroupsTable).values(questionGroups.map(parseDates) as any).onConflictDoNothing();
   if (questions.length)      await db.insert(questionsTable).values(questions.map(parseDates) as any).onConflictDoNothing();
 
   // Record which school this local server is for — enables license check and time-sync
@@ -122,7 +128,7 @@ router.post("/import-school", async (req, res) => {
 
   res.json({
     ok: true,
-    imported: { users: users.length, exams: exams.length, questions: questions.length, subjects: subjects.length },
+    imported: { users: users.length, exams: exams.length, questionGroups: questionGroups.length, questions: questions.length, subjects: subjects.length },
   });
 });
 
