@@ -40,6 +40,7 @@ function Router() {
 
       {/* Protected Routes inside Dashboards check their own auth */}
       <Route path="/super-admin" component={SuperAdminDashboard} />
+      <Route path="/school-admin/:category/:tab" component={SchoolAdminDashboard} />
       <Route path="/school-admin" component={SchoolAdminDashboard} />
       <Route path="/teacher" component={TeacherDashboard} />
       <Route path="/teacher/exams/:examId" component={TeacherExamDetails} />

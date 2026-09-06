@@ -1,8 +1,24 @@
 import { useState, useEffect, useRef } from "react";
+import { useParams, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout";
+
+const SLUG_TO_TAB: Record<string, string> = {
+  "teachers":        "Teachers",
+  "students":        "Students",
+  "credentials":     "Credentials",
+  "subjects":        "Subjects",
+  "exams":           "Exams",
+  "entrance-exam":   "Entrance Exam",
+  "staff-interview": "Staff Interview",
+  "results":         "Results",
+  "upload-results":  "Upload Results",
+  "broadsheet":      "Broadsheet",
+  "devices":         "Devices",
+  "local-server":    "Local Server",
+};
 import { useAuth } from "@/lib/auth";
 import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
-import { Card, Button, Modal, Input, Label, CustomTabs, Badge, Select, PasswordInput } from "@/components/ui-elements";
+import { Card, Button, Modal, Input, Label, Badge, Select, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { Trash2, UserPlus, RotateCw, ChevronRight, BookOpen, Plus, Upload, School, Printer, TableIcon, Power, PowerOff, ArrowRightLeft, GraduationCap, Briefcase, Medal, Users, KeyRound, Smartphone, Tablet, Monitor, Download } from "lucide-react";
@@ -18,8 +34,17 @@ import { getGradeColor } from "@/lib/grade";
 export default function SchoolAdminDashboard() {
   const { user } = useAuth();
   const schoolCode = user?.schoolCode || "";
-  const [activeTab, setActiveTab] = useState("Teachers");
   const queryClient = useQueryClient();
+
+  // URL-driven tab: /school-admin/:category/:tab
+  const { tab: tabSlug } = useParams() as { category?: string; tab?: string };
+  const [, setLocation] = useLocation();
+  const activeTab = SLUG_TO_TAB[tabSlug ?? ""] ?? "Teachers";
+
+  // Redirect bare /school-admin → /school-admin/people/teachers
+  useEffect(() => {
+    if (!tabSlug) setLocation("/school-admin/people/teachers", { replace: true });
+  }, [tabSlug]);
 
   const [classFilter, setClassFilter] = useState("KG1");
   const CLASSES = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3", "Entrance Exam", "Staff Interview"];
@@ -929,41 +954,7 @@ export default function SchoolAdminDashboard() {
         </div>
       </div>
 
-      {/* Mobile: horizontal scrollable tabs */}
-      <div className="md:hidden mb-6 overflow-x-auto pb-2">
-        <CustomTabs tabs={["Teachers", "Students", "Results", "Upload Results", "Subjects", "Exams", "Entrance Exam", "Staff Interview", "Broadsheet", "Credentials", "Devices", "Local Server"]} activeTab={activeTab} onChange={setActiveTab} />
-      </div>
-
-      <div className="flex gap-6">
-        {/* Desktop: grouped sidebar */}
-        <aside className="hidden md:block w-48 shrink-0">
-          <Card className="p-3 sticky top-20">
-            {([
-              { label: "People", items: ["Teachers", "Students", "Credentials"] },
-              { label: "Academics", items: ["Subjects", "Exams", "Entrance Exam", "Staff Interview"] },
-              { label: "Results", items: ["Results", "Upload Results", "Broadsheet"] },
-              { label: "System", items: ["Devices", "Local Server"] },
-            ] as { label: string; items: string[] }[]).map(group => (
-              <div key={group.label} className="mb-4 last:mb-0">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">{group.label}</p>
-                <div className="space-y-0.5">
-                  {group.items.map(item => (
-                    <button
-                      key={item}
-                      onClick={() => setActiveTab(item)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${activeTab === item ? "bg-primary text-primary-foreground font-medium" : "text-foreground hover:bg-muted"}`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </Card>
-        </aside>
-
-        {/* Content area */}
-        <div className="flex-1 min-w-0">
+      <div>
 
       {/* Teachers Tab */}
       {activeTab === "Teachers" && (
@@ -2269,8 +2260,7 @@ export default function SchoolAdminDashboard() {
         );
       })()}
 
-        </div>{/* end content area */}
-      </div>{/* end flex gap-6 */}
+      </div>{/* end tab content */}
 
       {/* Add Teacher Modal */}
       <Modal isOpen={isTeacherModalOpen} onClose={() => setTeacherModalOpen(false)} title="Add New Teacher">

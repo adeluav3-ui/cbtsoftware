@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation, Link } from "wouter";
 import { useLogout, useCurrentUser } from "@workspace/api-client-react";
-import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Camera, ClipboardList, ShieldOff, Wifi } from "lucide-react";
+import { Building, LayoutDashboard, BookOpen, PenTool, LogOut, Loader2, UserCircle, ChevronLeft, ChevronRight, Menu, X, Camera, ClipboardList, ShieldOff, Wifi, Users, Monitor, ChevronDown } from "lucide-react";
 import { cn } from "./ui-elements";
 
 const API = import.meta.env.VITE_API_URL as string;
@@ -31,12 +31,36 @@ function OfflineBanner() {
   );
 }
 
+const SCHOOL_ADMIN_CATEGORIES = [
+  { label: "People",    icon: Users,         defaultPath: "/school-admin/people/teachers",      items: [
+    { title: "Teachers",    path: "/school-admin/people/teachers" },
+    { title: "Students",    path: "/school-admin/people/students" },
+    { title: "Credentials", path: "/school-admin/people/credentials" },
+  ]},
+  { label: "Academics", icon: BookOpen,       defaultPath: "/school-admin/academics/subjects",    items: [
+    { title: "Subjects",        path: "/school-admin/academics/subjects" },
+    { title: "Exams",           path: "/school-admin/academics/exams" },
+    { title: "Entrance Exam",   path: "/school-admin/academics/entrance-exam" },
+    { title: "Staff Interview", path: "/school-admin/academics/staff-interview" },
+  ]},
+  { label: "Results",   icon: ClipboardList,  defaultPath: "/school-admin/results/results",       items: [
+    { title: "Results",         path: "/school-admin/results/results" },
+    { title: "Upload Results",  path: "/school-admin/results/upload-results" },
+    { title: "Broadsheet",      path: "/school-admin/results/broadsheet" },
+  ]},
+  { label: "System",    icon: Monitor,        defaultPath: "/school-admin/system/devices",        items: [
+    { title: "Devices",      path: "/school-admin/system/devices" },
+    { title: "Local Server", path: "/school-admin/system/local-server" },
+  ]},
+] as const;
+
 export function DashboardLayout({ children, allowedRoles }: { children: ReactNode, allowedRoles: string[] }) {
   const { user, isLoading, refetch, setUser } = useAuth();
   const { data: serverUser } = useCurrentUser();
-  const [, setLocation] = useLocation();
+  const [currentPath, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accordionOpen, setAccordionOpen] = useState<string>("People");
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
 
@@ -88,6 +112,15 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [mobileMenuOpen]);
+
+  const activeSchoolAdminCategory =
+    SCHOOL_ADMIN_CATEGORIES.find(cat =>
+      cat.items.some(item => currentPath === item.path)
+    )?.label ?? "People";
+
+  useEffect(() => {
+    setAccordionOpen(activeSchoolAdminCategory);
+  }, [activeSchoolAdminCategory]);
 
   const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -154,8 +187,8 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
     ],
   }[user.role] || [];
 
-  // Sidebar content component (reused for both desktop and mobile)
-  const SidebarContent = () => (
+  // Sidebar content — isMobileView enables accordion behavior for school_admin category groups
+  const SidebarContent = ({ isMobileView = false }: { isMobileView?: boolean }) => (
     <>
       <div>
         {/* Logo area */}
@@ -178,30 +211,104 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         </div>
 
         {/* Nav items */}
-        <nav className={cn("px-2 space-y-1 mt-3", collapsed && "px-1")}>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = window.location.pathname === item.path ||
-              (window.location.pathname.startsWith(item.path + '/') &&
-               !navItems.some(other => other.path !== item.path && window.location.pathname.startsWith(other.path)));
-            return (
-              <Link key={item.path} href={item.path} onClick={() => setMobileMenuOpen(false)}>
-                <div
-                  title={collapsed ? item.title : undefined}
-                  className={cn(
-                    "flex items-center rounded-xl font-semibold transition-all duration-200 cursor-pointer",
-                    collapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5 md:px-4 md:py-3",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                      : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                  )}
-                >
-                  <Icon className={cn("w-4 h-4 md:w-5 md:h-5 transition-transform group-hover:scale-110 shrink-0", !collapsed && "mr-2 md:mr-3")} />
-                  {!collapsed && <span className="text-sm md:text-base">{item.title}</span>}
-                </div>
-              </Link>
-            );
-          })}
+        <nav className={cn("px-2 mt-3", collapsed ? "px-1 space-y-1" : "space-y-1")}>
+          {user.role === "school_admin" ? (
+            collapsed ? (
+              /* Collapsed school_admin: one icon per category */
+              SCHOOL_ADMIN_CATEGORIES.map(cat => {
+                const Icon = cat.icon;
+                const isActive = cat.label === activeSchoolAdminCategory;
+                return (
+                  <Link key={cat.label} href={cat.defaultPath} onClick={() => setMobileMenuOpen(false)}>
+                    <div
+                      title={cat.label}
+                      className={cn(
+                        "flex items-center rounded-xl font-semibold transition-all duration-200 cursor-pointer px-0 py-2.5 justify-center",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                          : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                      )}
+                    >
+                      <Icon className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                    </div>
+                  </Link>
+                );
+              })
+            ) : (
+              /* Expanded school_admin: grouped category nav */
+              <div className="space-y-3">
+                {SCHOOL_ADMIN_CATEGORIES.map(cat => {
+                  const Icon = cat.icon;
+                  const isOpen = isMobileView ? accordionOpen === cat.label : true;
+                  return (
+                    <div key={cat.label}>
+                      {isMobileView ? (
+                        <button
+                          onClick={() => setAccordionOpen(open => open === cat.label ? "" : cat.label)}
+                          className="w-full flex items-center justify-between px-2 py-1 mb-0.5"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Icon className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{cat.label}</span>
+                          </div>
+                          <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-1 mb-0.5">
+                          <Icon className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{cat.label}</span>
+                        </div>
+                      )}
+                      {isOpen && (
+                        <div className="space-y-0.5">
+                          {cat.items.map(item => {
+                            const isActive = currentPath === item.path;
+                            return (
+                              <Link key={item.path} href={item.path} onClick={() => setMobileMenuOpen(false)}>
+                                <div className={cn(
+                                  "flex items-center rounded-xl font-semibold transition-all duration-200 cursor-pointer px-3 py-2 text-sm",
+                                  isActive
+                                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                )}>
+                                  {item.title}
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* All other roles: flat nav items */
+            navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPath === item.path ||
+                (currentPath.startsWith(item.path + '/') &&
+                 !navItems.some(other => other.path !== item.path && currentPath.startsWith(other.path)));
+              return (
+                <Link key={item.path} href={item.path} onClick={() => setMobileMenuOpen(false)}>
+                  <div
+                    title={collapsed ? item.title : undefined}
+                    className={cn(
+                      "flex items-center rounded-xl font-semibold transition-all duration-200 cursor-pointer",
+                      collapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5 md:px-4 md:py-3",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                        : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                    )}
+                  >
+                    <Icon className={cn("w-4 h-4 md:w-5 md:h-5 transition-transform group-hover:scale-110 shrink-0", !collapsed && "mr-2 md:mr-3")} />
+                    {!collapsed && <span className="text-sm md:text-base">{item.title}</span>}
+                  </div>
+                </Link>
+              );
+            })
+          )}
         </nav>
       </div>
 
@@ -328,7 +435,7 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <SidebarContent />
+        <SidebarContent isMobileView />
       </aside>
 
       {/* Main Content */}
