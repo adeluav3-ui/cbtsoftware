@@ -1,7 +1,7 @@
 'use strict';
 
 
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, shell, Menu } = require('electron');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -142,6 +142,93 @@ function ensureFirewallRule() {
   });
 }
 
+function resetSchool() {
+  const dbPath = path.join(app.getPath('userData'), 'cbt-local.db');
+
+  dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Reset & Create New School',
+    message: 'This will permanently delete all school data.',
+    detail:
+      'All students, teachers, exams, results, and settings will be erased. ' +
+      'The app will restart and show the school setup screen.\n\n' +
+      'This cannot be undone. Are you sure?',
+    buttons: ['Reset & Start Over', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+  }).then(({ response }) => {
+    if (response !== 0) return;
+
+    log('User requested school reset — stopping server');
+    stopServer();
+
+    // Delete the database and its journal files
+    for (const suffix of ['', '-shm', '-wal']) {
+      const f = dbPath + suffix;
+      try { fs.unlinkSync(f); log(`Deleted: ${f}`); } catch (_) {}
+    }
+
+    log('Restarting server after reset');
+    startServer();
+
+    waitForServer().then(() => {
+      if (mainWindow) {
+        mainWindow.loadURL(`http://localhost:${PORT}`);
+      }
+    }).catch((err) => {
+      log(`Server restart after reset failed: ${err.message}`);
+      dialog.showErrorBox('Restart Failed', err.message);
+    });
+  });
+}
+
+function buildMenu() {
+  const isMac = process.platform === 'darwin';
+
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Reset & Create New School…',
+          accelerator: null,
+          click: resetSchool,
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' } : { role: 'quit', label: 'Exit' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload', label: 'Reload' },
+        { role: 'forceReload', label: 'Force Reload' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Toggle Full Screen' },
+        ...(!app.isPackaged ? [
+          { type: 'separator' },
+          { role: 'toggleDevTools', label: 'Developer Tools' },
+        ] : []),
+      ],
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Open Log File',
+          click: () => shell.openPath(LOG_FILE),
+        },
+        {
+          label: `Version ${app.getVersion()}`,
+          enabled: false,
+        },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width:    1280,
@@ -223,6 +310,7 @@ app.whenReady().then(async () => {
     return;
   }
 
+  buildMenu();
   createWindow();
 });
 
