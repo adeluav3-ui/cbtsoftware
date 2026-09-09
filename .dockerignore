@@ -22,6 +22,7 @@ artifacts/cbt-app/vite.config.ts
 artifacts/cbt-app/tailwind.config.ts
 artifacts/desktop-app/src
 artifacts/desktop-app/resources
+artifacts/desktop-app/dist-installer
 artifacts/mockup-sandbox/src
 
 # Local artefacts

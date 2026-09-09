@@ -5,7 +5,7 @@ import { Card, Button, Modal, Input, Label, Badge, PasswordInput } from "@/compo
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck } from "lucide-react";
+import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck, Download } from "lucide-react";
 import { ConfirmDialog } from "@/components/feedback";
 
 const API = import.meta.env.VITE_API_URL as string;
@@ -95,6 +95,12 @@ export default function SuperAdminDashboard() {
   const [isTogglingPureCbt, setIsTogglingPureCbt] = useState(false);
   const [pureCbtSuccess, setPureCbtSuccess] = useState("");
 
+  // Generate offline license
+  const [genLicenseDays, setGenLicenseDays] = useState("365");
+  const [genLicenseMaxDevices, setGenLicenseMaxDevices] = useState("");
+  const [isGeneratingLicense, setIsGeneratingLicense] = useState(false);
+  const [genLicenseError, setGenLicenseError] = useState("");
+
   const handleUpdateMaxDevices = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!detailSchool) return;
@@ -135,6 +141,41 @@ export default function SuperAdminDashboard() {
       }
     } catch {}
     finally { setIsTogglingPureCbt(false); }
+  };
+
+  const handleGenerateLicense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailSchool) return;
+    setIsGeneratingLicense(true);
+    setGenLicenseError("");
+    try {
+      const res = await fetch(`${API}/schools/generate-offline-license`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          schoolCode: detailSchool.code,
+          maxDevices: genLicenseMaxDevices === "" ? null : Number(genLicenseMaxDevices),
+          validDays: Number(genLicenseDays),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setGenLicenseError(data.error || "Failed to generate license");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cbt-license-${detailSchool.code}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setGenLicenseError("Network error");
+    } finally {
+      setIsGeneratingLicense(false);
+    }
   };
 
   const handleExtendLicense = async (e: React.FormEvent) => {
@@ -268,6 +309,9 @@ export default function SuperAdminDashboard() {
     setMaxDevicesSuccess("");
     setPureCbtMode(school.pureCbtMode ?? false);
     setPureCbtSuccess("");
+    setGenLicenseDays("365");
+    setGenLicenseMaxDevices(school.maxDevices != null ? String(school.maxDevices) : "");
+    setGenLicenseError("");
     if (!overviewCache[school.code]) {
       setOverviewLoading(true);
       try {
@@ -776,6 +820,44 @@ export default function SuperAdminDashboard() {
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform ${pureCbtMode ? "translate-x-6" : "translate-x-1"}`} />
                 </button>
               </div>
+            </div>
+
+            {/* Generate Offline License */}
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Generate Offline License</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Create a signed license file to send to the school for their offline (desktop) installation. The school uploads this file when setting up the app for the first time.
+              </p>
+              <form onSubmit={handleGenerateLicense} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Validity (days)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="1825"
+                      value={genLicenseDays}
+                      onChange={e => { setGenLicenseDays(e.target.value); setGenLicenseError(""); }}
+                      placeholder="e.g. 365"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Max Devices <span className="text-muted-foreground font-normal">(blank = unlimited)</span></Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={genLicenseMaxDevices}
+                      onChange={e => { setGenLicenseMaxDevices(e.target.value); setGenLicenseError(""); }}
+                      placeholder="e.g. 30"
+                    />
+                  </div>
+                </div>
+                {genLicenseError && <p className="text-sm text-destructive font-medium">{genLicenseError}</p>}
+                <Button type="submit" variant="outline" size="sm" isLoading={isGeneratingLicense}>
+                  <Download className="w-4 h-4 mr-2" /> Generate &amp; Download License
+                </Button>
+              </form>
             </div>
 
             {/* Danger zone */}

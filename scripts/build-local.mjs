@@ -94,6 +94,12 @@ await build({
     "@workspace/db/schema": path.join(SERVER_DIR, "src", "db-local.ts"),
     "@sentry/node": path.join(SERVER_DIR, "src", "sentry-noop.ts"),
   },
+  // Compile the license secret into the bundle so the local server can verify
+  // licenses without a network call.  The value must match CBT_LICENSE_SECRET
+  // on the cloud server.  Keep this value secret — do not commit to public repos.
+  define: {
+    "__CBT_LICENSE_SECRET__": JSON.stringify("cbtSW-2026-offlineLicKey-xK9mP2nR7vQwY4hJ8bNpZsLdFeTuCmGiAo3k"),
+  },
   external: [
     // Native addons must stay external
     "better-sqlite3",

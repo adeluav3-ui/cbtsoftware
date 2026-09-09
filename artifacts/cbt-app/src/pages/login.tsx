@@ -4,7 +4,7 @@ import { useLogin, getCurrentUserQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Card, CustomTabs, Input, Label, PasswordInput } from "@/components/ui-elements";
-import { BookOpen, Upload, CheckCircle } from "lucide-react";
+import { BookOpen, Upload, CheckCircle, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 
 const API = (import.meta.env.VITE_API_URL as string) || "https://cbtsoftware.onrender.com/api";
@@ -26,9 +26,20 @@ export default function Login() {
   // Local-mode setup state
   const [setupChecked, setSetupChecked] = useState(!IS_LOCAL);
   const [hasSchool, setHasSchool] = useState(!IS_LOCAL);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importError, setImportError] = useState("");
-  const [importSuccess, setImportSuccess] = useState(false);
+
+  // License activation state
+  const [licenseData, setLicenseData] = useState<any>(null);
+  const [licenseError, setLicenseError] = useState("");
+  const [activationStep, setActivationStep] = useState<"license" | "details">("license");
+  const [schoolName, setSchoolName] = useState("");
+  const [adminFullName, setAdminFullName] = useState("");
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPasswordConfirm, setAdminPasswordConfirm] = useState("");
+  const [showAdminPw, setShowAdminPw] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [activationError, setActivationError] = useState("");
+  const [activationSuccess, setActivationSuccess] = useState(false);
 
   const { mutate: login, isPending } = useLogin();
 
@@ -47,31 +58,63 @@ export default function Login() {
       });
   }, []);
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLicenseUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportLoading(true);
-    setImportError("");
+    setLicenseError("");
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (!data?.school?.code) throw new Error("Invalid export file — school code missing");
-      const res = await fetch(`${API}/schools/${data.school.code}/sync/import-school`, {
+      if (data?.type !== "cbt-offline-license") {
+        throw new Error("This is not a valid CBT Software license file");
+      }
+      if (!data.schoolCode) throw new Error("License file is missing school code");
+      // Basic expiry check on the frontend too
+      if (data.validUntil && new Date(data.validUntil) < new Date()) {
+        throw new Error("This license has expired. Contact your administrator for a renewal.");
+      }
+      setLicenseData(data);
+      setActivationStep("details");
+    } catch (err: any) {
+      setLicenseError(err.message || "Could not read license file");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const handleActivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActivationError("");
+    if (adminPassword !== adminPasswordConfirm) {
+      setActivationError("Passwords do not match");
+      return;
+    }
+    if (adminPassword.length < 6) {
+      setActivationError("Password must be at least 6 characters");
+      return;
+    }
+    setActivating(true);
+    try {
+      const res = await fetch(`${API}/setup/activate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          license: licenseData,
+          schoolName,
+          adminFullName,
+          adminUsername: adminUsername.trim().toLowerCase(),
+          adminPassword,
+        }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Import failed");
-      setImportSuccess(true);
+      if (!res.ok) throw new Error(result.error || result.detail || "Activation failed");
+      setActivationSuccess(true);
       setHasSchool(true);
     } catch (err: any) {
-      setImportError(err.message || "Import failed");
+      setActivationError(err.message || "Activation failed");
     } finally {
-      setImportLoading(false);
-      // Reset the file input so the same file can be re-selected after an error
-      e.target.value = "";
+      setActivating(false);
     }
   };
 
@@ -136,7 +179,7 @@ export default function Login() {
     </div>
   );
 
-  // ── Local mode: show setup screen when no school has been imported yet ─────
+  // ── Local mode: show activation screen when no school set up yet ───────────
   if (IS_LOCAL && setupChecked && !hasSchool) {
     return (
       <div className="min-h-screen w-full flex bg-background">
@@ -147,60 +190,176 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-md"
           >
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-bold font-display text-foreground">Set Up Local Server</h2>
-              <p className="text-muted-foreground mt-2">
-                No school has been imported yet. Upload the export file from your cloud admin panel to get started.
-              </p>
-            </div>
-
-            <Card className="p-8 space-y-5">
-              {importSuccess ? (
-                <div className="flex flex-col items-center gap-4 py-4">
-                  <CheckCircle className="w-12 h-12 text-green-500" />
-                  <p className="text-center font-semibold text-foreground">School data imported successfully!</p>
-                  <p className="text-sm text-muted-foreground text-center">You can now log in with your school admin credentials.</p>
-                  <Button className="w-full" onClick={() => window.location.reload()}>
-                    Continue to Login
-                  </Button>
+            {/* Success */}
+            {activationSuccess ? (
+              <>
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold font-display text-foreground">Activated!</h2>
                 </div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">How to get the export file:</p>
-                    <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                      <li>Log in to the cloud admin panel</li>
-                      <li>Go to your school &rsaquo; <span className="font-medium">Export for Offline Use</span></li>
-                      <li>Download the <code className="bg-muted px-1 rounded text-xs">.json</code> file</li>
-                      <li>Upload it below</li>
-                    </ol>
+                <Card className="p-8">
+                  <div className="flex flex-col items-center gap-4 py-4">
+                    <CheckCircle className="w-14 h-14 text-green-500" />
+                    <p className="text-center font-semibold text-foreground text-lg">
+                      Your school has been set up successfully!
+                    </p>
+                    <p className="text-sm text-muted-foreground text-center">
+                      Log in with the admin username and password you just created.
+                    </p>
+                    <Button className="w-full mt-2" onClick={() => window.location.reload()}>
+                      Go to Login
+                    </Button>
+                  </div>
+                </Card>
+              </>
+            ) : activationStep === "license" ? (
+              /* Step 1: Upload license */
+              <>
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold font-display text-foreground">Activate Software</h2>
+                  <p className="text-muted-foreground mt-2">
+                    Upload the license file sent to you by the administrator after payment.
+                  </p>
+                </div>
+                <Card className="p-8 space-y-5">
+                  <div className="flex items-start gap-3 bg-muted/50 rounded-xl p-4">
+                    <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">How to get your license:</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        <li>Make payment to the administrator</li>
+                        <li>Send your payment receipt and the number of devices needed</li>
+                        <li>Receive your <code className="bg-muted px-1 rounded text-xs">.json</code> license file</li>
+                        <li>Upload it below to activate</li>
+                      </ol>
+                    </div>
                   </div>
 
-                  {importError && (
+                  {licenseError && (
                     <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">
-                      {importError}
+                      {licenseError}
                     </div>
                   )}
 
                   <label className="block">
-                    <div className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 cursor-pointer transition-colors ${importLoading ? "opacity-50 pointer-events-none" : "hover:border-primary hover:bg-primary/5 border-border"}`}>
+                    <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 cursor-pointer transition-colors hover:border-primary hover:bg-primary/5 border-border">
                       <Upload className="w-8 h-8 text-muted-foreground mb-3" />
-                      <span className="text-sm font-medium text-foreground">
-                        {importLoading ? "Importing…" : "Click to upload school export file"}
-                      </span>
-                      <span className="text-xs text-muted-foreground mt-1">.json file from cloud export</span>
+                      <span className="text-sm font-medium text-foreground">Click to upload your license file</span>
+                      <span className="text-xs text-muted-foreground mt-1">cbt-license-YOURCODE.json</span>
                     </div>
                     <input
                       type="file"
                       accept=".json,application/json"
                       className="sr-only"
-                      onChange={handleImport}
-                      disabled={importLoading}
+                      onChange={handleLicenseUpload}
                     />
                   </label>
-                </>
-              )}
-            </Card>
+                </Card>
+              </>
+            ) : (
+              /* Step 2: Fill school + admin details */
+              <>
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center gap-2 bg-green-500/10 text-green-600 px-3 py-1.5 rounded-full text-sm font-medium mb-4">
+                    <CheckCircle className="w-4 h-4" />
+                    License verified
+                  </div>
+                  <h2 className="text-3xl font-bold font-display text-foreground">Set Up Your School</h2>
+                  <p className="text-muted-foreground mt-2">
+                    Fill in your school details to complete activation.
+                  </p>
+                </div>
+
+                <Card className="p-8">
+                  {/* License summary */}
+                  <div className="bg-muted/50 rounded-xl p-3 mb-5 flex items-center justify-between text-sm">
+                    <div>
+                      <span className="text-muted-foreground">School Code: </span>
+                      <span className="font-bold text-foreground">{licenseData?.schoolCode}</span>
+                    </div>
+                    {licenseData?.maxDevices && (
+                      <div>
+                        <span className="text-muted-foreground">Devices: </span>
+                        <span className="font-bold text-foreground">{licenseData.maxDevices}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleActivate} className="space-y-4">
+                    {activationError && (
+                      <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">
+                        {activationError}
+                      </div>
+                    )}
+
+                    <div>
+                      <Label>School Name</Label>
+                      <Input
+                        value={schoolName}
+                        onChange={e => setSchoolName(e.target.value)}
+                        placeholder="e.g. Greenfield Academy"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Admin Full Name</Label>
+                      <Input
+                        value={adminFullName}
+                        onChange={e => setAdminFullName(e.target.value)}
+                        placeholder="Your full name"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Admin Username</Label>
+                      <Input
+                        value={adminUsername}
+                        onChange={e => setAdminUsername(e.target.value)}
+                        placeholder="Choose a username (e.g. admin)"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Admin Password</Label>
+                      <div className="relative">
+                        <PasswordInput
+                          value={adminPassword}
+                          onChange={e => setAdminPassword(e.target.value)}
+                          placeholder="At least 6 characters"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Confirm Password</Label>
+                      <PasswordInput
+                        value={adminPasswordConfirm}
+                        onChange={e => setAdminPasswordConfirm(e.target.value)}
+                        placeholder="Re-enter password"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => { setActivationStep("license"); setLicenseData(null); setActivationError(""); }}
+                      >
+                        Back
+                      </Button>
+                      <Button type="submit" className="flex-1" isLoading={activating}>
+                        Activate
+                      </Button>
+                    </div>
+                  </form>
+                </Card>
+              </>
+            )}
           </motion.div>
         </div>
       </div>

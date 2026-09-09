@@ -28,7 +28,17 @@
       "Bash(gh release *)",
       "Bash(ls \"c:/Users/HP/CBT/cbtsoftware-releases/\" 2>/dev/null || echo \"Releases repo not found at that path\")",
       "Read(//c/Users/HP/CBT/**)",
-      "PowerShell(git clone https://github.com/adeluav3-ui/cbtsoftware-releases.git \"C:\\\\Users\\\\HP\\\\CBT\\\\cbtsoftware-releases\" 2>&1)"
+      "PowerShell(git clone https://github.com/adeluav3-ui/cbtsoftware-releases.git \"C:\\\\Users\\\\HP\\\\CBT\\\\cbtsoftware-releases\" 2>&1)",
+      "Bash(git commit -m ' *)",
+      "Bash(pnpm --version)",
+      "Bash(npx tsc *)",
+      "Bash(git commit *)",
+      "Bash(VITE_API_URL=\"/api\" VITE_LOCAL_MODE=\"true\" pnpm run build)",
+      "Bash(pnpm run *)",
+      "PowerShell(gh release delete-asset v1.0.3 \"CBT.Software.Local.Setup.1.0.3.exe\" --repo adeluav3-ui/cbtsoftware-releases --yes)",
+      "PowerShell(gh release delete-asset v1.0.3 \"CBT.Software.Local.Setup.1.0.3.exe.blockmap\" --repo adeluav3-ui/cbtsoftware-releases --yes)",
+      "Bash(node --input-type=module --env-file=\"../../artifacts/api-server/.env\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

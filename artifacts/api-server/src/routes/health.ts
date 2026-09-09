@@ -11,9 +11,8 @@ router.get("/healthz", (_req, res) => {
   res.json(data);
 });
 
-// Returns whether at least one school has been imported.
-// Used by the local-mode frontend to decide whether to show the login form
-// or the first-time setup screen.
+// Returns whether the local server has been activated (has at least one school).
+// Used by the local-mode frontend to decide whether to show the setup or login screen.
 router.get("/setup-status", async (_req, res) => {
   if (process.env.DEPLOY_MODE !== "local") {
     res.json({ hasSchool: true });
@@ -21,9 +20,10 @@ router.get("/setup-status", async (_req, res) => {
   }
   try {
     const [result] = await db.select({ c: count() }).from(schoolsTable);
-    res.json({ hasSchool: (result?.c ?? 0) > 0 });
+    const activated = (result?.c ?? 0) > 0;
+    res.json({ hasSchool: activated, activated });
   } catch {
-    res.json({ hasSchool: false });
+    res.json({ hasSchool: false, activated: false });
   }
 });
 

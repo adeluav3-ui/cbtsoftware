@@ -11,12 +11,15 @@ import joinInfoRouter from "./join-info.js";
 import syncRouter from "./sync.js";
 import devicesRouter from "./devices.js";
 import timeCheckRouter from "./time-check.js";
+import offlineSetupRouter from "./offline-setup.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { checkLocalLicense } from "../middlewares/license.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+// Offline setup — no auth, local-only, must come before requireAuth-gated routes
+router.use("/setup", offlineSetupRouter);
 router.use("/auth", authRouter);
 router.use(timeCheckRouter);
 router.use("/upload", uploadRouter);

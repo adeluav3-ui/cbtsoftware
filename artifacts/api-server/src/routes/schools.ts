@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { schoolsTable, usersTable, examsTable, questionsTable, resultsTable, resultAnswersTable, gradingSchemesTable, subjectScoresTable, subjectsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin, requireSchoolAdmin, requireSchoolStaff } from "../middlewares/auth.js";
+import { generateLicense } from "../license-utils.js";
 
 interface SchoolParams {
   schoolCode: string;
@@ -1587,6 +1588,46 @@ router.patch("/:schoolCode/pure-cbt-mode", requireSuperAdmin, async (req: Reques
     console.error(err);
     res.status(500).json({ error: "Server error" });
     return;
+  }
+});
+
+// ── Offline license generation (super admin only, cloud only) ─────────────────
+// POST /api/schools/generate-offline-license
+// Generates a signed JSON license file the super admin can send to a school
+// after confirming payment.
+router.post("/generate-offline-license", requireSuperAdmin, async (req: Request, res: Response) => {
+  if (process.env.DEPLOY_MODE === "local") {
+    res.status(404).json({ error: "Not available in local mode" });
+    return;
+  }
+
+  const { schoolCode, maxDevices, validDays } = req.body as {
+    schoolCode?: string;
+    maxDevices?: number | null;
+    validDays?: number;
+  };
+
+  if (!schoolCode?.trim()) {
+    res.status(400).json({ error: "schoolCode is required" });
+    return;
+  }
+  if (typeof validDays !== "number" || validDays < 1 || validDays > 1825) {
+    res.status(400).json({ error: "validDays must be between 1 and 1825" });
+    return;
+  }
+
+  const upperCode = schoolCode.toUpperCase().trim();
+  const validUntil = new Date(Date.now() + validDays * 24 * 60 * 60 * 1000);
+  const parsedMaxDevices = typeof maxDevices === "number" ? maxDevices : null;
+
+  try {
+    const license = generateLicense(upperCode, parsedMaxDevices, validUntil);
+    const filename = `cbt-license-${upperCode}.json`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.json(license);
+  } catch (err) {
+    console.error("[generate-offline-license]", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "License generation failed" });
   }
 });
 
