@@ -292,12 +292,12 @@ export default function Login() {
       <footer className="mt-8 pt-6 border-t border-border text-center text-sm text-muted-foreground">
         Powered by{' '}
         <a
-          href="https://luma-website-six.vercel.app/"
+          href="https://compile-eight.vercel.app/"
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold text-primary hover:underline transition-colors"
         >
-          Vortex
+          Compile
         </a>
       </footer>
     </div>
