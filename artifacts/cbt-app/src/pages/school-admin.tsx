@@ -1330,6 +1330,8 @@ export default function SchoolAdminDashboard() {
                 { level: 'primary', label: 'Primary (Pry 1-5)' },
                 { level: 'junior', label: 'Junior Secondary (JSS1-3)' },
                 { level: 'senior', label: 'Senior Secondary (SSS1-3)' },
+                { level: 'entrance', label: 'Entrance Exam' },
+                { level: 'interview', label: 'Staff Interview' },
               ] as const).map(({ level, label }) => (
                 <div key={level}>
                   <div className="flex items-center gap-2 mb-4">
@@ -1419,12 +1421,14 @@ export default function SchoolAdminDashboard() {
               </div>
               <div>
                 <Label>Level</Label>
-                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                <Select value={newSubjectLevel} onChange={e => setNewSubjectLevel(e.target.value as any)}>
                   <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
+                  <option value="entrance">Entrance Exam</option>
+                  <option value="interview">Staff Interview</option>
                 </Select>
               </div>
               {subjectError && (
@@ -1442,12 +1446,14 @@ export default function SchoolAdminDashboard() {
             <div className="space-y-4">
               <div>
                 <Label>Level</Label>
-                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as "kg" | "nursery" | "primary" | "junior" | "senior")}>
+                <Select value={bulkSubjectsLevel} onChange={e => setBulkSubjectsLevel(e.target.value as any)}>
                   <option value="kg">Pre-School / Kindergarten (Pre-School, KG1, KG2)</option>
                   <option value="nursery">Nursery (Nursery 1, Nursery 2)</option>
                   <option value="primary">Primary (Pry 1 - Pry 5)</option>
                   <option value="junior">Junior Secondary (JSS1 - JSS3)</option>
                   <option value="senior">Senior Secondary (SSS1 - SSS3)</option>
+                  <option value="entrance">Entrance Exam</option>
+                  <option value="interview">Staff Interview</option>
                 </Select>
               </div>
               <div>
@@ -1649,29 +1655,128 @@ export default function SchoolAdminDashboard() {
         );
       })()}
 
-      {/* ── Entrance Exam Tab ─────────────────────────── */}
+      {/* ── Entrance Exam / Staff Interview Tabs ─────────── */}
       {(activeTab === "Entrance Exam" || activeTab === "Staff Interview") && (() => {
         const isEntrance = activeTab === "Entrance Exam";
         const type = isEntrance ? "entrance" : "interview";
+        const level = type; // matches the subject level key
         const icon = isEntrance ? <GraduationCap className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />;
         const label = isEntrance ? "Entrance Exam" : "Staff Interview / Appraisal";
-        const desc = isEntrance
-          ? "Candidates who sat the entrance exam and their results."
-          : "Staff interview & appraisal candidates and their scores.";
+        const classSubjects = subjects.filter(s => s.level === level);
+        const classExams = allExams.filter(e => e.class === activeTab);
+        const teacherMap = new Map(teachers.map(t => [t.id, t.fullName || t.username]));
 
         return (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold flex items-center gap-2">{icon} {label}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-              </div>
-              <Button onClick={() => fetchSpecialResults(type)} isLoading={isLoadingSpecial}>
-                Load Results
-              </Button>
+          <div className="space-y-6">
+            {/* Header */}
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">{icon} {label}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Manage subjects, exams, and view candidate results for this class.
+              </p>
             </div>
 
-            {/* Registered candidates */}
+            {/* Subjects section */}
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  Subjects ({classSubjects.length})
+                </h3>
+                <Button size="sm" onClick={() => { setNewSubjectLevel(level as any); setSubjectModalOpen(true); }}>
+                  <Plus className="w-3 h-3 mr-1" /> Add Subject
+                </Button>
+              </div>
+              {classSubjects.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  No subjects yet. Click "Add Subject" to add subjects for this class.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {classSubjects.map(s => (
+                    <div key={s.id} className="flex items-center gap-1.5 bg-muted/30 rounded-lg px-3 py-1.5">
+                      <span className="text-sm font-medium">{s.name}</span>
+                      <button
+                        onClick={() => setConfirmDeleteSubjectId(s.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Exams section */}
+            <Card className="p-0 overflow-hidden">
+              <div className="p-3 border-b border-border/50 bg-muted/20">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  Exams ({classExams.length})
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Teachers create exams from their dashboard. Publish here to make them available to candidates.
+                </p>
+              </div>
+              {classExams.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">No exams yet. Teachers can create exams and set the class to "{activeTab}".</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
+                        <th className="px-4 py-2 font-semibold">Title</th>
+                        <th className="px-4 py-2 font-semibold">Subject</th>
+                        <th className="px-4 py-2 font-semibold">Teacher</th>
+                        <th className="px-4 py-2 font-semibold text-center">Status</th>
+                        <th className="px-4 py-2 font-semibold text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classExams.map(exam => (
+                        <tr key={exam.id} className="border-b border-border/40 hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-2 font-semibold">{exam.title}</td>
+                          <td className="px-4 py-2 text-primary font-medium">{exam.subject}</td>
+                          <td className="px-4 py-2 text-muted-foreground text-xs">{teacherMap.get(exam.teacherId) || `Teacher #${exam.teacherId}`}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${exam.isActive ? "bg-secondary/10 text-secondary" : "bg-muted text-muted-foreground"}`}>
+                              {exam.isActive ? "Published" : "Draft"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleExam({ schoolCode, examId: exam.id })}
+                              className="text-xs"
+                            >
+                              {exam.isActive ? <><PowerOff className="w-3 h-3 mr-1" /> Unpublish</> : <><Power className="w-3 h-3 mr-1" /> Publish</>}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+
+            {/* Candidates & Results section */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Medal className="w-4 h-4 text-primary" />
+                  Candidate Results
+                </h3>
+                <Button size="sm" onClick={() => fetchSpecialResults(type)} isLoading={isLoadingSpecial}>
+                  Load Results
+                </Button>
+              </div>
+
             {specialResultsData && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Candidates list */}
@@ -1760,16 +1865,7 @@ export default function SchoolAdminDashboard() {
               </div>
             )}
 
-            {!specialResultsData && !isLoadingSpecial && (
-              <Card className="py-12 text-center text-muted-foreground">
-                {icon}
-                <p className="mt-3 font-semibold">Click "Load Results" to fetch {isEntrance ? "entrance exam" : "interview"} data</p>
-                <p className="text-xs mt-1">
-                  To add candidates: go to the <strong>Students</strong> tab → Add Student → set class to <strong>"{activeTab}"</strong>.<br />
-                  To create the exam: teachers set the class to <strong>"{activeTab}"</strong> when creating an exam.
-                </p>
-              </Card>
-            )}
+            </div>{/* end candidates section */}
           </div>
         );
       })()}

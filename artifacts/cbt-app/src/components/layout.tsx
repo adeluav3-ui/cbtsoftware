@@ -449,12 +449,12 @@ export function DashboardLayout({ children, allowedRoles }: { children: ReactNod
         <footer className="mt-8 pt-4 border-t border-border text-center text-xs text-muted-foreground pb-4">
           Powered by{' '}
           <a
-            href="https://luma-website-six.vercel.app/"
+            href="https://compile-eight.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-primary hover:underline transition-colors"
           >
-            Vortex
+            Compile
           </a>
         </footer>
       </main>

@@ -419,8 +419,8 @@ router.post("/:schoolCode/subjects", requireSchoolAdmin, async (req: Request, re
   const schoolCodeStr = String(schoolCode);
   const { name, level } = req.body;
 
-  if (!name || !level || !['kg', 'nursery', 'primary', 'junior', 'senior'].includes(level)) {
-    return res.status(400).json({ error: "Subject name and valid level (kg/nursery/primary/junior/senior) required" });
+  if (!name || !level || !['kg', 'nursery', 'primary', 'junior', 'senior', 'entrance', 'interview'].includes(level)) {
+    return res.status(400).json({ error: "Subject name and valid level required" });
   }
 
   try {
@@ -487,11 +487,13 @@ router.post("/:schoolCode/subjects/merge", requireSchoolAdmin, async (req: Reque
   }
 
   const levelClassMap: Record<string, string[]> = {
-    kg:      ["Pre-School", "KG1", "KG2"],
-    nursery: ["Nursery 1", "Nursery 2"],
-    primary: ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5"],
-    junior:  ["JSS1", "JSS2", "JSS3"],
-    senior:  ["SSS1", "SSS2", "SSS3"],
+    kg:        ["Pre-School", "KG1", "KG2"],
+    nursery:   ["Nursery 1", "Nursery 2"],
+    primary:   ["Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5"],
+    junior:    ["JSS1", "JSS2", "JSS3"],
+    senior:    ["SSS1", "SSS2", "SSS3"],
+    entrance:  ["Entrance Exam"],
+    interview: ["Staff Interview"],
   };
   const levelClasses = levelClassMap[level.trim()];
   if (!levelClasses) {
