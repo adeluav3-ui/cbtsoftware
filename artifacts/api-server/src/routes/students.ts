@@ -388,10 +388,15 @@ router.patch("/:studentId/fees-status", requireSchoolAdmin, async (req: Request<
 // Get subject scores for a student
 router.get("/:studentId/subject-scores", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
+  const sessionRole = (req as any).session?.role;
 
   // Students can only access their own scores
-  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+  // Non-super_admin users can only access data from their own school
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
   }
 
   try {
@@ -780,15 +785,33 @@ router.post("/:studentId/init-subject", requireSchoolStaff, async (req: Request<
   }
 });
 
-// Get all subject scores for a school
+// Get all subject scores for a school (filtered by term/session — defaults to school's current term)
 router.get("/subject-scores", requireSchoolStaff, async (req: Request<SchoolParams>, res: Response) => {
   const { schoolCode } = req.params;
+  const { term, academicSession } = req.query;
 
   try {
+    let filterTerm = term as string | undefined;
+    let filterSession = academicSession as string | undefined;
+
+    if (!filterTerm || !filterSession) {
+      const [school] = await db
+        .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+        .from(schoolsTable)
+        .where(eq(schoolsTable.code, schoolCode))
+        .limit(1);
+      filterTerm = filterTerm || school?.currentTerm || "First Term";
+      filterSession = filterSession || school?.currentAcademicSession || "2025/2026";
+    }
+
     const scores = await db
       .select()
       .from(subjectScoresTable)
-      .where(eq(subjectScoresTable.schoolCode, schoolCode));
+      .where(and(
+        eq(subjectScoresTable.schoolCode, schoolCode),
+        eq(subjectScoresTable.term, filterTerm),
+        eq(subjectScoresTable.academicSession, filterSession),
+      ));
 
     res.json(scores);
     return;
@@ -1016,8 +1039,12 @@ router.post("/:studentId/profile-picture", requireAuth, async (req: Request<Stud
 // Get position-in-class for a student (separate from subject-scores to avoid breaking existing callers)
 router.get("/:studentId/class-position", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
-  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+  const sessionRole = (req as any).session?.role;
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
   }
   try {
     const [school] = await db
@@ -1099,8 +1126,12 @@ router.get("/:studentId/class-position", requireAuth, async (req: Request<Studen
 // Get traits for a student for the current term/session
 router.get("/:studentId/traits", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
-  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+  const sessionRole = (req as any).session?.role;
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
   }
   try {
     const [school] = await db
@@ -1181,8 +1212,12 @@ router.post("/:studentId/traits", requireSchoolStaff, async (req: Request<Studen
 // Get attendance for a student for the current term/session
 router.get("/:studentId/attendance", requireAuth, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
-  if ((req as any).session?.role === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+  const sessionRole = (req as any).session?.role;
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
     return res.status(403).json({ error: "Forbidden" });
+  }
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
   }
   try {
     const [school] = await db

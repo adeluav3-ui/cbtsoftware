@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, real, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, real, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,10 +16,10 @@ export const resultsTable = pgTable("results", {
   retakeCount: integer("retake_count").default(0),
   submittedAt: timestamp("submitted_at").notNull().defaultNow(),
 }, (table) => ({
+  uniqueStudentExam: unique("results_student_id_exam_id_unique").on(table.studentId, table.examId),
   examIdIdx: index("results_exam_id_idx").on(table.examId),
   studentIdIdx: index("results_student_id_idx").on(table.studentId),
   schoolCodeIdx: index("results_school_code_idx").on(table.schoolCode),
-  // Composite indexes for common query patterns
   schoolExamIdx: index("results_school_exam_idx").on(table.schoolCode, table.examId),
   studentExamIdx: index("results_student_exam_idx").on(table.studentId, table.examId),
 }));

@@ -89,9 +89,11 @@ router.post("/login", async (req: Request, res: Response) => {
 
     // ── Local mode: enforce per-school device seat limit ───────────────────────
     if (isLocal && user.schoolCode) {
-      const deviceId = req.cookies?.cbt_device_id as string | undefined;
+      // Use req.deviceId set by deviceIdMiddleware (always present) rather than
+      // reading req.cookies.cbt_device_id which is absent on the very first request.
+      const deviceId = req.deviceId as string | undefined;
       if (!deviceId) {
-        return res.status(403).json({ error: "Device ID cookie missing. Please clear browser data and try again." });
+        return res.status(403).json({ error: "Device ID missing. Please reload the page and try again." });
       }
       const alreadyRegistered = isDeviceRegistered(deviceId);
       if (!alreadyRegistered) {
@@ -154,8 +156,9 @@ router.post("/login", async (req: Request, res: Response) => {
     });
     return;
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("[auth/login]", err);
+    const detail = isLocal && err instanceof Error ? err.message : undefined;
+    res.status(500).json({ error: "Server error", ...(detail && { detail }) });
     return;
   }
 });

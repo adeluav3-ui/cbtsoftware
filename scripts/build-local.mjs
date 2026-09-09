@@ -85,10 +85,14 @@ await build({
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
   },
-  // Alias workspace db packages → the SQLite local implementation
+  // Alias workspace db packages → the SQLite local implementation.
+  // Alias @sentry/node → a no-op stub: the local server has no DSN, and
+  // bundling the full @sentry/node package pulls in OpenTelemetry which can
+  // interfere with session handling and inflates the bundle significantly.
   alias: {
     "@workspace/db": path.join(SERVER_DIR, "src", "db-local.ts"),
     "@workspace/db/schema": path.join(SERVER_DIR, "src", "db-local.ts"),
+    "@sentry/node": path.join(SERVER_DIR, "src", "sentry-noop.ts"),
   },
   external: [
     // Native addons must stay external

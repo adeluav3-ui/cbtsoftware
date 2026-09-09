@@ -74,6 +74,13 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: "https://cbtsoftware-api.fly.dev",
+        changeOrigin: true,
+        secure: true,
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

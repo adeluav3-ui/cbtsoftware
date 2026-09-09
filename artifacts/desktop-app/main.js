@@ -42,9 +42,17 @@ function startServer() {
   serverProcess = spawn(NODE_EXE, [SERVER_MJS], {
     cwd:         SERVER_DIR,
     env:         { ...process.env, SQLITE_PATH: dbPath },
-    stdio:       'ignore',
+    stdio:       ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
+
+  // Pipe server stdout/stderr to the electron log file so errors are visible
+  if (serverProcess.stdout) {
+    serverProcess.stdout.on('data', (data) => log(`[server] ${data.toString().trimEnd()}`));
+  }
+  if (serverProcess.stderr) {
+    serverProcess.stderr.on('data', (data) => log(`[server:err] ${data.toString().trimEnd()}`));
+  }
 
   serverProcess.on('error', (err) => {
     log(`spawn error: ${err.message}`);
