@@ -37,10 +37,14 @@ function startServer() {
   const dbPath = path.join(app.getPath('userData'), 'cbt-local.db');
   log(`dbPath=${dbPath}`);
 
+  // Pass FRONTEND_DIR explicitly so the server never has to rely on process.cwd().
+  const frontendDir = path.join(SERVER_DIR, 'public');
+  log(`frontendDir=${frontendDir}`);
+
   log(`spawning: ${NODE_EXE} ${SERVER_MJS} cwd=${SERVER_DIR}`);
   serverProcess = spawn(NODE_EXE, [SERVER_MJS], {
     cwd:         SERVER_DIR,
-    env:         { ...process.env, SQLITE_PATH: dbPath },
+    env:         { ...process.env, SQLITE_PATH: dbPath, FRONTEND_DIR: frontendDir },
     stdio:       ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
@@ -162,13 +166,14 @@ function ensureFirewallRule() {
 }
 
 // Clears the Chromium service-worker and cache-storage so a stale PWA from a
-// previous install never serves old HTML/JS. Safe to call on every startup —
-// all content is served locally so there is no network cost.
+// previous install never serves old HTML/JS. Resolves within 5 s regardless —
+// on first launch after an upgrade this can block for 30+ s otherwise.
 async function clearStaleCache() {
   try {
-    await session.defaultSession.clearStorageData({
-      storages: ['serviceworkers', 'cachestorage'],
-    });
+    await Promise.race([
+      session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
     log('Cleared stale service-worker / cache-storage');
   } catch (err) {
     log(`clearStaleCache failed: ${err.message}`);
@@ -334,11 +339,11 @@ function createWindow() {
 app.whenReady().then(async () => {
   log('app ready');
 
-  // Clear stale PWA service-worker/cache from previous installs on every startup.
-  // Ensures the bundled frontend is always served fresh, not a cached old version.
-  await clearStaleCache();
-
+  // Start the server and clear the stale PWA cache in parallel so neither
+  // blocks the other. The window is only created once BOTH are done —
+  // clearing first ensures no stale service-worker intercepts the first load.
   startServer();
+  const cacheCleared = clearStaleCache();
 
   try {
     log('waiting for server...');
@@ -354,6 +359,9 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
+
+  // Ensure cache is fully cleared before the browser window opens.
+  await cacheCleared;
 
   buildMenu();
   createWindow();
