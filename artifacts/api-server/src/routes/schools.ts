@@ -1622,6 +1622,19 @@ router.post("/generate-offline-license", requireSuperAdmin, async (req: Request,
 
   try {
     const license = generateLicense(upperCode, parsedMaxDevices, validUntil);
+
+    // Create or update a cloud school record so the school appears on the
+    // super-admin dashboard. Name is left null — the school fills it in during
+    // offline activation. If the school already exists (e.g. a renewal), only
+    // the license fields are updated.
+    await db
+      .insert(schoolsTable)
+      .values({ code: upperCode, name: null, licenseValidUntil: validUntil, maxDevices: parsedMaxDevices })
+      .onConflictDoUpdate({
+        target: schoolsTable.code,
+        set: { licenseValidUntil: validUntil, maxDevices: parsedMaxDevices },
+      });
+
     const filename = `cbt-license-${upperCode}.json`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.json(license);
