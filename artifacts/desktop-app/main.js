@@ -1,7 +1,6 @@
 'use strict';
 
-
-const { app, BrowserWindow, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, dialog, shell, Menu, session } = require('electron');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -64,6 +63,33 @@ function startServer() {
   });
 }
 
+// Kill the server and wait for the OS to fully release file locks before resolving.
+function stopServerAndWait() {
+  return new Promise((resolve) => {
+    if (!serverProcess) { resolve(); return; }
+
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+
+    serverProcess.once('exit', () => {
+      // Give the OS an extra tick to release file handles after the process exits
+      setTimeout(finish, 200);
+    });
+    serverProcess.kill();
+    serverProcess = null;
+
+    // Hard fallback: if the process doesn't exit cleanly within 3 s, continue anyway
+    setTimeout(finish, 3000);
+  });
+}
+
+function stopServer() {
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+  }
+}
+
 function waitForServer(maxAttempts = 30) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
@@ -93,13 +119,6 @@ function waitForServer(maxAttempts = 30) {
 
     setTimeout(check, 1500);
   });
-}
-
-function stopServer() {
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
-  }
 }
 
 // Adds a Windows Firewall inbound rule for port 8080 on first launch.
@@ -142,10 +161,24 @@ function ensureFirewallRule() {
   });
 }
 
-function resetSchool() {
+// Clears the Chromium service-worker and cache-storage so a stale PWA from a
+// previous install never serves old HTML/JS. Safe to call on every startup —
+// all content is served locally so there is no network cost.
+async function clearStaleCache() {
+  try {
+    await session.defaultSession.clearStorageData({
+      storages: ['serviceworkers', 'cachestorage'],
+    });
+    log('Cleared stale service-worker / cache-storage');
+  } catch (err) {
+    log(`clearStaleCache failed: ${err.message}`);
+  }
+}
+
+async function resetSchool() {
   const dbPath = path.join(app.getPath('userData'), 'cbt-local.db');
 
-  dialog.showMessageBox(mainWindow, {
+  const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
     title: 'Reset & Create New School',
     message: 'This will permanently delete all school data.',
@@ -156,30 +189,38 @@ function resetSchool() {
     buttons: ['Reset & Start Over', 'Cancel'],
     defaultId: 1,
     cancelId: 1,
-  }).then(({ response }) => {
-    if (response !== 0) return;
-
-    log('User requested school reset — stopping server');
-    stopServer();
-
-    // Delete the database and its journal files
-    for (const suffix of ['', '-shm', '-wal']) {
-      const f = dbPath + suffix;
-      try { fs.unlinkSync(f); log(`Deleted: ${f}`); } catch (_) {}
-    }
-
-    log('Restarting server after reset');
-    startServer();
-
-    waitForServer().then(() => {
-      if (mainWindow) {
-        mainWindow.loadURL(`http://localhost:${PORT}`);
-      }
-    }).catch((err) => {
-      log(`Server restart after reset failed: ${err.message}`);
-      dialog.showErrorBox('Restart Failed', err.message);
-    });
   });
+
+  if (response !== 0) return;
+
+  log('User requested school reset — stopping server');
+
+  // Wait for the server process to fully exit so Windows releases the DB file lock
+  await stopServerAndWait();
+  log('Server stopped');
+
+  // Delete the database and its WAL/SHM journal files
+  for (const suffix of ['', '-shm', '-wal']) {
+    const f = dbPath + suffix;
+    try { fs.unlinkSync(f); log(`Deleted: ${f}`); }
+    catch (err) { log(`Could not delete ${f}: ${err.message}`); }
+  }
+
+  // Clear PWA cache so the setup screen loads fresh
+  await clearStaleCache();
+
+  log('Restarting server after reset');
+  startServer();
+
+  try {
+    await waitForServer();
+    if (mainWindow) {
+      mainWindow.loadURL(`http://localhost:${PORT}`);
+    }
+  } catch (err) {
+    log(`Server restart after reset failed: ${err.message}`);
+    dialog.showErrorBox('Restart Failed', err.message);
+  }
 }
 
 function buildMenu() {
@@ -191,7 +232,6 @@ function buildMenu() {
       submenu: [
         {
           label: 'Reset & Create New School…',
-          accelerator: null,
           click: resetSchool,
         },
         { type: 'separator' },
@@ -293,6 +333,11 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   log('app ready');
+
+  // Clear stale PWA service-worker/cache from previous installs on every startup.
+  // Ensures the bundled frontend is always served fresh, not a cached old version.
+  await clearStaleCache();
+
   startServer();
 
   try {
