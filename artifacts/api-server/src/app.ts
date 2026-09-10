@@ -93,12 +93,27 @@ if (isLocal) {
   app.use("/uploads", express.static(getUploadsDir()));
 
   const frontendDir = process.env.FRONTEND_DIR ?? path.join(process.cwd(), "public");
+  const indexHtmlPath = path.join(frontendDir, "index.html");
+
+  // Log startup info so Electron's log captures the resolved path and whether
+  // the file actually exists — helps diagnose "Cannot GET /" issues.
+  import("node:fs").then(({ existsSync }) => {
+    console.log(`[local] frontendDir=${frontendDir}`);
+    console.log(`[local] index.html exists=${existsSync(indexHtmlPath)}`);
+  });
+
   app.use(express.static(frontendDir));
 
   // SPA fallback — Wouter handles routing client-side, so all non-API paths
-  // must return index.html (app.use with no path = catch-all, required in Express 5)
-  app.use((_req, res) => {
-    res.sendFile(path.join(frontendDir, "index.html"));
+  // must return index.html.
+  // IMPORTANT: use the callback form of res.sendFile. In Express 5, res.sendFile
+  // returns a Promise; not returning it from the handler causes Express 5 to
+  // consider the middleware "done" synchronously and send "Cannot GET /" before
+  // the async file transfer completes.
+  app.use((_req, res, next) => {
+    res.sendFile(indexHtmlPath, (err) => {
+      if (err && !res.headersSent) next(err);
+    });
   });
 }
 
