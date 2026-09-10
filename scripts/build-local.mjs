@@ -99,6 +99,10 @@ await build({
   // on the cloud server.  Keep this value secret — do not commit to public repos.
   define: {
     "__CBT_LICENSE_SECRET__": JSON.stringify("cbtSW-2026-offlineLicKey-xK9mP2nR7vQwY4hJ8bNpZsLdFeTuCmGiAo3k"),
+    // Bake DEPLOY_MODE in at build time so isLocal is always true in the local
+    // bundle. Without this, esbuild inlines app.ts before index.local.ts sets
+    // the env var, making isLocal evaluate to false → no static file serving.
+    "process.env.DEPLOY_MODE": JSON.stringify("local"),
   },
   external: [
     // Native addons must stay external
