@@ -95,11 +95,19 @@ export default function SuperAdminDashboard() {
   const [isTogglingPureCbt, setIsTogglingPureCbt] = useState(false);
   const [pureCbtSuccess, setPureCbtSuccess] = useState("");
 
-  // Generate offline license
+  // Generate offline license (inside school detail modal — for existing cloud schools)
   const [genLicenseDays, setGenLicenseDays] = useState("365");
   const [genLicenseMaxDevices, setGenLicenseMaxDevices] = useState("");
   const [isGeneratingLicense, setIsGeneratingLicense] = useState(false);
   const [genLicenseError, setGenLicenseError] = useState("");
+
+  // Standalone offline license modal — no cloud school record required
+  const [isOfflineLicenseOpen, setIsOfflineLicenseOpen] = useState(false);
+  const [olCode, setOlCode] = useState("");
+  const [olDays, setOlDays] = useState("365");
+  const [olMaxDevices, setOlMaxDevices] = useState("");
+  const [olError, setOlError] = useState("");
+  const [isOlGenerating, setIsOlGenerating] = useState(false);
 
   const handleUpdateMaxDevices = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +183,44 @@ export default function SuperAdminDashboard() {
       setGenLicenseError("Network error");
     } finally {
       setIsGeneratingLicense(false);
+    }
+  };
+
+  // Standalone offline license generator — no cloud school record required
+  const handleGenerateOfflineLicense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsOlGenerating(true);
+    setOlError("");
+    try {
+      const res = await fetch(`${API}/schools/generate-offline-license`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          schoolCode: olCode.trim().toUpperCase(),
+          maxDevices: olMaxDevices === "" ? null : Number(olMaxDevices),
+          validDays: Number(olDays),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setOlError(data.error || "Failed to generate license");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cbt-license-${olCode.trim().toUpperCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      // Reset form after successful download
+      setOlCode(""); setOlDays("365"); setOlMaxDevices("");
+      setIsOfflineLicenseOpen(false);
+    } catch {
+      setOlError("Network error");
+    } finally {
+      setIsOlGenerating(false);
     }
   };
 
@@ -407,12 +453,15 @@ export default function SuperAdminDashboard() {
           <h1 className="text-3xl font-display font-bold">Registered Schools</h1>
           <p className="text-muted-foreground mt-1">Manage schools, admins, and platform access.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => { setCpError(""); setCpSuccess(""); setCpCurrent(""); setCpNew(""); setIsChangePwOpen(true); }}>
             <Key className="w-4 h-4 mr-2" /> Change Password
           </Button>
+          <Button variant="outline" onClick={() => { setOlCode(""); setOlDays("365"); setOlMaxDevices(""); setOlError(""); setIsOfflineLicenseOpen(true); }}>
+            <Download className="w-4 h-4 mr-2" /> New Offline License
+          </Button>
           <Button onClick={() => { setAddError(""); setIsAddOpen(true); }}>
-            <Plus className="w-4 h-4 mr-2" /> Add New School
+            <Plus className="w-4 h-4 mr-2" /> Add Cloud School
           </Button>
         </div>
       </div>
@@ -581,9 +630,69 @@ export default function SuperAdminDashboard() {
         </form>
       </Modal>
 
-      {/* Add New School Modal */}
-      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add New School">
+      {/* New Offline License Modal */}
+      <Modal isOpen={isOfflineLicenseOpen} onClose={() => setIsOfflineLicenseOpen(false)} title="Generate Offline License">
+        <form onSubmit={handleGenerateOfflineLicense} className="space-y-5">
+          <div className="p-4 bg-primary/5 rounded-xl border border-primary/20 text-sm text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground">For offline (desktop) installations only</p>
+            <p>The school fills in their own name and admin credentials when they first open the app. You only need to assign them a code and set the license terms.</p>
+          </div>
+          {olError && (
+            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">
+              {olError}
+            </div>
+          )}
+          <div>
+            <Label>School Code <span className="text-muted-foreground font-normal">(you assign this — share it with the school)</span></Label>
+            <Input
+              value={olCode}
+              onChange={e => setOlCode(e.target.value.toUpperCase())}
+              placeholder="e.g. ACME2025"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Validity (days)</Label>
+              <Input
+                type="number"
+                min="1"
+                max="1825"
+                value={olDays}
+                onChange={e => { setOlDays(e.target.value); setOlError(""); }}
+                placeholder="e.g. 365"
+                required
+              />
+            </div>
+            <div>
+              <Label>Max Devices <span className="text-muted-foreground font-normal">(blank = unlimited)</span></Label>
+              <Input
+                type="number"
+                min="1"
+                value={olMaxDevices}
+                onChange={e => { setOlMaxDevices(e.target.value); setOlError(""); }}
+                placeholder="e.g. 30"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            After downloading, send the <code className="font-mono bg-muted px-1 rounded">cbt-license-{olCode || "SCHOOLCODE"}.json</code> file to the school via WhatsApp or email. They upload it when setting up the app.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="ghost" onClick={() => setIsOfflineLicenseOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={isOlGenerating}>
+              <Download className="w-4 h-4 mr-2" /> Generate &amp; Download License
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Cloud School Modal */}
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add Cloud School">
         <form onSubmit={handleAddSchool} className="space-y-5">
+          <div className="p-4 bg-muted/40 rounded-xl border border-border text-sm text-muted-foreground">
+            For schools using the <span className="font-semibold text-foreground">cloud/online</span> version. You set all credentials here. For offline desktop installations, use <span className="font-semibold text-foreground">New Offline License</span> instead.
+          </div>
           {addError && (
             <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">
               {addError}
