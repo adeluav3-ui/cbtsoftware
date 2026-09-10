@@ -22,14 +22,6 @@ declare module "express-session" {
   }
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      deviceId?: string;
-    }
-  }
-}
-
 // Hard-fail on missing SESSION_SECRET in production — a missing secret makes
 // sessions forgeable and must never silently fall back to a known value.
 if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
