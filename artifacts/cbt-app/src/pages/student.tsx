@@ -134,6 +134,7 @@ export default function StudentDashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-sm truncate">{result.examTitle || result.subject}</h3>
+              <p className="text-xs text-muted-foreground">{result.subject}</p>
               <p className="text-xs text-muted-foreground">Score: {result.score} / {result.totalQuestions}</p>
             </div>
             <div className="text-right flex items-center gap-2">

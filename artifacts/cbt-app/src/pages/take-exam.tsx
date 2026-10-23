@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useGetExam, useSubmitExam, Question, GroupedQuestion } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, Button, Modal } from "@/components/ui-elements";
 import { ConfirmDialog } from "@/components/feedback";
 import { Clock, AlertCircle, CheckCircle2, Layers, Loader2 } from "lucide-react";
@@ -16,6 +17,7 @@ export default function TakeExam() {
   const [, setLocation] = useLocation();
   const [submittedResultId, setSubmittedResultId] = useState<number | null>(null);
   const [showReview, setShowReview] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: examData, isLoading } = useGetExam(schoolCode, examId);
 
@@ -30,8 +32,10 @@ export default function TakeExam() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [resultScore, setResultScore] = useState<{ score: number, pct: number } | null>(null);
+  const [resultScore, setResultScore] = useState<{ score: number, total: number, pct: number } | null>(null);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  // Ref-based guard so double-submit is blocked even before the isFinished state re-render
+  const submittedRef = useRef(false);
 
   // Use exam questions in teacher's original order — no shuffling
   const orderedExamItems = useMemo<GroupedQuestion[]>(
@@ -140,25 +144,33 @@ export default function TakeExam() {
   }, [hasStarted, isFinished]);
 
   const handleFinalSubmit = () => {
-    if (isFinished || !user) return;
+    // Use a ref so the guard is synchronous — state updates are async and can be
+    // bypassed if this function is called twice in the same JS tick (e.g. timer
+    // fires at the exact moment the student clicks Submit).
+    if (submittedRef.current || !user) return;
+    submittedRef.current = true;
     setIsFinished(true);
+    const capturedAnswers = { ...answers };
     submitExam({
       schoolCode,
       examId,
       data: {
         studentId: user.id,
         fullName: user.fullName || user.username,
-        answers
+        answers: capturedAnswers
       }
     }, {
       onSuccess: (res) => {
         localStorage.removeItem(`exam_${examId}`);
         localStorage.removeItem(`answers_${examId}`);
-        setResultScore({ score: res.score, pct: res.percentage });
+        setResultScore({ score: res.score, total: res.totalQuestions, pct: res.percentage });
         setSubmittedResultId(res.id);
+        // Invalidate the results cache so the dashboard shows the new score immediately
+        queryClient.invalidateQueries({ queryKey: ['results', schoolCode] });
       },
       onError: (err) => {
         console.error("Submit failed:", err);
+        submittedRef.current = false;
         setIsFinished(false);
       }
     });
@@ -344,8 +356,8 @@ export default function TakeExam() {
           ) : resultScore ? (
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>
               <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
-              <h2 className="text-2xl font-bold">{resultScore.score} / {flattenedQuestions.length}</h2>
-              <p className="text-sm text-muted-foreground mb-4">You answered {resultScore.score} out of {flattenedQuestions.length} correctly</p>
+              <h2 className="text-2xl font-bold">{resultScore.score} / {resultScore.total}</h2>
+              <p className="text-sm text-muted-foreground mb-4">You answered {resultScore.score} out of {resultScore.total} correctly</p>
               <div className="flex flex-col gap-2">
                 <Button size="sm" variant="outline" onClick={() => setShowReview(true)}>Review Answers</Button>
                 <Button size="sm" onClick={() => setLocation("/student")}>Return to Dashboard</Button>
