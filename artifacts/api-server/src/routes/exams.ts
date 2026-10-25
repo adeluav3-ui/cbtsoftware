@@ -437,6 +437,48 @@ router.patch("/:examId", requireSchoolStaff, async (req: RequestWithSession, res
   }
 });
 
+// Change assessment type of an exam
+router.patch("/:examId/assessment-type", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
+  const { schoolCode, examId } = req.params;
+  const schoolCodeStr = toString(schoolCode);
+  const examIdNum = toNumber(examId);
+  const { assessmentType } = req.body;
+  const userId = req.session?.userId;
+  const userRole = req.session?.role;
+
+  const validTypes = ["mid_term", "exam", "class_activity"];
+  if (!assessmentType || !validTypes.includes(assessmentType)) {
+    return res.status(400).json({ error: "Valid assessmentType is required (mid_term, exam, class_activity)" });
+  }
+
+  try {
+    const [existingExam] = await db
+      .select()
+      .from(examsTable)
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .limit(1);
+
+    if (!existingExam) return res.status(404).json({ error: "Exam not found" });
+
+    if (userRole === 'teacher' && userId && existingExam.teacherId !== userId) {
+      return res.status(403).json({ error: "You don't have permission to modify this exam" });
+    }
+
+    const [updated] = await db
+      .update(examsTable)
+      .set({ assessmentType })
+      .where(and(eq(examsTable.id, examIdNum), eq(examsTable.schoolCode, schoolCodeStr)))
+      .returning();
+
+    res.json(updated);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Delete exam
 router.delete("/:examId", requireSchoolStaff, async (req: RequestWithSession, res: Response) => {
   const { schoolCode, examId } = req.params;

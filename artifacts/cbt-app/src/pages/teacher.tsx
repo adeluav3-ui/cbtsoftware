@@ -9,7 +9,7 @@ import {
 import { Card, Button, Modal, Input, Label, Select, CustomTabs, Badge, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListExamsQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
-import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap, ArrowRightLeft } from "lucide-react";
+import { BookOpen, Plus, Settings, Trash2, Power, PowerOff, ClipboardList, Users, UserPlus, Upload, GraduationCap, ArrowRightLeft, Tag } from "lucide-react";
 import { ResultDetailModal } from "@/components/result-detail-modal";
 import { ConfirmDialog } from "@/components/feedback";
 import { EnterScoresModal } from "@/components/enter-scores-modal";
@@ -81,6 +81,13 @@ export default function TeacherDashboard() {
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState("");
 
+  // Change assessment type
+  const [assessTypeModalOpen, setAssessTypeModalOpen] = useState(false);
+  const [assessTypeExam, setAssessTypeExam] = useState<{ id: number; title: string; assessmentType: string } | null>(null);
+  const [newAssessType, setNewAssessType] = useState("exam");
+  const [isChangingAssessType, setIsChangingAssessType] = useState(false);
+  const [assessTypeError, setAssessTypeError] = useState("");
+
   const { mutate: createExam, isPending: isCEPending } = useCreateExam({
     mutation: {
       onSuccess: () => {
@@ -132,6 +139,32 @@ export default function TeacherDashboard() {
       setTransferError("Network error.");
     } finally {
       setIsTransferring(false);
+    }
+  };
+
+  const handleChangeAssessType = async () => {
+    if (!assessTypeExam) return;
+    setIsChangingAssessType(true);
+    setAssessTypeError("");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/exams/${assessTypeExam.id}/assessment-type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assessmentType: newAssessType }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setAssessTypeError(d.error || "Failed to update");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: getListExamsQueryKey(schoolCode) });
+      setAssessTypeModalOpen(false);
+      setAssessTypeExam(null);
+    } catch {
+      setAssessTypeError("Network error.");
+    } finally {
+      setIsChangingAssessType(false);
     }
   };
 
@@ -288,6 +321,13 @@ export default function TeacherDashboard() {
                     <ArrowRightLeft size={14} />
                   </button>
                   <button
+                    onClick={() => { setAssessTypeExam({ id: exam.id, title: exam.title, assessmentType: exam.assessmentType || "exam" }); setNewAssessType(exam.assessmentType || "exam"); setAssessTypeError(""); setAssessTypeModalOpen(true); }}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary/10 hover:text-secondary transition-colors"
+                    title="Change Assessment Type"
+                  >
+                    <Tag size={14} />
+                  </button>
+                  <button
                     onClick={() => setConfirmExam({ id: exam.id, title: exam.title })}
                     className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                     title="Delete"
@@ -297,7 +337,10 @@ export default function TeacherDashboard() {
                 </div>
               </div>
               <h3 className="text-lg md:text-xl font-bold font-display mb-1">{exam.title}</h3>
-              <p className="text-primary font-semibold text-xs md:text-sm mb-3">{exam.subject} • {exam.class}</p>
+              <p className="text-primary font-semibold text-xs md:text-sm mb-1">{exam.subject} • {exam.class}</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {exam.assessmentType === "mid_term" ? "Mid-Term Test" : exam.assessmentType === "class_activity" ? "Class Activity" : "Final Exam"}
+              </p>
               <div className="flex justify-between text-xs text-muted-foreground mt-auto pt-3 border-t border-border/50">
                 <span>{exam.durationMinutes} mins</span>
                 <span>{exam.questionCount || 0} Questions</span>
@@ -622,6 +665,30 @@ export default function TeacherDashboard() {
             <Button variant="outline" onClick={() => setTransferModalOpen(false)} className="flex-1">Cancel</Button>
             <Button onClick={handleTransfer} isLoading={isTransferring} className="flex-1">
               <ArrowRightLeft className="w-4 h-4 mr-2" /> Move Exam
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={assessTypeModalOpen} onClose={() => setAssessTypeModalOpen(false)} title="Change Assessment Type">
+        <div className="space-y-4">
+          {assessTypeExam && (
+            <p className="text-sm">Changing assessment type for <span className="font-semibold">"{assessTypeExam.title}"</span>.</p>
+          )}
+          <div>
+            <Label>Assessment Type</Label>
+            <Select value={newAssessType} onChange={e => setNewAssessType(e.target.value)}>
+              <option value="mid_term">Mid-Term Test</option>
+              <option value="exam">Final Exam</option>
+              <option value="class_activity">Class Activity</option>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">Note: If students have already submitted results, existing scores remain unchanged.</p>
+          {assessTypeError && <div className="bg-destructive/10 text-destructive p-2 rounded text-sm">{assessTypeError}</div>}
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => setAssessTypeModalOpen(false)} className="flex-1">Cancel</Button>
+            <Button onClick={handleChangeAssessType} isLoading={isChangingAssessType} className="flex-1">
+              <Tag className="w-4 h-4 mr-2" /> Save Change
             </Button>
           </div>
         </div>

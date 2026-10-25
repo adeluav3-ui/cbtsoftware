@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout";
 import { useAuth } from "@/lib/auth";
 import { useListExams, useListResults } from "@workspace/api-client-react";
-import { Card, Button, Badge, Modal, Input } from "@/components/ui-elements";
+import { Card, Button, Badge, Modal, Input, CustomTabs } from "@/components/ui-elements";
 import { getGradeColor } from "@/lib/grade";
 import { useLocation } from "wouter";
-import { Clock, CheckCircle2, PlayCircle, RotateCcw, ClipboardList, BookOpen, TrendingUp } from "lucide-react";
+import { Clock, CheckCircle2, PlayCircle, RotateCcw, ClipboardList, BookOpen, TrendingUp, History } from "lucide-react";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -17,6 +17,15 @@ export default function StudentDashboard() {
   const { data: rawResults, refetch: refetchResults } = useListResults(schoolCode, { studentId: user?.id });
   const exams = Array.isArray(rawExams) ? rawExams : [];
   const results = Array.isArray(rawResults) ? rawResults : [];
+
+  const [activeTab, setActiveTab] = useState("This Term");
+
+  // Past results
+  const [pastTerms, setPastTerms] = useState<{ term: string; academicSession: string }[]>([]);
+  const [selectedPastTerm, setSelectedPastTerm] = useState<{ term: string; academicSession: string } | null>(null);
+  const [pastSubjects, setPastSubjects] = useState<any[]>([]);
+  const [isLoadingPastResults, setIsLoadingPastResults] = useState(false);
+  const [pastGradeScheme, setPastGradeScheme] = useState({ gradeAMin: 70, gradeBMin: 60, gradeCMin: 50, gradeDMin: 40 });
 
   const [retakeModalOpen, setRetakeModalOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<{ id: number; title: string } | null>(null);
@@ -34,7 +43,18 @@ export default function StudentDashboard() {
       fetchTermResults();
       fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/grading-scheme`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setGradeScheme({ gradeAMin: d.gradeAMin ?? 70, gradeBMin: d.gradeBMin ?? 60, gradeCMin: d.gradeCMin ?? 50, gradeDMin: d.gradeDMin ?? 40 }); })
+        .then(d => {
+          if (d) {
+            const scheme = { gradeAMin: d.gradeAMin ?? 70, gradeBMin: d.gradeBMin ?? 60, gradeCMin: d.gradeCMin ?? 50, gradeDMin: d.gradeDMin ?? 40 };
+            setGradeScheme(scheme);
+            setPastGradeScheme(scheme);
+          }
+        })
+        .catch(() => {});
+      // Fetch list of past terms
+      fetch(`${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/${user.id}/past-terms`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : [])
+        .then(d => { if (Array.isArray(d)) setPastTerms(d); })
         .catch(() => {});
     }
   }, [schoolCode, user?.id]);
@@ -52,6 +72,22 @@ export default function StudentDashboard() {
       else setTermSubjects([]);
     } catch (_) {} finally {
       setIsLoadingTermResults(false);
+    }
+  };
+
+  const fetchPastResults = async (term: string, academicSession: string) => {
+    setIsLoadingPastResults(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/schools/${schoolCode}/students/${user!.id}/past-subject-scores?term=${encodeURIComponent(term)}&academicSession=${encodeURIComponent(academicSession)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) { setPastSubjects([]); return; }
+      const data = await res.json();
+      if (Array.isArray(data)) setPastSubjects(data);
+      else setPastSubjects([]);
+    } catch (_) { setPastSubjects([]); } finally {
+      setIsLoadingPastResults(false);
     }
   };
 
@@ -94,11 +130,109 @@ export default function StudentDashboard() {
 
   return (
     <DashboardLayout allowedRoles={["student"]}>
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl md:text-3xl font-display font-bold">Student Portal</h1>
         <p className="text-sm text-muted-foreground mt-1">Class: <span className="font-semibold text-primary">{studentClass}</span></p>
       </div>
 
+      <div className="mb-6 overflow-x-auto pb-2">
+        <CustomTabs
+          tabs={["This Term", "Past Results"]}
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab);
+            if (tab === "Past Results" && pastTerms.length > 0 && !selectedPastTerm) {
+              setSelectedPastTerm(pastTerms[0]);
+              fetchPastResults(pastTerms[0].term, pastTerms[0].academicSession);
+            }
+          }}
+        />
+      </div>
+
+      {activeTab === "Past Results" && (
+        <div>
+          {pastTerms.length === 0 ? (
+            <Card className="py-12 text-center text-muted-foreground">
+              <History className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="font-semibold">No previous term results</p>
+              <p className="text-sm mt-1">Results from past terms will appear here after your school advances to a new term.</p>
+            </Card>
+          ) : (
+            <div>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {pastTerms.map((t) => (
+                  <button
+                    key={`${t.term}-${t.academicSession}`}
+                    onClick={() => {
+                      setSelectedPastTerm(t);
+                      fetchPastResults(t.term, t.academicSession);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selectedPastTerm?.term === t.term && selectedPastTerm?.academicSession === t.academicSession ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                  >
+                    {t.term} — {t.academicSession}
+                  </button>
+                ))}
+              </div>
+
+              {isLoadingPastResults ? (
+                <Card className="py-8 text-center text-muted-foreground">Loading past results…</Card>
+              ) : pastSubjects.length === 0 ? (
+                <Card className="py-8 text-center text-muted-foreground">No recorded results for this term.</Card>
+              ) : (() => {
+                const completed = pastSubjects.filter(s => s.percentage !== null);
+                const avg = completed.length > 0
+                  ? completed.reduce((acc: number, s: any) => acc + (s.percentage || 0), 0) / completed.length
+                  : 0;
+                const grade = avg >= pastGradeScheme.gradeAMin ? 'A' : avg >= pastGradeScheme.gradeBMin ? 'B' : avg >= pastGradeScheme.gradeCMin ? 'C' : avg >= pastGradeScheme.gradeDMin ? 'D' : 'F';
+                const gradeColorStyle = { color: getGradeColor(grade) };
+
+                return (
+                  <Card className="p-4 md:p-6">
+                    <div className="flex flex-wrap gap-4 mb-4">
+                      <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Subjects</p>
+                        <p className="text-2xl font-bold">{pastSubjects.length}</p>
+                      </div>
+                      <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Avg Score</p>
+                        <p className="text-2xl font-bold" style={completed.length > 0 ? gradeColorStyle : {}}>{completed.length > 0 ? `${avg.toFixed(0)}%` : "—"}</p>
+                      </div>
+                      <div className="flex-1 min-w-24 bg-muted/20 rounded-xl p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Grade</p>
+                        <p className="text-2xl font-bold" style={completed.length > 0 ? gradeColorStyle : {}}>{completed.length > 0 ? grade : "—"}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {pastSubjects.map((s: any) => {
+                        const pct = s.percentage ?? null;
+                        const g = s.grade ?? null;
+                        const gcStyle = (pct !== null && g) ? { color: getGradeColor(g) } : {};
+                        return (
+                          <div key={s.subjectName} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/20">
+                            <span className="font-medium text-sm">{s.subjectName}</span>
+                            <div className="flex items-center gap-3 text-sm">
+                              {pct !== null ? (
+                                <>
+                                  <span className="font-bold" style={gcStyle}>{s.totalScore}/100</span>
+                                  <span className="font-bold w-6 text-center" style={gcStyle}>{g}</span>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Pending</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "This Term" && <>
       <h2 className="text-lg md:text-xl font-bold mb-3">Available Exams</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {isLoading && <div className="col-span-full text-center py-8">Loading exams...</div>}
@@ -245,6 +379,7 @@ export default function StudentDashboard() {
           </div>
         </div>
       </Modal>
+      </>}
     </DashboardLayout>
   );
 }

@@ -640,6 +640,111 @@ router.get("/:studentId/subject-scores", requireAuth, async (req: Request<Studen
   }
 });
 
+// List distinct past (term, academicSession) pairs for a student — excludes the current term
+router.get("/:studentId/past-terms", requireAuth, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const sessionRole = (req as any).session?.role;
+
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
+  }
+
+  try {
+    const [school] = await db
+      .select({ currentTerm: schoolsTable.currentTerm, currentAcademicSession: schoolsTable.currentAcademicSession })
+      .from(schoolsTable)
+      .where(eq(schoolsTable.code, schoolCode))
+      .limit(1);
+    const currentTerm = school?.currentTerm ?? "First Term";
+    const currentAcademicSession = school?.currentAcademicSession ?? "2025/2026";
+
+    const rows = await db
+      .selectDistinct({ term: subjectScoresTable.term, academicSession: subjectScoresTable.academicSession })
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.schoolCode, schoolCode),
+        )
+      );
+
+    // Exclude the current term/session
+    const past = rows.filter(
+      (r) => !(r.term === currentTerm && r.academicSession === currentAcademicSession)
+    );
+
+    // Sort: newest academic session first, then term order (Third > Second > First)
+    const termOrder: Record<string, number> = { "Third Term": 3, "Second Term": 2, "First Term": 1 };
+    past.sort((a, b) => {
+      const [aYear] = (a.academicSession ?? "").split("/").map(Number);
+      const [bYear] = (b.academicSession ?? "").split("/").map(Number);
+      if (bYear !== aYear) return bYear - aYear;
+      return (termOrder[b.term ?? ""] ?? 0) - (termOrder[a.term ?? ""] ?? 0);
+    });
+
+    res.json(past);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
+// Get subject scores for a student for a specific past term/session
+router.get("/:studentId/past-subject-scores", requireAuth, async (req: Request<StudentParams>, res: Response) => {
+  const { schoolCode, studentId } = req.params;
+  const { term, academicSession } = req.query as { term?: string; academicSession?: string };
+  const sessionRole = (req as any).session?.role;
+
+  if (sessionRole === 'student' && (req as any).session?.userId !== parseInt(studentId)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  if (sessionRole !== 'super_admin' && (req as any).session?.schoolCode !== schoolCode) {
+    return res.status(403).json({ error: "Not authorized for this school" });
+  }
+  if (!term || !academicSession) {
+    return res.status(400).json({ error: "term and academicSession query params required" });
+  }
+
+  try {
+    const scores = await db
+      .select()
+      .from(subjectScoresTable)
+      .where(
+        and(
+          eq(subjectScoresTable.studentId, parseInt(studentId)),
+          eq(subjectScoresTable.schoolCode, schoolCode),
+          eq(subjectScoresTable.term, term),
+          eq(subjectScoresTable.academicSession, academicSession),
+        )
+      );
+
+    const result = scores
+      .filter(s => s.midTermScore !== null || s.classActivityScore !== null || s.examScore !== null)
+      .map(s => ({
+        subjectName: s.subjectName,
+        midTermScore: s.midTermScore,
+        classActivityScore: s.classActivityScore,
+        examScore: s.examScore,
+        totalScore: s.totalScore,
+        percentage: s.percentage,
+        grade: s.grade,
+        teacherComment: s.teacherComment,
+      }));
+
+    res.json(result);
+    return;
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+    return;
+  }
+});
+
 // Save or update subject score for a student
 router.post("/:studentId/subject-scores", requireSchoolStaff, async (req: Request<StudentParams>, res: Response) => {
   const { schoolCode, studentId } = req.params;
