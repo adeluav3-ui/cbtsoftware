@@ -1,6 +1,6 @@
 {
   "name": "@workspace/desktop-app",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "CBT Software Local — Electron desktop wrapper",
   "main": "main.js",
   "private": true,
