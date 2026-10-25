@@ -32,7 +32,28 @@ log(`SERVER_MJS exists=${fs.existsSync(SERVER_MJS)}`);
 let serverProcess = null;
 let mainWindow    = null;
 
+// Kill any process already listening on the given port so stale server instances
+// from a previous session don't intercept waitForServer() before the new one binds.
+function killProcessOnPort(port) {
+  try {
+    // netstat -ano lists PID in column 5; findstr filters to the exact port.
+    // We run in cmd.exe because PowerShell's for-loop syntax differs.
+    execSync(
+      `for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port} ^| findstr LISTENING') do taskkill /F /PID %a 2>nul`,
+      { shell: 'cmd.exe', windowsHide: true, timeout: 5000 }
+    );
+    log(`killProcessOnPort(${port}): done`);
+  } catch (_) {
+    // Either no process was found or taskkill failed — both are fine
+    log(`killProcessOnPort(${port}): no process or already gone`);
+  }
+}
+
 function startServer() {
+  // Kill any leftover server from a previous Electron session before spawning a new one.
+  // Without this, waitForServer() can resolve against the OLD process (which returns 404).
+  killProcessOnPort(PORT);
+
   // Store the database in the user-data directory so it survives app reinstalls/updates.
   const dbPath = path.join(app.getPath('userData'), 'cbt-local.db');
   log(`dbPath=${dbPath}`);
@@ -44,7 +65,7 @@ function startServer() {
   log(`spawning: ${NODE_EXE} ${SERVER_MJS} cwd=${SERVER_DIR}`);
   serverProcess = spawn(NODE_EXE, [SERVER_MJS], {
     cwd:         SERVER_DIR,
-    env:         { ...process.env, SQLITE_PATH: dbPath, FRONTEND_DIR: frontendDir },
+    env:         { ...process.env, SQLITE_PATH: dbPath, FRONTEND_DIR: frontendDir, DEPLOY_MODE: 'local' },
     stdio:       ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
@@ -349,6 +370,15 @@ app.whenReady().then(async () => {
     log('waiting for server...');
     await waitForServer();
     log('server ready');
+
+    // Diagnostic: log exactly what GET / returns before the window opens
+    http.get(`http://localhost:${PORT}/`, (diagRes) => {
+      let body = '';
+      diagRes.on('data', (d) => { body += d; });
+      diagRes.on('end', () => {
+        log(`[diag] GET / → HTTP ${diagRes.statusCode} (${body.length} bytes): ${body.substring(0, 120).replace(/\n/g, '\\n')}`);
+      });
+    }).on('error', (e) => log(`[diag] GET / error: ${e.message}`));
   } catch (err) {
     log(`waitForServer failed: ${err.message}`);
     dialog.showErrorBox(

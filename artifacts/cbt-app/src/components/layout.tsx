@@ -22,7 +22,8 @@ function OfflineBanner() {
     };
   }, []);
 
-  if (!isOffline) return null;
+  // In local mode the server runs on localhost — internet connectivity is irrelevant
+  if (!isOffline || IS_LOCAL) return null;
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-destructive text-white px-4 py-2 rounded-xl shadow-lg font-semibold text-xs z-50 whitespace-nowrap">

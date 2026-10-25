@@ -7,6 +7,7 @@ import { createClient } from "redis";
 import RedisStore from "connect-redis";
 import helmet from "helmet";
 import path from "node:path";
+import fs from "node:fs";
 import router from "./routes/index.js";
 import { getUploadsDir } from "./storage.js";
 import { deviceIdMiddleware } from "./middlewares/device-id.js";
@@ -95,26 +96,36 @@ if (isLocal) {
   const frontendDir = process.env.FRONTEND_DIR ?? path.join(process.cwd(), "public");
   const indexHtmlPath = path.join(frontendDir, "index.html");
 
-  // Log startup info so Electron's log captures the resolved path and whether
-  // the file actually exists — helps diagnose "Cannot GET /" issues.
-  import("node:fs").then(({ existsSync }) => {
+  // Read index.html synchronously at startup and cache it — this completely
+  // avoids any async timing issues with res.sendFile or serve-static in Express 5.
+  let indexHtmlContent: Buffer | null = null;
+  try {
+    indexHtmlContent = fs.readFileSync(indexHtmlPath);
     console.log(`[local] frontendDir=${frontendDir}`);
-    console.log(`[local] index.html exists=${existsSync(indexHtmlPath)}`);
-  });
+    console.log(`[local] index.html cached: ${indexHtmlContent.length} bytes`);
+  } catch (err: unknown) {
+    console.error(`[local] ERROR: could not read index.html: ${err}`);
+  }
 
-  app.use(express.static(frontendDir));
+  const sendIndex = (_req: express.Request, res: express.Response) => {
+    if (indexHtmlContent) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(indexHtmlContent);
+    } else {
+      res.status(500).end("index.html not found — check server startup logs");
+    }
+  };
+
+  // Explicit GET / before express.static so it is never ambiguous
+  app.get("/", sendIndex);
+
+  // Static assets (JS/CSS/fonts/images) — explicit index:false so only app.get('/')
+  // above handles the root, preventing serve-static from intercepting it again
+  app.use(express.static(frontendDir, { index: false }));
 
   // SPA fallback — Wouter handles routing client-side, so all non-API paths
-  // must return index.html.
-  // IMPORTANT: use the callback form of res.sendFile. In Express 5, res.sendFile
-  // returns a Promise; not returning it from the handler causes Express 5 to
-  // consider the middleware "done" synchronously and send "Cannot GET /" before
-  // the async file transfer completes.
-  app.use((_req, res, next) => {
-    res.sendFile(indexHtmlPath, (err) => {
-      if (err && !res.headersSent) next(err);
-    });
-  });
+  // must return index.html
+  app.use(sendIndex);
 }
 
 // Sentry error handler — must come after routes, before any other error middleware
