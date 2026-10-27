@@ -10,6 +10,17 @@ import { eq, and, inArray, sql, count } from "drizzle-orm";
 
 const router = Router({ mergeParams: true });
 
+// SQLite has a default variable limit of 999. Inserting many rows at once
+// (rows × columns) can exceed this, so we batch large inserts.
+async function batchInsert(table: any, rows: any[], batchSize = 50): Promise<void> {
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    if (batch.length > 0) {
+      await db.insert(table).values(batch).onConflictDoNothing();
+    }
+  }
+}
+
 // ── Cloud: export full school data as JSON for local server bootstrap ─────────
 // GET /api/schools/:schoolCode/sync/local-export
 router.get("/local-export", requireAuth, async (req, res) => {
@@ -108,6 +119,7 @@ router.post("/import-school", async (req, res) => {
     // Insert in FK dependency order, preserving cloud IDs so FK references stay valid.
     // onConflictDoNothing is idempotent — re-importing skips rows that already exist.
     // parseDates converts ISO timestamp strings → Date objects for SQLite compatibility.
+    // batchInsert splits large arrays to avoid hitting SQLite's SQL-variable limit (999).
     //
     // Schools: strip the cloud integer id so SQLite auto-assigns a local one.
     // All FK references to schools use school_code TEXT, not the integer PK — so
@@ -115,12 +127,12 @@ router.post("/import-school", async (req, res) => {
     // seed data.
     const { id: _schoolId, ...schoolWithoutId } = school as Record<string, unknown>;
     await db.insert(schoolsTable).values(parseDates(schoolWithoutId) as any).onConflictDoNothing();
-    if (users.length)          await db.insert(usersTable).values(users.map(parseDates) as any).onConflictDoNothing();
-    if (subjects.length)       await db.insert(subjectsTable).values(subjects.map(parseDates) as any).onConflictDoNothing();
-    if (gradingSchemes.length) await db.insert(gradingSchemesTable).values(gradingSchemes.map(parseDates) as any).onConflictDoNothing();
-    if (exams.length)          await db.insert(examsTable).values(exams.map(parseDates) as any).onConflictDoNothing();
-    if (questionGroups.length) await db.insert(questionGroupsTable).values(questionGroups.map(parseDates) as any).onConflictDoNothing();
-    if (questions.length)      await db.insert(questionsTable).values(questions.map(parseDates) as any).onConflictDoNothing();
+    if (users.length)          await batchInsert(usersTable,          users.map(parseDates));
+    if (subjects.length)       await batchInsert(subjectsTable,       subjects.map(parseDates));
+    if (gradingSchemes.length) await batchInsert(gradingSchemesTable, gradingSchemes.map(parseDates));
+    if (exams.length)          await batchInsert(examsTable,          exams.map(parseDates));
+    if (questionGroups.length) await batchInsert(questionGroupsTable, questionGroups.map(parseDates));
+    if (questions.length)      await batchInsert(questionsTable,      questions.map(parseDates));
 
     // Record which school this local server is for — enables license check and time-sync
     await (db.insert(serverConfigTable as any)
