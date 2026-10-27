@@ -690,8 +690,8 @@ export default function SuperAdminDashboard() {
       {/* Add Cloud School Modal */}
       <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add Cloud School">
         <form onSubmit={handleAddSchool} className="space-y-5">
-          <div className="p-4 bg-muted/40 rounded-xl border border-border text-sm text-muted-foreground">
-            For schools using the <span className="font-semibold text-foreground">cloud/online</span> version. You set all credentials here. For offline desktop installations, use <span className="font-semibold text-foreground">New Offline License</span> instead.
+          <div className="p-4 bg-muted/40 rounded-xl border border-border text-sm text-muted-foreground space-y-1">
+            <p>Creates a cloud account for the school. If an offline license was already generated for this school code, entering the same code here will upgrade it to a <span className="font-semibold text-foreground">hybrid school</span> — accessible on both cloud and offline.</p>
           </div>
           {addError && (
             <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-xl text-sm font-semibold border border-destructive/20">

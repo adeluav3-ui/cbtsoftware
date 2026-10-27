@@ -45,10 +45,10 @@ export default function Login() {
 
   useEffect(() => {
     if (!IS_LOCAL) return;
-    fetch(`${API}/setup-status`)
+    fetch(`${API}/setup/status`)
       .then(r => r.json())
-      .then((data: { hasSchool: boolean }) => {
-        setHasSchool(data.hasSchool);
+      .then((data: { activated: boolean }) => {
+        setHasSchool(data.activated);
         setSetupChecked(true);
       })
       .catch(() => {

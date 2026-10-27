@@ -30,7 +30,11 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
       .where(eq(schoolsTable.code, upperCode))
       .limit(1);
 
-    if (existing) {
+    // A stub record (name=null) is created by generate-offline-license for schools
+    // that will use the offline/desktop version. Upgrading the stub to a full cloud
+    // school is allowed so a school can have BOTH cloud and offline access under
+    // the same school code. A full record (name set) blocks creation as before.
+    if (existing && existing.name !== null) {
       return res.status(400).json({ error: "A school with this code already exists" });
     }
 
@@ -49,13 +53,25 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
 
     // Wrap school + admin creation in a transaction so partial failures roll back
     const school = await db.transaction(async (tx) => {
-      const licenseValidUntil = new Date();
-      licenseValidUntil.setMonth(licenseValidUntil.getMonth() + 3);
+      const defaultLicenseValidUntil = new Date();
+      defaultLicenseValidUntil.setMonth(defaultLicenseValidUntil.getMonth() + 3);
 
-      const [newSchool] = await tx
-        .insert(schoolsTable)
-        .values({ code: upperCode, name, licenseValidUntil, maxDevices: maxDevices ? Number(maxDevices) : null })
-        .returning();
+      let updatedSchool;
+      if (existing) {
+        // Upgrade offline-only stub to a hybrid cloud+offline school.
+        // Preserve the offline licenseValidUntil and maxDevices from the stub
+        // so the school's offline license period is not shortened.
+        [updatedSchool] = await tx
+          .update(schoolsTable)
+          .set({ name })
+          .where(eq(schoolsTable.code, upperCode))
+          .returning();
+      } else {
+        [updatedSchool] = await tx
+          .insert(schoolsTable)
+          .values({ code: upperCode, name, licenseValidUntil: defaultLicenseValidUntil, maxDevices: maxDevices ? Number(maxDevices) : null })
+          .returning();
+      }
 
       await tx.insert(usersTable).values({
         username: adminUsername,
@@ -65,7 +81,7 @@ router.post("/create", requireSuperAdmin, async (req: Request, res: Response) =>
         schoolCode: upperCode,
       });
 
-      return newSchool;
+      return updatedSchool;
     });
 
     res.status(201).json(school);

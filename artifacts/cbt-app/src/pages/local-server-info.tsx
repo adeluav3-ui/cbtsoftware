@@ -19,6 +19,7 @@ interface JoinInfo {
 function ImportSchoolSection({ schoolCode }: { schoolCode: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,8 +49,10 @@ function ImportSchoolSection({ schoolCode }: { schoolCode: string }) {
       }
 
       if (!r.ok) throw new Error(data.error ?? "Import failed");
+      // Invalidate all cached queries so the dashboard reflects the imported data immediately
+      await queryClient.invalidateQueries();
       setStatus(
-        `Imported: ${data.imported.users} users, ${data.imported.exams} exams, ${data.imported.questions} questions.`
+        `Imported: ${data.imported.users} users, ${data.imported.exams} exams, ${data.imported.questions} questions. Navigate to the dashboard to see the imported data.`
       );
     } catch (err: any) {
       setStatus(`Error: ${err.message}`);
@@ -340,7 +343,7 @@ export default function LocalServerInfo() {
   const { user } = useAuth();
   const sessionSchoolCode = user?.schoolCode ?? "";
 
-  const [schoolCode, setSchoolCode] = useState("");
+  const [schoolCode, setSchoolCode] = useState(sessionSchoolCode);
 
   return (
     <DashboardLayout allowedRoles={["school_admin", "teacher"]}>
