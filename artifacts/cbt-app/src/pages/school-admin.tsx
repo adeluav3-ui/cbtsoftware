@@ -722,8 +722,8 @@ export default function SchoolAdminDashboard() {
     const LAPI = import.meta.env.VITE_API_URL as string;
     const poll = () =>
       fetch(`${LAPI}/devices`, { credentials: "include" })
-        .then(r => r.ok ? r.json() : [])
-        .then(setLocalDevices)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setLocalDevices(Array.isArray(d) ? d : (d?.devices ?? [])))
         .catch(() => null);
     poll();
     const id = setInterval(poll, 30_000);
