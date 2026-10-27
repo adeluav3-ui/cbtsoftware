@@ -1751,7 +1751,7 @@ export default function SchoolAdminDashboard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => toggleExam({ schoolCode, examId: exam.id })}
+                              onClick={() => toggleExamStatus({ schoolCode, examId: exam.id, isActive: !exam.isActive })}
                               className="text-xs"
                             >
                               {exam.isActive ? <><PowerOff className="w-3 h-3 mr-1" /> Unpublish</> : <><Power className="w-3 h-3 mr-1" /> Publish</>}

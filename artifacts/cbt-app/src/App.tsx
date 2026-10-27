@@ -5,6 +5,7 @@ import { Toaster } from "@/components/feedback";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
 import { LicenseLock } from "@/components/LicenseLock";
+import { ErrorBoundary, PageErrorBoundary } from "@/components/ErrorBoundary";
 
 const IS_LOCAL = import.meta.env.VITE_LOCAL_MODE === "true";
 
@@ -33,25 +34,32 @@ const queryClient = new QueryClient({
   }
 });
 
+function wrap(Component: React.ComponentType<any>) {
+  return (props: any) => (
+    <PageErrorBoundary>
+      <Component {...props} />
+    </PageErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
+      <Route path="/login" component={wrap(Login)} />
 
-      {/* Protected Routes inside Dashboards check their own auth */}
-      <Route path="/super-admin" component={SuperAdminDashboard} />
-      <Route path="/school-admin/:category/:tab" component={SchoolAdminDashboard} />
-      <Route path="/school-admin" component={SchoolAdminDashboard} />
-      <Route path="/teacher" component={TeacherDashboard} />
-      <Route path="/teacher/exams/:examId" component={TeacherExamDetails} />
-      <Route path="/student" component={StudentDashboard} />
-      <Route path="/exam/:examId" component={TakeExam} />
-      <Route path="/teacher/exams/:examId/results" component={ExamResults} />
-      <Route path="/comprehensive-results" component={ComprehensiveResults} />
-      <Route path="/student/results" component={MyResults} />
+      <Route path="/super-admin" component={wrap(SuperAdminDashboard)} />
+      <Route path="/school-admin/:category/:tab" component={wrap(SchoolAdminDashboard)} />
+      <Route path="/school-admin" component={wrap(SchoolAdminDashboard)} />
+      <Route path="/teacher" component={wrap(TeacherDashboard)} />
+      <Route path="/teacher/exams/:examId" component={wrap(TeacherExamDetails)} />
+      <Route path="/student" component={wrap(StudentDashboard)} />
+      <Route path="/exam/:examId" component={wrap(TakeExam)} />
+      <Route path="/teacher/exams/:examId/results" component={wrap(ExamResults)} />
+      <Route path="/comprehensive-results" component={wrap(ComprehensiveResults)} />
+      <Route path="/student/results" component={wrap(MyResults)} />
 
-      <Route path="/local-info" component={LocalServerInfo} />
-      <Route path="/" component={Home} />
+      <Route path="/local-info" component={wrap(LocalServerInfo)} />
+      <Route path="/" component={wrap(Home)} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -88,18 +96,20 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {licenseLock && <LicenseLock error={licenseLock.error} licenseValidUntil={licenseLock.licenseValidUntil} />}
-      <AuthProvider>
-        <LocalStatusBar />
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        {licenseLock && <LicenseLock error={licenseLock.error} licenseValidUntil={licenseLock.licenseValidUntil} />}
+        <AuthProvider>
+          <LocalStatusBar />
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
