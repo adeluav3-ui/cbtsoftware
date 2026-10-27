@@ -77,59 +77,65 @@ router.post("/import-school", async (req, res) => {
     return;
   }
 
-  const [{ c: schoolCount }] = await db.select({ c: count() }).from(schoolsTable);
-  const hasSchool = schoolCount > 0;
+  try {
+    const [{ c: schoolCount }] = await db.select({ c: count() }).from(schoolsTable);
+    const hasSchool = Number(schoolCount) > 0;
 
-  if (hasSchool) {
-    // Re-import: require the school's own admin to be logged in.
-    if (!req.session?.userId) {
-      res.status(401).json({ error: "Not authenticated" });
+    if (hasSchool) {
+      // Re-import: require the school's own admin to be logged in.
+      if (!req.session?.userId) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+      if (req.session.role !== "school_admin") {
+        res.status(403).json({ error: "Only the school admin can re-import school data" });
+        return;
+      }
+    }
+
+    const { schoolCode } = req.params as { schoolCode: string };
+    const { school, users = [], exams = [], questions = [], questionGroups = [], subjects = [], gradingSchemes = [] } = req.body ?? {};
+
+    if (!school?.code) {
+      res.status(400).json({ error: "Invalid export data — missing school.code. Make sure you upload the file downloaded from the cloud admin dashboard." });
       return;
     }
-    if (req.session.role !== "school_admin") {
-      res.status(403).json({ error: "Only the school admin can re-import school data" });
+    if (school.code !== schoolCode) {
+      res.status(400).json({ error: `School code mismatch: the file contains school "${school.code}" but you entered "${schoolCode}". Enter the correct school code in the input field.` });
       return;
     }
+
+    // Insert in FK dependency order, preserving cloud IDs so FK references stay valid.
+    // onConflictDoNothing is idempotent — re-importing skips rows that already exist.
+    // parseDates converts ISO timestamp strings → Date objects for SQLite compatibility.
+    //
+    // Schools: strip the cloud integer id so SQLite auto-assigns a local one.
+    // All FK references to schools use school_code TEXT, not the integer PK — so
+    // the local id value doesn't matter and stripping it avoids PK collisions with
+    // seed data.
+    const { id: _schoolId, ...schoolWithoutId } = school as Record<string, unknown>;
+    await db.insert(schoolsTable).values(parseDates(schoolWithoutId) as any).onConflictDoNothing();
+    if (users.length)          await db.insert(usersTable).values(users.map(parseDates) as any).onConflictDoNothing();
+    if (subjects.length)       await db.insert(subjectsTable).values(subjects.map(parseDates) as any).onConflictDoNothing();
+    if (gradingSchemes.length) await db.insert(gradingSchemesTable).values(gradingSchemes.map(parseDates) as any).onConflictDoNothing();
+    if (exams.length)          await db.insert(examsTable).values(exams.map(parseDates) as any).onConflictDoNothing();
+    if (questionGroups.length) await db.insert(questionGroupsTable).values(questionGroups.map(parseDates) as any).onConflictDoNothing();
+    if (questions.length)      await db.insert(questionsTable).values(questions.map(parseDates) as any).onConflictDoNothing();
+
+    // Record which school this local server is for — enables license check and time-sync
+    await (db.insert(serverConfigTable as any)
+      .values({ key: "school_code", value: schoolCode })
+      .onConflictDoUpdate({ target: (serverConfigTable as any).key, set: { value: schoolCode } }) as unknown as Promise<void>);
+
+    res.json({
+      ok: true,
+      imported: { users: users.length, exams: exams.length, questionGroups: questionGroups.length, questions: questions.length, subjects: subjects.length },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown server error";
+    console.error("[import-school] error:", err);
+    res.status(500).json({ error: `Import failed: ${message}` });
   }
-
-  const { schoolCode } = req.params as { schoolCode: string };
-  const { school, users = [], exams = [], questions = [], questionGroups = [], subjects = [], gradingSchemes = [] } = req.body;
-
-  if (!school?.code) {
-    res.status(400).json({ error: "Invalid export data — missing school.code" });
-    return;
-  }
-  if (school.code !== schoolCode) {
-    res.status(400).json({ error: "School code mismatch" });
-    return;
-  }
-
-  // Insert in FK dependency order, preserving cloud IDs so FK references stay valid.
-  // onConflictDoNothing is idempotent — re-importing skips rows that already exist.
-  // parseDates converts ISO timestamp strings → Date objects for SQLite compatibility.
-  //
-  // Schools: strip the cloud integer id so SQLite auto-assigns a local one.
-  // All FK references to schools use school_code TEXT, not the integer PK — so
-  // the local id value doesn't matter and stripping it avoids PK collisions with
-  // seed data.
-  const { id: _schoolId, ...schoolWithoutId } = school as Record<string, unknown>;
-  await db.insert(schoolsTable).values(parseDates(schoolWithoutId) as any).onConflictDoNothing();
-  if (users.length)          await db.insert(usersTable).values(users.map(parseDates) as any).onConflictDoNothing();
-  if (subjects.length)       await db.insert(subjectsTable).values(subjects.map(parseDates) as any).onConflictDoNothing();
-  if (gradingSchemes.length) await db.insert(gradingSchemesTable).values(gradingSchemes.map(parseDates) as any).onConflictDoNothing();
-  if (exams.length)          await db.insert(examsTable).values(exams.map(parseDates) as any).onConflictDoNothing();
-  if (questionGroups.length) await db.insert(questionGroupsTable).values(questionGroups.map(parseDates) as any).onConflictDoNothing();
-  if (questions.length)      await db.insert(questionsTable).values(questions.map(parseDates) as any).onConflictDoNothing();
-
-  // Record which school this local server is for — enables license check and time-sync
-  await (db.insert(serverConfigTable as any)
-    .values({ key: "school_code", value: schoolCode })
-    .onConflictDoUpdate({ target: (serverConfigTable as any).key, set: { value: schoolCode } }) as unknown as Promise<void>);
-
-  res.json({
-    ok: true,
-    imported: { users: users.length, exams: exams.length, questionGroups: questionGroups.length, questions: questions.length, subjects: subjects.length },
-  });
 });
 
 // ── Cloud: download a license patch file for the local server ────────────────

@@ -85,6 +85,12 @@ app.use(session({
 app.use(deviceIdMiddleware);
 app.use("/api", router);
 
+// Catch-all for unmatched /api/* routes — return JSON 404 instead of falling
+// through to the SPA sendIndex which would return HTML (unparseable as JSON).
+app.use("/api", (_req: express.Request, res: express.Response) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 if (isLocal) {
   startTimeSync();
 }
@@ -130,5 +136,20 @@ if (isLocal) {
 
 // Sentry error handler — must come after routes, before any other error middleware
 Sentry.setupExpressErrorHandler(app);
+
+// JSON error handler — ensures API route errors always return JSON, never HTML.
+// Without this, Express's default error handler sends an HTML page in dev mode
+// which breaks any caller that tries to parse the response as JSON.
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[error]", req.method, req.path, err.message);
+  if (!res.headersSent) {
+    const status = (err as any).status ?? (err as any).statusCode ?? 500;
+    if (req.path.startsWith("/api/") || req.path === "/api") {
+      res.status(status).json({ error: err.message ?? "Internal server error" });
+    } else {
+      res.status(status).end(err.message ?? "Internal server error");
+    }
+  }
+});
 
 export default app;

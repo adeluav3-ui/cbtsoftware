@@ -26,14 +26,27 @@ function ImportSchoolSection({ schoolCode }: { schoolCode: string }) {
     setBusy(true);
     setStatus(null);
     try {
-      const payload = JSON.parse(await file.text());
+      let payload: unknown;
+      try {
+        payload = JSON.parse(await file.text());
+      } catch {
+        throw new Error("The selected file is not a valid JSON export. Please download the export file from the cloud admin dashboard (School Admin → Local Server → Download School Data).");
+      }
+
       const r = await fetch(`${API}/schools/${schoolCode}/sync/import-school`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
       });
-      const data = await r.json();
+
+      let data: any;
+      try {
+        data = await r.json();
+      } catch {
+        throw new Error(`Server returned an unexpected response (status ${r.status}). Check that the local server is running correctly.`);
+      }
+
       if (!r.ok) throw new Error(data.error ?? "Import failed");
       setStatus(
         `Imported: ${data.imported.users} users, ${data.imported.exams} exams, ${data.imported.questions} questions.`
