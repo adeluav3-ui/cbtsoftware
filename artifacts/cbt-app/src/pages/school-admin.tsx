@@ -17,7 +17,7 @@ const SLUG_TO_TAB: Record<string, string> = {
   "local-server":    "Local Server",
 };
 import { useAuth } from "@/lib/auth";
-import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
+import { useListTeachers, useCreateTeacher, useDeleteTeacher, useListStudents, useCreateStudent, useDeleteStudent, useListResults, useStartNewSession, usePreviewNewSession, useListExams, useToggleExamStatus, getListExamsQueryKey, useStudentCredentials } from "@workspace/api-client-react";
 import { Card, Button, Modal, Input, Label, Badge, Select, PasswordInput } from "@/components/ui-elements";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListTeachersQueryKey, getListStudentsQueryKey } from "@workspace/api-client-react";
@@ -90,6 +90,7 @@ export default function SchoolAdminDashboard() {
   const [resExpandedGroup, setResExpandedGroup] = useState<{ class: string; subject: string; type: string } | null>(null);
 
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
+  const [nsConfirmStep, setNsConfirmStep] = useState(false);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
   const [academicSessionModalOpen, setAcademicSessionModalOpen] = useState(false);
   const [newAcademicSession, setNewAcademicSession] = useState("2025/2026");
@@ -182,9 +183,12 @@ export default function SchoolAdminDashboard() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey(schoolCode, classFilter) });
         setSessionModalOpen(false);
+        setNsConfirmStep(false);
       }
     }
   });
+
+  const { data: nsPreview, isLoading: isNsPreviewLoading } = usePreviewNewSession(schoolCode, isSessionModalOpen);
 
   // Update academic session
   const updateAcademicSession = async () => {
@@ -2460,7 +2464,7 @@ export default function SchoolAdminDashboard() {
       </Modal>
 
       {/* New Session Modal */}
-      <Modal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Start New Academic Session">
+      <Modal isOpen={isSessionModalOpen} onClose={() => { setSessionModalOpen(false); setNsConfirmStep(false); }} title="Start New Academic Session">
         <div className="space-y-4 text-muted-foreground">
           <div className="border border-border rounded-lg p-4 space-y-2">
             <Label className="text-foreground">Next Term Begins</Label>
@@ -2483,12 +2487,59 @@ export default function SchoolAdminDashboard() {
             )}
           </div>
           <hr className="border-border" />
-          <p>Are you sure you want to start a new academic session?</p>
-          <p className="text-destructive font-bold">This will automatically promote all students to their next class (e.g. KG1 → KG2, Nursery 2 → Pry 1, JSS1 → JSS2). SSS3 students will be graduated.</p>
-          <div className="flex justify-end pt-2">
-            <Button variant="ghost" onClick={() => setSessionModalOpen(false)} className="mr-3">Cancel</Button>
-            <Button variant="destructive" onClick={() => newSession({ schoolCode })} isLoading={isNSPending}>Yes, Promote Students</Button>
-          </div>
+
+          {/* Promotion preview */}
+          {isNsPreviewLoading ? (
+            <p className="text-sm text-center py-2">Loading promotion preview…</p>
+          ) : nsPreview ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                Session change: <span className="font-bold">{nsPreview.currentSession}</span> → <span className="font-bold text-primary">{nsPreview.newSession}</span>
+              </p>
+              <div className="border border-border rounded-md overflow-hidden text-xs">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">Class</th>
+                      <th className="text-left px-3 py-2 font-medium">→ Next Class</th>
+                      <th className="text-right px-3 py-2 font-medium text-green-600">Promoting</th>
+                      <th className="text-right px-3 py-2 font-medium text-amber-600">Retained</th>
+                      <th className="text-right px-3 py-2 font-medium text-destructive">Graduating</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nsPreview.classes.map((row) => (
+                      <tr key={row.class} className="border-t border-border">
+                        <td className="px-3 py-2 font-medium text-foreground">{row.class}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{row.graduating > 0 ? "— Graduated" : row.nextClass ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-green-600">{row.promoting > 0 ? row.promoting : "—"}</td>
+                        <td className="px-3 py-2 text-right text-amber-600">{row.retaining > 0 ? row.retaining : "—"}</td>
+                        <td className="px-3 py-2 text-right text-destructive">{row.graduating > 0 ? row.graduating : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">Students with &lt;50% average are retained. JSS3 students are always promoted (WAEC year). SSS3 students are graduated and their accounts removed.</p>
+            </div>
+          ) : null}
+
+          {!nsConfirmStep ? (
+            <div className="flex justify-end pt-2">
+              <Button variant="ghost" onClick={() => setSessionModalOpen(false)} className="mr-3">Cancel</Button>
+              <Button variant="outline" onClick={() => setNsConfirmStep(true)} disabled={isNsPreviewLoading || !nsPreview}>
+                Review &amp; Confirm →
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-destructive font-bold text-sm">⚠ This action cannot be undone. All students will be moved to the class shown above. SSS3 students will be permanently removed.</p>
+              <div className="flex justify-end pt-1">
+                <Button variant="ghost" onClick={() => setNsConfirmStep(false)} className="mr-3">← Back</Button>
+                <Button variant="destructive" onClick={() => newSession({ schoolCode })} isLoading={isNSPending}>Yes, Start New Session</Button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

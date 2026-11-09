@@ -196,6 +196,18 @@ export const api = {
             });
             return response.json();
         },
+
+        previewNewSession: async (schoolCode: string): Promise<{
+            currentSession: string;
+            currentTerm: string;
+            newSession: string;
+            classes: { class: string; nextClass: string | null; promoting: number; retaining: number; graduating: number }[];
+        }> => {
+            const response = await fetch(`${API_BASE_URL}/schools/${schoolCode}/new-session-preview`, {
+                credentials: 'include',
+            });
+            return response.json();
+        },
     },
 
     teachers: {
@@ -498,6 +510,15 @@ export function useStartNewSession(options?: MutationOptions) {
             options?.mutation?.onSuccess?.();
         },
         onError: options?.mutation?.onError,
+    });
+}
+
+export function usePreviewNewSession(schoolCode: string, enabled: boolean) {
+    return useQuery({
+        queryKey: ['newSessionPreview', schoolCode],
+        queryFn: () => api.schools.previewNewSession(schoolCode),
+        enabled: !!schoolCode && enabled,
+        staleTime: 0,
     });
 }
 

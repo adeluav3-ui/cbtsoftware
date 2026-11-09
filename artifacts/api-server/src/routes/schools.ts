@@ -964,6 +964,90 @@ router.post("/:schoolCode/next-term-begins", requireSchoolStaff, async (req: Req
   }
 });
 
+// Shared helper: compute promotion plan without committing any DB changes
+async function computePromotionPlan(schoolCodeStr: string) {
+  const classOrder = ["Pre-School", "KG1", "KG2", "Nursery 1", "Nursery 2", "Pry 1", "Pry 2", "Pry 3", "Pry 4", "Pry 5", "JSS1", "JSS2", "JSS3", "SSS1", "SSS2", "SSS3"];
+
+  const [school] = await db.select().from(schoolsTable).where(eq(schoolsTable.code, schoolCodeStr)).limit(1);
+
+  const prevTerm = school?.currentTerm ?? "Third Term";
+  const prevSession = school?.currentAcademicSession ?? "2025/2026";
+
+  let newSession = "2026/2027";
+  if (school?.currentAcademicSession) {
+    const [startYear] = school.currentAcademicSession.split("/");
+    const nextYear = parseInt(startYear) + 1;
+    newSession = `${nextYear}/${nextYear + 1}`;
+  }
+
+  const students = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.schoolCode, schoolCodeStr), eq(usersTable.role, "student")));
+
+  const prevScores = await db
+    .select({ studentId: subjectScoresTable.studentId, percentage: subjectScoresTable.percentage })
+    .from(subjectScoresTable)
+    .where(and(
+      eq(subjectScoresTable.schoolCode, schoolCodeStr),
+      eq(subjectScoresTable.term, prevTerm),
+      eq(subjectScoresTable.academicSession, prevSession),
+    ));
+
+  const accumulator = new Map<number, { sum: number; count: number }>();
+  for (const s of prevScores) {
+    if (s.percentage !== null) {
+      const curr = accumulator.get(s.studentId) ?? { sum: 0, count: 0 };
+      accumulator.set(s.studentId, { sum: curr.sum + s.percentage, count: curr.count + 1 });
+    }
+  }
+  const avgMap = new Map<number, number>();
+  for (const [id, { sum, count }] of accumulator) {
+    avgMap.set(id, count > 0 ? sum / count : 0);
+  }
+
+  // Build per-class breakdown
+  const breakdown = new Map<string, { promoting: number; retaining: number; graduating: number }>();
+  for (const student of students) {
+    const idx = classOrder.indexOf(student.class ?? "");
+    if (idx === -1) continue;
+    const entry = breakdown.get(student.class!) ?? { promoting: 0, retaining: 0, graduating: 0 };
+    if (idx === classOrder.length - 1) {
+      entry.graduating++;
+    } else {
+      const avg = avgMap.get(student.id);
+      if (student.class === "JSS3" || avg === undefined || avg >= 50) {
+        entry.promoting++;
+      } else {
+        entry.retaining++;
+      }
+    }
+    breakdown.set(student.class!, entry);
+  }
+
+  const classes = Array.from(breakdown.entries())
+    .map(([cls, counts]) => ({
+      class: cls,
+      nextClass: classOrder[classOrder.indexOf(cls) + 1] ?? null,
+      ...counts,
+    }))
+    .sort((a, b) => classOrder.indexOf(a.class) - classOrder.indexOf(b.class));
+
+  return { currentSession: prevSession, currentTerm: prevTerm, newSession, classes };
+}
+
+// Preview new session promotion plan without committing
+router.get("/:schoolCode/new-session-preview", requireSchoolAdmin, async (req: Request, res: Response) => {
+  const schoolCodeStr = String(req.params.schoolCode);
+  try {
+    const plan = await computePromotionPlan(schoolCodeStr);
+    res.json(plan);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Start new session: advance academic session and promote all students one class
 router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request, res: Response) => {
   const { schoolCode } = req.params;
@@ -1049,11 +1133,8 @@ router.post("/:schoolCode/new-session", requireSchoolAdmin, async (req: Request,
         archived++;
       } else {
         const avg = avgMap.get(student.id);
-        // JSS3 sits WAEC (external exam) — no internal scores, always promote across all schools
-        // TMGS2026 one-time: didn't use result system in 2025/2026, promote all this transition only
-        const forcePromote =
-          student.class === "JSS3" ||
-          (schoolCodeStr === "TMGS2026" && prevSession === "2025/2026");
+        // JSS3 sits WAEC (external exam) — no internal scores, always promote
+        const forcePromote = student.class === "JSS3";
         if (!forcePromote && avg !== undefined && avg < 50) {
           retained++;
         } else {
