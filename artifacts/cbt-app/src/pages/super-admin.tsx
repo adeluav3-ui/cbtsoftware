@@ -146,7 +146,7 @@ export default function SuperAdminDashboard() {
   const [olError, setOlError] = useState("");
   const [isOlGenerating, setIsOlGenerating] = useState(false);
 
-  // Q&A tab (NEW-1004)
+  // Q&A tab (NEW-1001)
   const [activeTab, setActiveTab] = useState<"schools" | "qa">("schools");
   const [qaExams, setQaExams] = useState<QaExam[]>([]);
   const [qaExamsLoading, setQaExamsLoading] = useState(false);
@@ -496,7 +496,7 @@ export default function SuperAdminDashboard() {
     setQaExamsLoading(true);
     setQaExamsError("");
     try {
-      const res = await fetch(`${API}/schools/NEW-1004/exams`, { credentials: "include" });
+      const res = await fetch(`${API}/schools/NEW-1001/exams`, { credentials: "include" });
       if (res.ok) {
         setQaExams(await res.json());
       } else {
@@ -514,7 +514,7 @@ export default function SuperAdminDashboard() {
     setQaQuestionsLoading(true);
     setQaQuestions([]);
     try {
-      const res = await fetch(`${API}/schools/NEW-1004/exams/${exam.id}`, { credentials: "include" });
+      const res = await fetch(`${API}/schools/NEW-1001/exams/${exam.id}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setQaQuestions(data.questions ?? []);
@@ -608,7 +608,7 @@ export default function SuperAdminDashboard() {
           onClick={() => { setActiveTab("qa"); if (qaExams.length === 0 && !qaExamsError) fetchQaExams(); }}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "qa" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          <FileText className="w-4 h-4" /> NEW-1004 Q&A
+          <FileText className="w-4 h-4" /> NEW-1001 Q&A
         </button>
       </div>
 
@@ -764,7 +764,7 @@ export default function SuperAdminDashboard() {
             <Card className="p-0 overflow-hidden">
               <div className="px-4 py-3 border-b border-border bg-muted/30">
                 <h2 className="font-semibold text-sm">Exams & Tests</h2>
-                <p className="text-xs text-muted-foreground font-mono">NEW-1004</p>
+                <p className="text-xs text-muted-foreground font-mono">NEW-1001</p>
               </div>
               {qaExamsLoading ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">Loading exams…</div>
@@ -776,7 +776,7 @@ export default function SuperAdminDashboard() {
               ) : qaExams.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  No exams found for NEW-1004.
+                  No exams found for NEW-1001.
                 </div>
               ) : (
                 <div className="max-h-[72vh] overflow-y-auto divide-y divide-border/50">
