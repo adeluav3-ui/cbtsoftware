@@ -150,6 +150,7 @@ export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState<"schools" | "qa">("schools");
   const [qaExams, setQaExams] = useState<QaExam[]>([]);
   const [qaExamsLoading, setQaExamsLoading] = useState(false);
+  const [qaExamsError, setQaExamsError] = useState("");
   const [qaSelectedExam, setQaSelectedExam] = useState<QaExam | null>(null);
   const [qaQuestions, setQaQuestions] = useState<QaGroupedItem[]>([]);
   const [qaQuestionsLoading, setQaQuestionsLoading] = useState(false);
@@ -492,12 +493,19 @@ export default function SuperAdminDashboard() {
   const overview = detailSchool ? overviewCache[detailSchool.code] : null;
 
   const fetchQaExams = async () => {
-    if (qaExams.length > 0) return;
     setQaExamsLoading(true);
+    setQaExamsError("");
     try {
       const res = await fetch(`${API}/schools/NEW-1004/exams`, { credentials: "include" });
-      if (res.ok) setQaExams(await res.json());
-    } catch {}
+      if (res.ok) {
+        setQaExams(await res.json());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setQaExamsError(`HTTP ${res.status}: ${data.error || res.statusText}`);
+      }
+    } catch (e: any) {
+      setQaExamsError(`Network error: ${e?.message ?? "unknown"}`);
+    }
     setQaExamsLoading(false);
   };
 
@@ -597,7 +605,7 @@ export default function SuperAdminDashboard() {
           <Building className="w-4 h-4" /> Schools
         </button>
         <button
-          onClick={() => { setActiveTab("qa"); fetchQaExams(); }}
+          onClick={() => { setActiveTab("qa"); if (qaExams.length === 0 && !qaExamsError) fetchQaExams(); }}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "qa" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           <FileText className="w-4 h-4" /> NEW-1004 Q&A
@@ -760,10 +768,15 @@ export default function SuperAdminDashboard() {
               </div>
               {qaExamsLoading ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">Loading exams…</div>
+              ) : qaExamsError ? (
+                <div className="p-6 text-center space-y-3">
+                  <p className="text-xs text-destructive font-medium">{qaExamsError}</p>
+                  <button onClick={fetchQaExams} className="text-xs px-3 py-1.5 rounded-lg border border-border bg-muted hover:bg-muted/80 font-medium transition-colors">Retry</button>
+                </div>
               ) : qaExams.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  No exams found.
+                  No exams found for NEW-1004.
                 </div>
               ) : (
                 <div className="max-h-[72vh] overflow-y-auto divide-y divide-border/50">
