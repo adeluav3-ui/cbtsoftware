@@ -5,7 +5,7 @@ import { Card, Button, Modal, Input, Label, Badge, PasswordInput } from "@/compo
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSchoolsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck, Download } from "lucide-react";
+import { Building, Edit2, Plus, Trash2, Eye, Users, GraduationCap, BookOpen, Shield, Key, AlertTriangle, X, ShieldOff, ShieldCheck, Download, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/feedback";
 
 const API = import.meta.env.VITE_API_URL as string;
@@ -39,6 +39,43 @@ interface School {
   licenseValidUntil?: string | null;
   maxDevices?: number | null;
   pureCbtMode?: boolean;
+}
+
+interface QaExam {
+  id: number;
+  title: string;
+  subject: string;
+  class: string;
+  durationMinutes: number;
+  isActive: boolean;
+  assessmentType: string | null;
+  term: string | null;
+  createdAt: string | null;
+  questionCount: number;
+}
+
+interface QaQuestion {
+  id: number;
+  text: string;
+  optionA: string | null;
+  optionB: string | null;
+  optionC: string | null;
+  optionD: string | null;
+  correctOption: string;
+  questionType: string | null;
+  correctAnswerText: string | null;
+  imageUrl: string | null;
+  groupOrder: number | null;
+  questionGroupId: number | null;
+}
+
+interface QaGroupedItem {
+  isGroup: boolean;
+  question?: QaQuestion;
+  groupId?: number;
+  groupTitle?: string | null;
+  groupText?: string | null;
+  questions?: QaQuestion[];
 }
 
 export default function SuperAdminDashboard() {
@@ -108,6 +145,14 @@ export default function SuperAdminDashboard() {
   const [olMaxDevices, setOlMaxDevices] = useState("");
   const [olError, setOlError] = useState("");
   const [isOlGenerating, setIsOlGenerating] = useState(false);
+
+  // Q&A tab (NEW-1004)
+  const [activeTab, setActiveTab] = useState<"schools" | "qa">("schools");
+  const [qaExams, setQaExams] = useState<QaExam[]>([]);
+  const [qaExamsLoading, setQaExamsLoading] = useState(false);
+  const [qaSelectedExam, setQaSelectedExam] = useState<QaExam | null>(null);
+  const [qaQuestions, setQaQuestions] = useState<QaGroupedItem[]>([]);
+  const [qaQuestionsLoading, setQaQuestionsLoading] = useState(false);
 
   const handleUpdateMaxDevices = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -446,6 +491,83 @@ export default function SuperAdminDashboard() {
 
   const overview = detailSchool ? overviewCache[detailSchool.code] : null;
 
+  const fetchQaExams = async () => {
+    if (qaExams.length > 0) return;
+    setQaExamsLoading(true);
+    try {
+      const res = await fetch(`${API}/schools/NEW-1004/exams`, { credentials: "include" });
+      if (res.ok) setQaExams(await res.json());
+    } catch {}
+    setQaExamsLoading(false);
+  };
+
+  const fetchQaQuestions = async (exam: QaExam) => {
+    setQaSelectedExam(exam);
+    setQaQuestionsLoading(true);
+    setQaQuestions([]);
+    try {
+      const res = await fetch(`${API}/schools/NEW-1004/exams/${exam.id}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setQaQuestions(data.questions ?? []);
+      }
+    } catch {}
+    setQaQuestionsLoading(false);
+  };
+
+  const renderQaQuestion = (q: QaQuestion, num: number) => {
+    const isSubjective = q.questionType === "subjective";
+    let acceptedAnswers: string[] = [];
+    if (isSubjective && q.correctAnswerText) {
+      try { acceptedAnswers = JSON.parse(q.correctAnswerText); } catch {}
+    }
+    const opts = [
+      { k: "A", t: q.optionA }, { k: "B", t: q.optionB },
+      { k: "C", t: q.optionC }, { k: "D", t: q.optionD },
+    ].filter(o => o.t);
+
+    return (
+      <div key={q.id} className="p-4 bg-card rounded-xl border border-border">
+        <div className="flex gap-3">
+          <span className="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium leading-relaxed">{q.text}</p>
+            {q.imageUrl && (
+              <img src={q.imageUrl} alt="" className="mt-2 max-h-48 rounded-lg object-contain" />
+            )}
+            {isSubjective ? (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Accepted Answers</p>
+                {acceptedAnswers.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {acceptedAnswers.map((ans, i) => (
+                      <span key={i} className="px-3 py-1 rounded-full bg-secondary/10 text-secondary text-sm font-medium border border-secondary/20">{ans}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">No accepted answers configured.</span>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3 space-y-1.5">
+                {opts.map(o => (
+                  <div
+                    key={o.k}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm ${o.k === q.correctOption ? "bg-secondary/10 border border-secondary/40 font-semibold text-secondary" : "bg-muted/30 border border-transparent text-muted-foreground"}`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${o.k === q.correctOption ? "bg-secondary text-white" : "bg-muted text-muted-foreground"}`}>{o.k}</span>
+                    <span className="flex-1">{o.t}</span>
+                    {o.k === q.correctOption && <span className="text-xs text-secondary ml-auto">✓ correct</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout allowedRoles={["super_admin"]}>
       <div className="flex justify-between items-center mb-8">
@@ -466,6 +588,24 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
+      {/* Tab Switcher */}
+      <div className="flex border-b border-border mb-6">
+        <button
+          onClick={() => setActiveTab("schools")}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "schools" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          <Building className="w-4 h-4" /> Schools
+        </button>
+        <button
+          onClick={() => { setActiveTab("qa"); fetchQaExams(); }}
+          className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === "qa" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          <FileText className="w-4 h-4" /> NEW-1004 Q&A
+        </button>
+      </div>
+
+      {activeTab === "schools" && (
+      <>
       <Card className="p-0 overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-muted-foreground">Loading schools...</div>
@@ -606,6 +746,96 @@ export default function SuperAdminDashboard() {
           </Card>
         )}
       </div>
+      </>
+      )}
+
+      {activeTab === "qa" && (
+        <div className="flex gap-6 items-start">
+          {/* Exam list sidebar */}
+          <div className="w-72 shrink-0">
+            <Card className="p-0 overflow-hidden">
+              <div className="px-4 py-3 border-b border-border bg-muted/30">
+                <h2 className="font-semibold text-sm">Exams & Tests</h2>
+                <p className="text-xs text-muted-foreground font-mono">NEW-1004</p>
+              </div>
+              {qaExamsLoading ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">Loading exams…</div>
+              ) : qaExams.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  No exams found.
+                </div>
+              ) : (
+                <div className="max-h-[72vh] overflow-y-auto divide-y divide-border/50">
+                  {qaExams.map(exam => (
+                    <button
+                      key={exam.id}
+                      onClick={() => fetchQaQuestions(exam)}
+                      className={`w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors ${qaSelectedExam?.id === exam.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                    >
+                      <p className="font-medium text-sm leading-tight">{exam.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{exam.class} · {exam.subject}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Badge variant={exam.isActive ? "success" : "default"}>{exam.isActive ? "Active" : "Inactive"}</Badge>
+                        <span className="text-xs text-muted-foreground">{exam.questionCount}q</span>
+                        {exam.assessmentType && <span className="text-xs text-muted-foreground capitalize">{exam.assessmentType}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Questions panel */}
+          <div className="flex-1 min-w-0">
+            {!qaSelectedExam ? (
+              <Card className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center">
+                <FileText className="w-12 h-12 mb-4 opacity-20" />
+                <p className="text-sm">Select an exam from the list to view its questions and answers.</p>
+              </Card>
+            ) : qaQuestionsLoading ? (
+              <Card className="p-12 text-center text-sm text-muted-foreground">Loading questions…</Card>
+            ) : (
+              <div>
+                <div className="mb-5">
+                  <h2 className="text-xl font-bold">{qaSelectedExam.title}</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {qaSelectedExam.class} · {qaSelectedExam.subject}
+                    {qaSelectedExam.term && ` · ${qaSelectedExam.term}`}
+                    {qaSelectedExam.assessmentType && ` · ${qaSelectedExam.assessmentType}`}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {(() => {
+                    let n = 0;
+                    return qaQuestions.map((item, idx) => {
+                      if (!item.isGroup) {
+                        n++;
+                        return renderQaQuestion(item.question!, n);
+                      }
+                      const groupContent = (
+                        <Card key={`g${item.groupId ?? idx}`} className="p-0 overflow-hidden">
+                          {(item.groupTitle || item.groupText) && (
+                            <div className="px-5 py-3 bg-muted/30 border-b border-border">
+                              {item.groupTitle && <p className="font-semibold text-sm">{item.groupTitle}</p>}
+                              {item.groupText && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{item.groupText}</p>}
+                            </div>
+                          )}
+                          <div className="p-3 space-y-3">
+                            {item.questions!.map(q => { n++; return renderQaQuestion(q, n); })}
+                          </div>
+                        </Card>
+                      );
+                      return groupContent;
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Edit School Name Modal */}
       <Modal isOpen={isAssignOpen} onClose={() => setIsAssignOpen(false)} title="Edit School Name">
