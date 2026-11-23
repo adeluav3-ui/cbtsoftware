@@ -32,6 +32,7 @@ export default function TakeExam() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [resultScore, setResultScore] = useState<{ score: number, total: number, pct: number } | null>(null);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   // Ref-based guard so double-submit is blocked even before the isFinished state re-render
@@ -168,10 +169,10 @@ export default function TakeExam() {
         // Invalidate the results cache so the dashboard shows the new score immediately
         queryClient.invalidateQueries({ queryKey: ['results', schoolCode] });
       },
-      onError: (err) => {
+      onError: (err: any) => {
         console.error("Submit failed:", err);
         submittedRef.current = false;
-        setIsFinished(false);
+        setSubmitError(err?.message ?? "Submission failed. Please inform your teacher.");
       }
     });
   };
@@ -349,9 +350,16 @@ export default function TakeExam() {
         </div>
       </main>
 
-      <Modal isOpen={isFinished} onClose={() => { }} title="Exam Completed">
+      <Modal isOpen={isFinished || !!submitError} onClose={() => { }} title="Exam Completed">
         <div className="text-center py-6">
-          {isSubmitting ? (
+          {submitError ? (
+            <div>
+              <p className="text-destructive font-semibold mb-2">Submission Error</p>
+              <p className="text-sm text-muted-foreground mb-4">{submitError}</p>
+              <p className="text-xs text-muted-foreground mb-4">Please inform your teacher or try again.</p>
+              <Button size="sm" variant="outline" onClick={() => { setSubmitError(null); setIsFinished(false); }}>Try Again</Button>
+            </div>
+          ) : isSubmitting ? (
             <div className="text-base animate-pulse">Calculating Results...</div>
           ) : resultScore ? (
             <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}>

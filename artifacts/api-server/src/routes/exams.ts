@@ -1172,35 +1172,39 @@ router.post("/:examId/submit", requireAuth, async (req: Request<ExamParams>, res
 
       if (questions.length > 0) {
         type Question = typeof questionsTable.$inferSelect;
-        await tx.insert(resultAnswersTable).values(
-          questions.map((q: Question) => {
-            const studentAnswer = answers[q.id.toString()] ?? null;
-            if (q.questionType === "subjective") {
-              const normalized = (studentAnswer ?? "").trim().toLowerCase();
-              let acceptedAnswers: string[] = [];
-              try { acceptedAnswers = JSON.parse(q.correctAnswerText ?? "[]"); } catch {}
-              const isCorrect = normalized
-                ? acceptedAnswers.some((a: string) => a.trim().toLowerCase() === normalized)
-                : false;
-              return {
-                resultId: inserted.id, questionId: q.id, questionText: q.text,
-                optionA: "", optionB: "", optionC: "", optionD: "",
-                correctOption: q.correctAnswerText ?? "[]",
-                selectedOption: studentAnswer,
-                isCorrect,
-                schoolCode: schoolCodeStr,
-              };
-            }
+        const answerRows = questions.map((q: Question) => {
+          const studentAnswer = answers[q.id.toString()] ?? null;
+          if (q.questionType === "subjective") {
+            const normalized = (studentAnswer ?? "").trim().toLowerCase();
+            let acceptedAnswers: string[] = [];
+            try { acceptedAnswers = JSON.parse(q.correctAnswerText ?? "[]"); } catch {}
+            const isCorrect = normalized
+              ? acceptedAnswers.some((a: string) => a.trim().toLowerCase() === normalized)
+              : false;
             return {
               resultId: inserted.id, questionId: q.id, questionText: q.text,
-              optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD,
-              correctOption: q.correctOption,
+              optionA: "", optionB: "", optionC: "", optionD: "",
+              correctOption: q.correctAnswerText ?? "[]",
               selectedOption: studentAnswer,
-              isCorrect: studentAnswer === q.correctOption,
+              isCorrect,
               schoolCode: schoolCodeStr,
             };
-          })
-        );
+          }
+          return {
+            resultId: inserted.id, questionId: q.id, questionText: q.text,
+            optionA: q.optionA, optionB: q.optionB, optionC: q.optionC, optionD: q.optionD,
+            correctOption: q.correctOption,
+            selectedOption: studentAnswer,
+            isCorrect: studentAnswer === q.correctOption,
+            schoolCode: schoolCodeStr,
+          };
+        });
+        // SQLite has a 999-variable limit. resultAnswersTable has 11 columns per row,
+        // so inserting 91+ rows at once would exceed it. Batch at 50 rows (550 vars).
+        const BATCH = 50;
+        for (let i = 0; i < answerRows.length; i += BATCH) {
+          await tx.insert(resultAnswersTable).values(answerRows.slice(i, i + BATCH));
+        }
       }
 
       await tx
